@@ -165,8 +165,8 @@ export function HistoryTable() {
       </div> */}
 
       {history.length === 0 ? (
-        <div className="text-center py-12 px-5 border-2 border-dashed border-gray-200 rounded-md text-muted-foreground flex-1 flex items-center justify-center">
-          No generation history yet. Generate your first audio to see it here.
+        <div className="text-center py-12 px-5 border-2 border-dashed mb-5 border-muted rounded-md text-muted-foreground flex-1 flex items-center justify-center">
+          No voice generations, yet...
         </div>
       ) : (
         <>
