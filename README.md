@@ -31,8 +31,8 @@
 Voice AI is exploding, but most tools are either cloud-locked, expensive, or a nightmare to set up. Voicebox is different:
 
 - **100% Local** — Your voice data never leaves your machine
-- **Lightweight** — ~50MB app, runs on modest hardware
-- **Fast** — Sub-2-second generation with caching
+- **Lightweight** — No bloated Electron, native Tauri performance
+- **Fast** — Near-instant on CUDA, optimized for Apple Silicon
 - **Flexible** — Use the app, integrate the API, or both
 - **Open Source** — No subscriptions, no limits, no lock-in
 
