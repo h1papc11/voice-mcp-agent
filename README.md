@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://voicebox.sh">Website</a> •
+  <a href="https://voicebox.sh">voicebox.sh</a> •
   <a href="#download">Download</a> •
   <a href="#features">Features</a> •
   <a href="#api">API</a> •
