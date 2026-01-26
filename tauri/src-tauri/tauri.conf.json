@@ -24,7 +24,8 @@
     "macOS": {
       "frameworks": [],
       "minimumSystemVersion": "11.0",
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "entitlements": "Entitlements.plist"
     },
     "resources": {
       "gen/Assets.car": "./",

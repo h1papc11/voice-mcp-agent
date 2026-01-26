@@ -31,10 +31,21 @@ async fn start_server(
     std::fs::create_dir_all(&data_dir)
         .map_err(|e| format!("Failed to create data dir: {}", e))?;
 
+    println!("=================================================================");
+    println!("Starting voicebox-server sidecar");
+    println!("Data directory: {:?}", data_dir);
+    println!("Remote mode: {}", remote.unwrap_or(false));
+
     let mut sidecar = app
         .shell()
         .sidecar("voicebox-server")
-        .map_err(|e| format!("Failed to get sidecar: {}", e))?;
+        .map_err(|e| {
+            eprintln!("Failed to get sidecar: {}", e);
+            eprintln!("This usually means the binary is not bundled correctly or doesn't have execute permissions");
+            format!("Failed to get sidecar: {}", e)
+        })?;
+
+    println!("Sidecar command created successfully");
 
     // Pass data directory to Python server
     sidecar = sidecar.args([
@@ -48,9 +59,21 @@ async fn start_server(
         sidecar = sidecar.args(["--host", "0.0.0.0"]);
     }
 
+    println!("Spawning server process...");
     let (mut rx, child) = sidecar
         .spawn()
-        .map_err(|e| format!("Failed to spawn: {}", e))?;
+        .map_err(|e| {
+            eprintln!("Failed to spawn server process: {}", e);
+            eprintln!("This could be due to:");
+            eprintln!("  - Missing or corrupted binary");
+            eprintln!("  - Missing execute permissions");
+            eprintln!("  - Code signing issues on macOS");
+            eprintln!("  - Missing dependencies");
+            format!("Failed to spawn: {}", e)
+        })?;
+
+    println!("Server process spawned, waiting for ready signal...");
+    println!("=================================================================");
 
     // Store child process
     *state.child.lock().unwrap() = Some(child);
@@ -58,10 +81,18 @@ async fn start_server(
     // Wait for server to be ready by listening for startup log
     let timeout = tokio::time::Duration::from_secs(30);
     let start_time = tokio::time::Instant::now();
+    let mut error_output = Vec::new();
 
     loop {
         if start_time.elapsed() > timeout {
-            return Err("Server startup timeout".to_string());
+            eprintln!("Server startup timeout after 30 seconds");
+            if !error_output.is_empty() {
+                eprintln!("Collected error output:");
+                for line in &error_output {
+                    eprintln!("  {}", line);
+                }
+            }
+            return Err("Server startup timeout - check Console.app for detailed logs".to_string());
         }
 
         match tokio::time::timeout(tokio::time::Duration::from_millis(100), rx.recv()).await {
@@ -77,8 +108,13 @@ async fn start_server(
                         }
                     }
                     tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                        let line_str = String::from_utf8_lossy(&line);
+                        let line_str = String::from_utf8_lossy(&line).to_string();
                         eprintln!("Server: {}", line_str);
+
+                        // Collect error lines for debugging
+                        if line_str.contains("ERROR") || line_str.contains("Error") || line_str.contains("Failed") {
+                            error_output.push(line_str.clone());
+                        }
 
                         // Uvicorn logs to stderr, so check there too
                         if line_str.contains("Uvicorn running") || line_str.contains("Application startup complete") {
@@ -90,6 +126,9 @@ async fn start_server(
                 }
             }
             Ok(None) => {
+                eprintln!("Server process ended unexpectedly during startup!");
+                eprintln!("The server binary may have crashed or exited with an error.");
+                eprintln!("Check Console.app logs for more details (search for 'voicebox')");
                 return Err("Server process ended unexpectedly".to_string());
             }
             Err(_) => {
