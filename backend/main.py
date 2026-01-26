@@ -143,6 +143,33 @@ async def list_profiles(db: Session = Depends(get_db)):
     return await profiles.list_profiles(db)
 
 
+@app.post("/profiles/import", response_model=models.VoiceProfileResponse)
+async def import_profile(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Import a voice profile from a ZIP archive."""
+    # Validate file size (max 100MB)
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    
+    # Read file content
+    content = await file.read()
+    
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
+        )
+    
+    try:
+        profile = await export_import.import_profile_from_zip(content, db)
+        return profile
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/profiles/{profile_id}", response_model=models.VoiceProfileResponse)
 async def get_profile(
     profile_id: str,
@@ -259,33 +286,6 @@ async def export_profile(
                 "Content-Disposition": f'attachment; filename="{filename}"'
             }
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/profiles/import", response_model=models.VoiceProfileResponse)
-async def import_profile(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
-    """Import a voice profile from a ZIP archive."""
-    # Validate file size (max 100MB)
-    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-    
-    # Read file content
-    content = await file.read()
-    
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
-        )
-    
-    try:
-        profile = await export_import.import_profile_from_zip(content, db)
-        return profile
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

@@ -65,13 +65,16 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
 
     // Fallback: construct URLs if not found in assets
     const baseUrl = `https://github.com/${GITHUB_REPO}/releases/download/${version}`;
-    
+
     const releaseInfo: ReleaseInfo = {
       version,
       downloadLinks: {
-        macArm: downloadLinks.macArm || `${baseUrl}/voicebox_${version.replace('v', '')}_aarch64.dmg`,
-        macIntel: downloadLinks.macIntel || `${baseUrl}/voicebox_${version.replace('v', '')}_x64.dmg`,
-        windows: downloadLinks.windows || `${baseUrl}/voicebox_${version.replace('v', '')}_x64_en-US.msi`,
+        macArm:
+          downloadLinks.macArm || `${baseUrl}/voicebox_${version.replace('v', '')}_aarch64.dmg`,
+        macIntel:
+          downloadLinks.macIntel || `${baseUrl}/voicebox_${version.replace('v', '')}_x64.dmg`,
+        windows:
+          downloadLinks.windows || `${baseUrl}/voicebox_${version.replace('v', '')}_x64_en-US.msi`,
         linux: downloadLinks.linux || `${baseUrl}/voicebox_x86_64-unknown-linux-gnu.AppImage`,
       },
     };
