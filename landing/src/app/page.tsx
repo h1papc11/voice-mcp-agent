@@ -2,13 +2,36 @@
 
 import { Cloud, Code, Cpu, Github, Shield, Zap } from 'lucide-react';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/PlatformIcons';
 import { Button } from '@/components/ui/button';
 import { Section, SectionTitle } from '@/components/ui/section';
 import { DOWNLOAD_LINKS, GITHUB_REPO } from '@/lib/constants';
+import type { DownloadLinks } from '@/lib/releases';
 import { FeatureCard } from '../components/ui/feature-card';
 
 export default function Home() {
+  const [downloadLinks, setDownloadLinks] = useState<DownloadLinks>(DOWNLOAD_LINKS);
+
+  useEffect(() => {
+    // Fetch latest release info
+    fetch('/api/releases')
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error('Failed to fetch releases');
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data.downloadLinks) {
+          setDownloadLinks(data.downloadLinks);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch release info:', error);
+        // Keep fallback links (releases page) on error
+      });
+  }, []);
   const features = [
     {
       title: 'Near-Perfect Voice Cloning',
@@ -64,20 +87,34 @@ export default function Home() {
                   priority
                 />
               </div>
-              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight text-left">
+              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight text-center lg:text-left">
                 Voicebox
               </h1>
-              <p className="text-lg sm:text-xl md:text-2xl text-foreground/70 max-w-xl text-left">
+              <p className="text-lg sm:text-xl md:text-2xl text-foreground/70 max-w-xl text-center lg:text-left mx-auto lg:mx-0">
                 Open source voice cloning powered by Qwen3-TTS. Create natural-sounding speech from
                 text with near-perfect voice replication.
               </p>
+
+              {/* Mobile: centered screenshot above download buttons */}
+              <div className="flex justify-center lg:hidden my-8">
+                <div className="w-full max-w-2xl">
+                  <Image
+                    src="/VoiceBoxAppScreenshot.webp"
+                    alt="Voicebox Application Screenshot"
+                    width={1920}
+                    height={1080}
+                    className="w-full h-auto rounded-lg shadow-lg"
+                    priority
+                  />
+                </div>
+              </div>
 
               {/* Download buttons under left content */}
               <div className="space-y-4 pt-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
                   <Button asChild size="lg" className="w-full px-0">
                     <a
-                      href={DOWNLOAD_LINKS.macArm}
+                      href={downloadLinks.macArm}
                       download
                       className="flex items-center w-full relative"
                     >
@@ -90,7 +127,7 @@ export default function Home() {
                   </Button>
                   <Button asChild size="lg" className="w-full px-0">
                     <a
-                      href={DOWNLOAD_LINKS.macIntel}
+                      href={downloadLinks.macIntel}
                       download
                       className="flex items-center w-full relative"
                     >
@@ -103,7 +140,7 @@ export default function Home() {
                   </Button>
                   <Button asChild size="lg" className="w-full px-0">
                     <a
-                      href={DOWNLOAD_LINKS.windows}
+                      href={downloadLinks.windows}
                       download
                       className="flex items-center w-full relative"
                     >
@@ -116,7 +153,7 @@ export default function Home() {
                   </Button>
                   <Button asChild size="lg" className="w-full px-0">
                     <a
-                      href={DOWNLOAD_LINKS.linux}
+                      href={downloadLinks.linux}
                       download
                       className="flex items-center w-full relative"
                     >
@@ -137,7 +174,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right side - Large screenshot positioned off-screen */}
+            {/* Desktop: Large screenshot positioned off-screen */}
             <div className="hidden lg:block relative">
               <div className="absolute right-0 top-0 -mt-10 w-[200%] -mr-[100%]">
                 <Image

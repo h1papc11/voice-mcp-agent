@@ -54,8 +54,12 @@
   * {
     @apply border-border;
   }
+  html {
+    overflow-x: hidden;
+  }
   body {
     @apply bg-background text-foreground antialiased;
+    overflow-x: hidden;
     background-image:
       radial-gradient(at 0% 0%, rgba(255, 255, 255, 0.03) 0px, transparent 50%),
       radial-gradient(at 100% 100%, rgba(255, 255, 255, 0.02) 0px, transparent 50%);
