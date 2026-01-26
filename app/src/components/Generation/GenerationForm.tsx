@@ -23,8 +23,10 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api/client';
 import { useGeneration } from '@/lib/hooks/useGeneration';
 import { useProfile } from '@/lib/hooks/useProfiles';
+import { usePlayerStore } from '@/stores/playerStore';
 import { useUIStore } from '@/stores/uiStore';
 
 const generationSchema = z.object({
@@ -42,6 +44,7 @@ export function GenerationForm() {
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
   const generation = useGeneration();
   const { toast } = useToast();
+  const setAudio = usePlayerStore((state) => state.setAudio);
 
   const form = useForm<GenerationFormValues>({
     resolver: zodResolver(generationSchema),
@@ -78,6 +81,10 @@ export function GenerationForm() {
         title: 'Generation complete!',
         description: `Audio generated (${result.duration.toFixed(2)}s)`,
       });
+
+      // Autoplay the generated audio
+      const audioUrl = apiClient.getAudioUrl(result.id);
+      setAudio(audioUrl, result.id, data.text.substring(0, 50));
 
       form.reset();
     } catch (error) {
