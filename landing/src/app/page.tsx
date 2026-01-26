@@ -141,7 +141,7 @@ export default function Home() {
             <div className="hidden lg:block relative">
               <div className="absolute right-0 top-0 -mt-10 w-[200%] -mr-[100%]">
                 <Image
-                  src="/AppScreenshot.webp"
+                  src="/VoiceBoxAppScreenshot.webp"
                   alt="Voicebox Application Screenshot"
                   width={1920}
                   height={1080}
