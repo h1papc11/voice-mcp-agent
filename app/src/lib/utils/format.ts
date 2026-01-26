@@ -7,7 +7,22 @@ export function formatDuration(seconds: number): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return formatDistance(new Date(date), new Date(), { addSuffix: true });
+  // Parse the date string - if it doesn't have timezone info, treat it as UTC
+  let dateObj: Date;
+  if (typeof date === 'string') {
+    // If the string doesn't end with Z or have timezone offset, assume it's UTC
+    const dateStr = date.trim();
+    if (!dateStr.includes('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)) {
+      // No timezone info, treat as UTC
+      dateObj = new Date(dateStr + 'Z');
+    } else {
+      dateObj = new Date(dateStr);
+    }
+  } else {
+    dateObj = date;
+  }
+  
+  return formatDistance(dateObj, new Date(), { addSuffix: true }).replace(/^about /i, '');
 }
 
 export function formatFileSize(bytes: number): string {
