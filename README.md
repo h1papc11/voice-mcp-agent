@@ -21,7 +21,13 @@
 <br/>
 
 <p align="center">
-  <img src=".github/assets/screenshot.webp" alt="Voicebox App Screenshot" width="800" />
+  <a href="https://voicebox.sh">
+    <img src=".github/assets/screenshot.webp" alt="Voicebox App Screenshot" width="800" />
+  </a>
+</p>
+
+<p align="center">
+  <em>Click the image above to watch the demo video on <a href="https://voicebox.sh">voicebox.sh</a></em>
 </p>
 
 <br/>
@@ -52,14 +58,6 @@ Voicebox is available now for macOS and Windows.
 | Windows (Setup) | [voicebox_0.1.0_x64-setup.exe](https://github.com/jamiepine/voicebox/releases/download/v0.1.0/voicebox_0.1.0_x64-setup.exe) |
 
 > **Linux builds coming soon** — Currently blocked by GitHub runner disk space limitations.
-
----
-
-## See it in action...
-
-[![Watch the demo video](https://github.com/jamiepine/voicebox/raw/refs/heads/main/landing/public/VoiceBoxAppScreenshot.webp)](https://voicebox.sh)
-
-_Click the image above to watch the demo video on [voicebox.sh](https://voicebox.sh)_
 
 ---
 
