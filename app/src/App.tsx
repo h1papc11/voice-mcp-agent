@@ -151,13 +151,24 @@ function App() {
             <UpdateNotification />
 
             {activeTab === 'settings' ? (
-              <div className="space-y-4 overflow-y-auto">
+              <div className="space-y-4 overflow-y-auto flex flex-col">
                 <div className="grid gap-4 md:grid-cols-2">
                   <ConnectionForm />
                   <ServerStatus />
                 </div>
                 {isTauri() && <UpdateStatus />}
                 <ModelManagement />
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  Created by{' '}
+                  <a
+                    href="https://github.com/jamiepine"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:underline"
+                  >
+                    Jamie Pine
+                  </a>
+                </div>
               </div>
             ) : (
               // Main view: Profiles top left, Generator bottom left, History right
