@@ -52,9 +52,9 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
       const name = asset.name.toLowerCase();
       const url = asset.browser_download_url;
 
-      if (name.includes('aarch64') || name.includes('arm64')) {
+      if ((name.includes('aarch64') || name.includes('arm64')) && name.includes('.app.tar.gz')) {
         downloadLinks.macArm = url;
-      } else if (name.includes('x64') && name.includes('.dmg')) {
+      } else if (name.includes('x64') && name.includes('.app.tar.gz')) {
         downloadLinks.macIntel = url;
       } else if (name.includes('.msi')) {
         downloadLinks.windows = url;
@@ -70,9 +70,9 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
       version,
       downloadLinks: {
         macArm:
-          downloadLinks.macArm || `${baseUrl}/voicebox_${version.replace('v', '')}_aarch64.dmg`,
+          downloadLinks.macArm || `${baseUrl}/voicebox_aarch64.app.tar.gz`,
         macIntel:
-          downloadLinks.macIntel || `${baseUrl}/voicebox_${version.replace('v', '')}_x64.dmg`,
+          downloadLinks.macIntel || `${baseUrl}/voicebox_x64.app.tar.gz`,
         windows:
           downloadLinks.windows || `${baseUrl}/voicebox_${version.replace('v', '')}_x64_en-US.msi`,
         linux: downloadLinks.linux || `${baseUrl}/voicebox_x86_64-unknown-linux-gnu.AppImage`,

@@ -12,18 +12,21 @@ export function DownloadSection() {
       icon: Laptop,
       link: DOWNLOAD_LINKS.macArm,
       description: 'macOS (Intel + Apple Silicon)',
+      disabled: false,
     },
     {
       platform: 'Windows',
       icon: Monitor,
       link: DOWNLOAD_LINKS.windows,
       description: 'Windows x64',
+      disabled: false,
     },
     {
       platform: 'Linux',
       icon: Terminal,
       link: DOWNLOAD_LINKS.linux,
       description: 'Linux AppImage',
+      disabled: true,
     },
   ];
 
@@ -34,10 +37,14 @@ export function DownloadSection() {
         <p className="text-2xl font-bold">{LATEST_VERSION}</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        {downloads.map(({ platform, icon: Icon, link, description }) => (
+        {downloads.map(({ platform, icon: Icon, link, description, disabled }) => (
           <Card
             key={platform}
-            className="hover:border-primary/20 hover:shadow-lg hover:shadow-primary/3 transition-all duration-200 hover:-translate-y-0.5"
+            className={`transition-all duration-200 ${
+              disabled
+                ? 'opacity-50'
+                : 'hover:border-primary/20 hover:shadow-lg hover:shadow-primary/3 hover:-translate-y-0.5'
+            }`}
           >
             <CardContent className="p-6">
               <div className="flex flex-col items-center text-center space-y-4">
@@ -48,8 +55,8 @@ export function DownloadSection() {
                   <h3 className="text-lg font-semibold mb-1">{platform}</h3>
                   <p className="text-sm text-muted-foreground">{description}</p>
                 </div>
-                <Button asChild size="lg" className="w-full">
-                  <a href={link} download>
+                <Button asChild size="lg" className="w-full" disabled={disabled}>
+                  <a href={link} download className={disabled ? 'pointer-events-none' : ''}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </a>

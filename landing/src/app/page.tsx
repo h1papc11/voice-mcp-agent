@@ -151,11 +151,13 @@ export default function Home() {
                       <span className="flex-1 text-center px-4">Windows</span>
                     </a>
                   </Button>
-                  <Button asChild size="lg" className="w-full px-0">
+                  <Button asChild size="lg" className="w-full px-0" disabled>
                     <a
                       href={downloadLinks.linux}
-                      download
-                      className="flex items-center w-full relative"
+                      onClick={(e) => e.preventDefault()}
+                      className="flex items-center w-full relative opacity-50 cursor-not-allowed"
+                      title="Linux builds coming soon — Currently blocked by GitHub runner disk space limitations."
+                      aria-label="Linux builds coming soon — Currently blocked by GitHub runner disk space limitations."
                     >
                       <div className="flex items-center gap-2 flex-shrink-0 pl-4">
                         <LinuxIcon className="h-5 w-5" />
