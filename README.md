@@ -42,14 +42,16 @@ Built with **Tauri** (Rust), **TypeScript**, **React**, and **Python**. Native p
 
 ## Download
 
-Voicebox is available now for macOS, Windows, and Linux.
+Voicebox is available now for macOS and Windows.
 
 | Platform | Download |
 |----------|----------|
-| macOS (Apple Silicon) | [voicebox-macos-arm64.dmg](https://github.com/voicebox-sh/voicebox/releases/latest) |
-| macOS (Intel) | [voicebox-macos-x64.dmg](https://github.com/voicebox-sh/voicebox/releases/latest) |
-| Windows | [voicebox-windows-x64.exe](https://github.com/voicebox-sh/voicebox/releases/latest) |
-| Linux | [voicebox-linux-x64.AppImage](https://github.com/voicebox-sh/voicebox/releases/latest) |
+| macOS (Apple Silicon) | [voicebox_aarch64.app.tar.gz](https://github.com/jamiepine/voicebox/releases/download/v0.1.0/voicebox_aarch64.app.tar.gz) |
+| macOS (Intel) | [voicebox_x64.app.tar.gz](https://github.com/jamiepine/voicebox/releases/download/v0.1.0/voicebox_x64.app.tar.gz) |
+| Windows (MSI) | [voicebox_0.1.0_x64_en-US.msi](https://github.com/jamiepine/voicebox/releases/download/v0.1.0/voicebox_0.1.0_x64_en-US.msi) |
+| Windows (Setup) | [voicebox_0.1.0_x64-setup.exe](https://github.com/jamiepine/voicebox/releases/download/v0.1.0/voicebox_0.1.0_x64-setup.exe) |
+
+> **Linux builds coming soon** — Currently blocked by GitHub runner disk space limitations.
 
 ---
 
