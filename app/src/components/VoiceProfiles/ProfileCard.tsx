@@ -1,4 +1,4 @@
-import { Edit, Eye, Mic, Trash2 } from 'lucide-react';
+import { Download, Edit, Eye, Mic, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { VoiceProfileResponse } from '@/lib/api/types';
-import { useDeleteProfile } from '@/lib/hooks/useProfiles';
+import { useDeleteProfile, useExportProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
 import { useUIStore } from '@/stores/uiStore';
 import { ProfileDetail } from './ProfileDetail';
@@ -26,6 +26,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const deleteProfile = useDeleteProfile();
+  const exportProfile = useExportProfile();
   const setEditingProfileId = useUIStore((state) => state.setEditingProfileId);
   const setProfileDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
@@ -50,6 +51,11 @@ export function ProfileCard({ profile }: ProfileCardProps) {
   const handleDeleteConfirm = () => {
     deleteProfile.mutate(profile.id);
     setDeleteDialogOpen(false);
+  };
+
+  const handleExport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    exportProfile.mutate(profile.id);
   };
 
   return (
@@ -86,6 +92,12 @@ export function ProfileCard({ profile }: ProfileCardProps) {
                 setDetailOpen(true);
               }}
               aria-label="View details"
+            />
+            <CircleButton
+              icon={Download}
+              onClick={handleExport}
+              disabled={exportProfile.isPending}
+              aria-label="Export profile"
             />
             <CircleButton
               icon={Edit}

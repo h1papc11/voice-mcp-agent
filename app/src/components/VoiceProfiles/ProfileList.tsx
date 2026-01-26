@@ -1,7 +1,16 @@
-import { Mic, Sparkles } from 'lucide-react';
+import { Mic, Sparkles, Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useProfiles } from '@/lib/hooks/useProfiles';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useProfiles, useImportProfile } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
 import { ProfileCard } from './ProfileCard';
 import { ProfileForm } from './ProfileForm';
@@ -9,6 +18,44 @@ import { ProfileForm } from './ProfileForm';
 export function ProfileList() {
   const { data: profiles, isLoading, error } = useProfiles();
   const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
+  const importProfile = useImportProfile();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file extension
+      if (!file.name.endsWith('.voicebox.zip')) {
+        alert('Please select a valid .voicebox.zip file');
+        return;
+      }
+      setSelectedFile(file);
+      setImportDialogOpen(true);
+    }
+  };
+
+  const handleImportConfirm = () => {
+    if (selectedFile) {
+      importProfile.mutate(selectedFile, {
+        onSuccess: () => {
+          setImportDialogOpen(false);
+          setSelectedFile(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        },
+        onError: (error) => {
+          alert(`Failed to import profile: ${error.message}`);
+        },
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -32,10 +79,23 @@ export function ProfileList() {
     <div className="flex flex-col">
       <div className="flex items-center justify-between mb-4 shrink-0">
         <h2 className="text-2xl font-bold">Voicebox</h2>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Sparkles className="mr-2 h-4 w-4" />
-          New Profile
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleImportClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import Voice
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".voicebox.zip"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <Button onClick={() => setDialogOpen(true)}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Create Voice
+          </Button>
+        </div>
       </div>
 
       <div className="shrink-0">
@@ -48,7 +108,7 @@ export function ProfileList() {
               </p>
               <Button onClick={() => setDialogOpen(true)}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Create Profile
+                Create Voice
               </Button>
             </CardContent>
           </Card>
@@ -62,6 +122,37 @@ export function ProfileList() {
       </div>
 
       <ProfileForm />
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Profile</DialogTitle>
+            <DialogDescription>
+              Import the profile from "{selectedFile?.name}". This will create a new profile with all samples.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = '';
+                }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleImportConfirm}
+              disabled={importProfile.isPending || !selectedFile}
+            >
+              {importProfile.isPending ? 'Importing...' : 'Import'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -109,6 +109,40 @@ class ApiClient {
     });
   }
 
+  async exportProfile(profileId: string): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/profiles/${profileId}/export`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: response.statusText,
+      }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
+  }
+
+  async importProfile(file: File): Promise<VoiceProfileResponse> {
+    const url = `${this.getBaseUrl()}/profiles/import`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: response.statusText,
+      }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   // Generation
   async generateSpeech(data: GenerationRequest): Promise<GenerationResponse> {
     return this.request<GenerationResponse>('/generate', {

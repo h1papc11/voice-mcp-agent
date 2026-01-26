@@ -6,7 +6,7 @@ Handles voice cloning, generation history, and server mode.
 
 from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -14,10 +14,11 @@ import uvicorn
 import argparse
 import torch
 import tempfile
+import io
 from pathlib import Path
 import uuid
 
-from . import database, models, profiles, history, tts, transcribe, config
+from . import database, models, profiles, history, tts, transcribe, config, export_import
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 
@@ -225,6 +226,68 @@ async def delete_profile_sample(
     if not success:
         raise HTTPException(status_code=404, detail="Sample not found")
     return {"message": "Sample deleted successfully"}
+
+
+@app.get("/profiles/{profile_id}/export")
+async def export_profile(
+    profile_id: str,
+    db: Session = Depends(get_db),
+):
+    """Export a voice profile as a ZIP archive."""
+    try:
+        # Get profile to get name for filename
+        profile = await profiles.get_profile(profile_id, db)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Export to ZIP
+        zip_bytes = export_import.export_profile_to_zip(profile_id, db)
+        
+        # Create safe filename
+        safe_name = "".join(c for c in profile.name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if not safe_name:
+            safe_name = "profile"
+        filename = f"profile-{safe_name}.voicebox.zip"
+        
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(zip_bytes),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/profiles/import", response_model=models.VoiceProfileResponse)
+async def import_profile(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Import a voice profile from a ZIP archive."""
+    # Validate file size (max 100MB)
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    
+    # Read file content
+    content = await file.read()
+    
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
+        )
+    
+    try:
+        profile = await export_import.import_profile_from_zip(content, db)
+        return profile
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================

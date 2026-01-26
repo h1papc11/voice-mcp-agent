@@ -74,7 +74,7 @@ export function HistoryTable() {
           <div
             className={cn(
               'flex-1 min-h-0 overflow-y-auto space-y-2',
-              isPlayerVisible && 'max-h-[calc(100vh-220px)]',
+              isPlayerVisible && 'max-h-[calc(100vh-117px)]',
             )}
           >
             {history.map((gen) => {
@@ -169,21 +169,23 @@ export function HistoryTable() {
             })}
           </div>
 
-          <div className="flex justify-between items-center mt-4 shrink-0">
-            <Button
-              variant="outline"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-            >
-              Previous
-            </Button>
-            <div className="text-sm text-muted-foreground">
-              Page {page + 1} • {total} total
+          {(total > limit || page > 0) && (
+            <div className="flex justify-between items-center mt-4 shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                Previous
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                Page {page + 1} • {total} total
+              </div>
+              <Button variant="outline" onClick={() => setPage((p) => p + 1)} disabled={!hasMore}>
+                Next
+              </Button>
             </div>
-            <Button variant="outline" onClick={() => setPage((p) => p + 1)} disabled={!hasMore}>
-              Next
-            </Button>
-          </div>
+          )}
         </>
       )}
     </div>
