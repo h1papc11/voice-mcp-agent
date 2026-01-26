@@ -182,7 +182,7 @@ Voicebox aims to be the **one-stop shop for everything voice** — cloning, synt
 
 ## Development
 
-See [SETUP.md](SETUP.md) for detailed setup instructions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup and contribution guidelines.
 
 ### Quick Start
 

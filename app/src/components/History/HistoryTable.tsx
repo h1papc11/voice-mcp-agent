@@ -80,22 +80,15 @@ export function HistoryTable() {
             {history.map((gen) => {
               const isCurrentlyPlaying = currentAudioId === gen.id && isPlaying;
               return (
-                <div
+                <button
                   key={gen.id}
+                  type="button"
                   className={cn(
-                    'flex items-stretch gap-4 h-24 border rounded-md p-3 bg-card hover:bg-muted/70 transition-colors cursor-pointer',
+                    'flex items-stretch gap-4 h-24 border rounded-md p-3 bg-card hover:bg-muted/70 transition-colors cursor-pointer text-left w-full',
                     isCurrentlyPlaying && 'bg-muted/70',
                   )}
                   onClick={() => handlePlay(gen.id, gen.text)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handlePlay(gen.id, gen.text);
-                    }
-                  }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label="Play audio"
+                  aria-label={`Play audio: ${gen.text.substring(0, 50)}`}
                 >
                   {/* Waveform icon */}
                   <div className="flex items-center shrink-0">
@@ -129,10 +122,7 @@ export function HistoryTable() {
                   </div>
 
                   {/* Far right - Ellipsis actions */}
-                  <div
-                    className="w-10 shrink-0 flex justify-end"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="w-10 shrink-0 flex justify-end">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -140,6 +130,7 @@ export function HistoryTable() {
                           size="icon"
                           className="h-8 w-8"
                           aria-label="Actions"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -164,7 +155,7 @@ export function HistoryTable() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

@@ -199,6 +199,7 @@ export default function Home() {
           </h2>
           <div className="flex justify-center">
             <div className="w-full max-w-5xl">
+              {/** biome-ignore lint/a11y/useMediaCaption: not generating captions for this, ya damn linter */}
               <video
                 className="w-full h-auto rounded-lg shadow-lg"
                 controls
@@ -206,7 +207,11 @@ export default function Home() {
                 preload="metadata"
                 poster="/VoiceBoxAppScreenshot.webp"
               >
-                <source src="/voicebox-demo.webm" type="video/webm" />
+                <source
+                  src="/voicebox-demo.webm"
+                  type="video/webm"
+                  aria-label="Voicebox Demo Video"
+                />
                 Your browser does not support the video tag.
               </video>
             </div>

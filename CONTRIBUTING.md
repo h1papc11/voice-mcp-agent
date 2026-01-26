@@ -13,10 +13,22 @@ Thank you for your interest in contributing to Voicebox! This document provides 
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) - Package manager
-- [Rust](https://rustup.rs) - For Tauri desktop app
-- [Python 3.11+](https://python.org) - For backend
-- Git
+- **[Bun](https://bun.sh)** - Fast JavaScript runtime and package manager
+  ```bash
+  curl -fsSL https://bun.sh/install | bash
+  ```
+
+- **[Python 3.11+](https://python.org)** - For backend development
+  ```bash
+  python --version  # Should be 3.11 or higher
+  ```
+
+- **[Rust](https://rustup.rs)** - For Tauri desktop app (installed automatically by Tauri CLI)
+  ```bash
+  rustc --version  # Check if installed
+  ```
+
+- **Git** - Version control
 
 ### Development Setup
 
@@ -26,26 +38,104 @@ Thank you for your interest in contributing to Voicebox! This document provides 
    cd voicebox
    ```
 
-2. **Install dependencies**
+2. **Install JavaScript dependencies**
    ```bash
    bun install
-   cd backend && pip install -r requirements.txt && cd ..
+   ```
+   This installs dependencies for:
+   - `app/` - Shared React frontend
+   - `tauri/` - Tauri desktop wrapper
+   - `web/` - Web deployment wrapper
+
+3. **Set up Python backend**
+   ```bash
+   cd backend
+   
+   # Create virtual environment
+   python -m venv venv
+   
+   # Activate virtual environment
+   source venv/bin/activate  # On macOS/Linux
+   # or
+   venv\Scripts\activate  # On Windows
+   
+   # Install Python dependencies
+   pip install -r requirements.txt
+   
+   # Install Qwen3-TTS (required for voice synthesis)
+   pip install git+https://github.com/QwenLM/Qwen3-TTS.git
    ```
 
-3. **Set up the database**
+4. **Initialize database**
    ```bash
    cd backend
    python -c "from database import init_db; init_db()"
    ```
+   This creates the SQLite database at `data/voicebox.db`.
 
-4. **Start development**
-   ```bash
-   # Terminal 1: Backend server
-   bun run dev:server
+5. **Start development servers**
    
-   # Terminal 2: Desktop app
+   **Terminal 1: Backend server**
+   ```bash
+   cd backend
+   source venv/bin/activate  # Activate venv if not already active
+   bun run dev:server
+   # Or manually: uvicorn main:app --reload --port 8000
+   ```
+   Backend will be available at `http://localhost:8000`
+   
+   **Terminal 2: Desktop app**
+   ```bash
    bun run dev
    ```
+   This will:
+   - Start Vite dev server on port 5173
+   - Launch Tauri window pointing to localhost:5173
+   - Enable hot reload
+
+   **Optional: Web app**
+   ```bash
+   bun run dev:web
+   ```
+   Web app will be available at `http://localhost:5174`
+
+### Model Downloads
+
+Models are automatically downloaded from HuggingFace Hub on first use:
+- **Whisper** (transcription): Auto-downloads on first transcription
+- **Qwen3-TTS** (voice cloning): Auto-downloads on first generation (~2-4GB)
+
+First-time usage will be slower due to model downloads, but subsequent runs will use cached models.
+
+### Building
+
+**Build Python server binary:**
+```bash
+./scripts/build-server.sh
+```
+Creates platform-specific binary in `tauri/src-tauri/binaries/`
+
+**Build Tauri desktop app:**
+```bash
+cd tauri
+bun run tauri build
+```
+Creates platform-specific installers (`.dmg`, `.msi`, `.AppImage`)
+
+**Build web app:**
+```bash
+cd web
+bun run build
+```
+Output in `web/dist/`
+
+### Generate OpenAPI Client
+
+After starting the backend server:
+```bash
+./scripts/generate-api.sh
+```
+This downloads the OpenAPI schema and generates the TypeScript client in `app/src/lib/api/`
 
 ## Development Workflow
 
@@ -237,11 +327,30 @@ Releases are managed by maintainers:
 4. Push tag: `git push --tags`
 5. GitHub Actions builds and releases
 
+## Troubleshooting
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
+
+**Quick fixes:**
+
+- **Backend won't start:** Check Python version (3.11+), ensure venv is activated, install dependencies
+- **Tauri build fails:** Ensure Rust is installed, clean build with `cd tauri/src-tauri && cargo clean`
+- **OpenAPI client generation fails:** Ensure backend is running, check `curl http://localhost:8000/openapi.json`
+
 ## Questions?
 
 - Open an issue for bugs or feature requests
 - Check existing issues and discussions
 - Review the codebase to understand patterns
+- See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues
+
+## Additional Resources
+
+- [README.md](README.md) - Project overview
+- [backend/README.md](backend/README.md) - API documentation
+- [docs/AUTOUPDATER_QUICKSTART.md](docs/AUTOUPDATER_QUICKSTART.md) - Auto-updater setup
+- [SECURITY.md](SECURITY.md) - Security policy
+- [CHANGELOG.md](CHANGELOG.md) - Version history
 
 ## License
 
