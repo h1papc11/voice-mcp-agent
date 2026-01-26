@@ -100,7 +100,7 @@ function App() {
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
         <main className="flex-1 ml-20 overflow-hidden flex flex-col">
-          <div className="container mx-auto px-8 py-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
+          <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
             <UpdateNotification />
 
             {activeTab === 'settings' ? (

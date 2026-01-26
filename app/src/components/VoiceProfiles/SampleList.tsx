@@ -1,10 +1,9 @@
 import { Plus, Trash2, Play } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import { useDeleteSample, useProfileSamples } from '@/lib/hooks/useProfiles';
-import { useServerStore } from '@/stores/serverStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { apiClient } from '@/lib/api/client';
 import { SampleUpload } from './SampleUpload';
 
 interface SampleListProps {
@@ -15,8 +14,6 @@ export function SampleList({ profileId }: SampleListProps) {
   const { data: samples, isLoading } = useProfileSamples(profileId);
   const deleteSample = useDeleteSample();
   const [uploadOpen, setUploadOpen] = useState(false);
-  const { toast } = useToast();
-  const serverUrl = useServerStore((state) => state.serverUrl);
   const setAudio = usePlayerStore((state) => state.setAudio);
   const currentAudioId = usePlayerStore((state) => state.audioId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
@@ -27,8 +24,8 @@ export function SampleList({ profileId }: SampleListProps) {
     }
   };
 
-  const handlePlay = (audioPath: string, referenceText: string, sampleId: string) => {
-    const audioUrl = `${serverUrl}${audioPath}`;
+  const handlePlay = (referenceText: string, sampleId: string) => {
+    const audioUrl = apiClient.getSampleUrl(sampleId);
     setAudio(audioUrl, sampleId, referenceText.substring(0, 50));
   };
 
@@ -65,7 +62,7 @@ export function SampleList({ profileId }: SampleListProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handlePlay(sample.audio_path, sample.reference_text, sample.id)}
+                  onClick={() => handlePlay(sample.reference_text, sample.id)}
                   className={currentAudioId === sample.id && isPlaying ? 'text-primary' : ''}
                 >
                   <Play className="h-4 w-4 mr-1" />

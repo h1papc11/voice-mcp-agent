@@ -427,6 +427,26 @@ async def get_audio(generation_id: str, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/samples/{sample_id}")
+async def get_sample_audio(sample_id: str, db: Session = Depends(get_db)):
+    """Serve profile sample audio file."""
+    from .database import ProfileSample as DBProfileSample
+    
+    sample = db.query(DBProfileSample).filter_by(id=sample_id).first()
+    if not sample:
+        raise HTTPException(status_code=404, detail="Sample not found")
+    
+    audio_path = Path(sample.audio_path)
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found")
+    
+    return FileResponse(
+        audio_path,
+        media_type="audio/wav",
+        filename=f"sample_{sample_id}.wav",
+    )
+
+
 # ============================================
 # MODEL MANAGEMENT
 # ============================================

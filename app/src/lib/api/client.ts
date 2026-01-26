@@ -146,6 +146,10 @@ class ApiClient {
     return `${this.getBaseUrl()}/audio/${audioId}`;
   }
 
+  getSampleUrl(sampleId: string): string {
+    return `${this.getBaseUrl()}/samples/${sampleId}`;
+  }
+
   // Transcription
   async transcribeAudio(file: File, language?: 'en' | 'zh'): Promise<TranscriptionResponse> {
     const formData = new FormData();
