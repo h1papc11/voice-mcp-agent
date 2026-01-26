@@ -1,6 +1,5 @@
-import { Download, MoreHorizontal, Play, Trash2 } from 'lucide-react';
+import { AudioWaveform, Download, MoreHorizontal, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -8,20 +7,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
 import { apiClient } from '@/lib/api/client';
 import { useDeleteGeneration, useHistory } from '@/lib/hooks/useHistory';
 import { cn } from '@/lib/utils/cn';
 import { formatDate, formatDuration } from '@/lib/utils/format';
 import { usePlayerStore } from '@/stores/playerStore';
 
+// OLD TABLE-BASED COMPONENT - REMOVED (can be found in git history)
+// This is the new alternate history view with fixed height rows
+
+// NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS
 export function HistoryTable() {
   const [page, setPage] = useState(0);
   const limit = 20;
@@ -77,80 +73,99 @@ export function HistoryTable() {
         <>
           <div
             className={cn(
-              'flex-1 min-h-0 overflow-y-auto border rounded-md overflow-x-hidden',
+              'flex-1 min-h-0 overflow-y-auto space-y-2',
               isPlayerVisible && 'max-h-[calc(100vh-220px)]',
             )}
           >
-            <Table className="w-full table-fixed">
-              <TableHeader className="sticky top-0 bg-background z-10">
-                <TableRow>
-                  <TableHead className="w-[38%]">Input</TableHead>
-                  <TableHead className="w-[13%]">Voice</TableHead>
-                  <TableHead className="w-[9%]">Lang</TableHead>
-                  <TableHead className="w-[9%]">Length</TableHead>
-                  <TableHead className="w-[13%]">Date</TableHead>
-                  <TableHead className="w-[8%] text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.map((gen) => {
-                  const isCurrentlyPlaying = currentAudioId === gen.id && isPlaying;
-                  return (
-                    <TableRow
-                      key={gen.id}
-                      className={cn(isCurrentlyPlaying && 'bg-muted/50', 'cursor-pointer')}
-                      onClick={() => handlePlay(gen.id, gen.text)}
-                    >
-                      <TableCell className="truncate">{gen.text}</TableCell>
-                      <TableCell className="truncate">{gen.profile_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          {gen.language}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">{formatDuration(gen.duration)}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground/60">
-                        {formatDate(gen.created_at)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 rounded-full"
-                                aria-label="Actions"
-                              >
-                                <MoreHorizontal className="h-3.5 w-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text)}>
-                                <Play className="mr-2 h-4 w-4" />
-                                Play
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownload(gen.id, gen.text)}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => deleteGeneration.mutate(gen.id)}
-                                disabled={deleteGeneration.isPending}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            {history.map((gen) => {
+              const isCurrentlyPlaying = currentAudioId === gen.id && isPlaying;
+              return (
+                <div
+                  key={gen.id}
+                  className={cn(
+                    'flex items-stretch gap-4 h-24 border rounded-md p-3 bg-card hover:bg-muted/70 transition-colors cursor-pointer',
+                    isCurrentlyPlaying && 'bg-muted/70',
+                  )}
+                  onClick={() => handlePlay(gen.id, gen.text)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handlePlay(gen.id, gen.text);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label="Play audio"
+                >
+                  {/* Waveform icon */}
+                  <div className="flex items-center shrink-0">
+                    <AudioWaveform className="h-5 w-5 text-muted-foreground" />
+                  </div>
+
+                  {/* Left side - Meta information */}
+                  <div className="flex flex-col gap-1.5 w-48 shrink-0 justify-center">
+                    <div className="font-medium text-sm truncate" title={gen.profile_name}>
+                      {gen.profile_name}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {gen.language}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDuration(gen.duration)}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatDate(gen.created_at)}
+                    </div>
+                  </div>
+
+                  {/* Right side - Transcript textarea */}
+                  <div className="flex-1 min-w-0 flex">
+                    <Textarea
+                      readOnly
+                      value={gen.text}
+                      className="flex-1 resize-none text-sm text-muted-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+
+                  {/* Far right - Ellipsis actions */}
+                  <div className="w-10 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Actions"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text)}>
+                          <Play className="mr-2 h-4 w-4" />
+                          Play
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownload(gen.id, gen.text)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => deleteGeneration.mutate(gen.id)}
+                          disabled={deleteGeneration.isPending}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           <div className="flex justify-between items-center mt-4 shrink-0">

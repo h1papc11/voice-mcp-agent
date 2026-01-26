@@ -11,6 +11,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
 import { UpdateNotification } from '@/components/UpdateNotification';
 import { isTauri, startServer, setupWindowCloseHandler } from '@/lib/tauri';
+import voiceboxLogo from '@/assets/voicebox-logo.png';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -77,9 +78,17 @@ function App() {
   if (isTauri() && !serverReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Starting server...</p>
+        <div className="text-center space-y-6">
+          <div className="flex justify-center">
+            <img
+              src={voiceboxLogo}
+              alt="Voicebox"
+              className="w-16 h-16 object-contain animate-fade-in-scale"
+            />
+          </div>
+          <p className="text-muted-foreground text-lg animate-fade-in-delayed">
+            Starting voicebox...
+          </p>
         </div>
       </div>
     );

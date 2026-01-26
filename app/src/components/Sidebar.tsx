@@ -37,8 +37,8 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
               onClick={() => onTabChange(tab.id)}
               className={cn(
                 'w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
-                isActive ? 'bg-accent text-accent-foreground shadow-lg' : 'text-muted-foreground',
+                'hover:bg-muted/50',
+                isActive ? 'bg-muted/50 text-foreground shadow-lg' : 'text-muted-foreground',
               )}
               title={tab.label}
               aria-label={tab.label}

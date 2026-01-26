@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Mic } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -104,7 +103,7 @@ export function GenerationForm() {
                 <div className="mt-2 p-3 border rounded-md bg-muted/50 flex items-center gap-2">
                   <Mic className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{selectedProfile.name}</span>
-                  <Badge variant="outline">{selectedProfile.language}</Badge>
+                  <span className="text-sm text-muted-foreground">{selectedProfile.language}</span>
                 </div>
               ) : (
                 <div className="mt-2 p-3 border border-dashed rounded-md text-sm text-muted-foreground">
