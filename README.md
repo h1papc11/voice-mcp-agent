@@ -182,14 +182,9 @@ Voicebox aims to be the **one-stop shop for everything voice** — cloning, synt
 
 ## Development
 
-### Prerequisites
+See [SETUP.md](SETUP.md) for detailed setup instructions.
 
-- [Bun](https://bun.sh) (package manager)
-- [Rust](https://rustup.rs) (for Tauri)
-- [Python 3.11+](https://python.org) (for backend)
-- CUDA-capable GPU recommended (CPU inference supported but slower)
-
-### Setup
+### Quick Start
 
 ```bash
 # Clone the repo
@@ -205,6 +200,8 @@ cd backend && pip install -r requirements.txt && cd ..
 # Start development
 bun run dev
 ```
+
+**Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org). CUDA-capable GPU recommended (CPU inference supported but slower).
 
 ### Project Structure
 
@@ -222,18 +219,22 @@ voicebox/
 
 ## Contributing
 
-Contributions welcome! Whether it's bug fixes, new features, or documentation improvements.
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 1. Fork the repo
 2. Create a feature branch
 3. Make your changes
 4. Submit a PR
 
+## Security
+
+Found a security vulnerability? Please report it responsibly. See [SECURITY.md](SECURITY.md) for details.
+
 ---
 
 ## License
 
-MIT License — use it however you want.
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 

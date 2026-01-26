@@ -1,6 +1,6 @@
-# voicebox Setup Guide
+# Development Setup Guide
 
-Quick start guide for setting up the voicebox development environment.
+This guide will help you set up the Voicebox development environment.
 
 ## Prerequisites
 
@@ -174,20 +174,23 @@ voicebox/
 
 ## Troubleshooting
 
-### Backend won't start
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
+
+### Quick Fixes
+
+**Backend won't start:**
 - Check Python version: `python --version` (needs 3.11+)
 - Ensure virtual environment is activated
 - Install dependencies: `pip install -r requirements.txt`
 
-### Tauri build fails
+**Tauri build fails:**
 - Ensure Rust is installed: `rustc --version`
 - Install Tauri CLI: `bunx @tauri-apps/cli install`
-- Check `tauri/src-tauri/Cargo.toml` for correct dependencies
+- Clean build: `cd tauri/src-tauri && cargo clean`
 
-### OpenAPI client generation fails
+**OpenAPI client generation fails:**
 - Ensure backend is running on port 8000
 - Check `curl http://localhost:8000/openapi.json` returns valid JSON
-- Install openapi-typescript-codegen: `bun add -d openapi-typescript-codegen`
 
 ## Model Downloads
 
@@ -199,9 +202,13 @@ First-time usage will be slower due to model downloads, but subsequent runs will
 
 ## Next Steps
 
-1. ✅ TTS model loading implemented in `backend/tts.py`
-2. ✅ API routes implemented in `backend/main.py`
-3. Build React components in `app/src/components/`
-4. Connect frontend to backend via generated API client
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
+- Check [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) if you encounter issues
+- Review [backend/README.md](backend/README.md) for API documentation
+- See [README.md](README.md) for project overview
 
-See [README.md](./README.md) for architecture details and [docs/](./docs/) for detailed documentation.
+## Additional Resources
+
+- [Auto-Updater Setup](docs/AUTOUPDATER_QUICKSTART.md) - Configure automatic updates
+- [Security Policy](SECURITY.md) - Security reporting and best practices
+- [Changelog](CHANGELOG.md) - Version history and changes

@@ -1,6 +1,6 @@
-# Tauri v2 Autoupdater Setup
+# Auto-Updater Documentation
 
-The autoupdater has been configured for this project. Follow these steps to complete the setup.
+Voicebox includes automatic updates powered by Tauri's updater plugin. This document explains how it works for both users and developers.
 
 ## 1. Generate Signing Keys
 
@@ -148,28 +148,15 @@ Add your private key to GitHub secrets:
 - Add `TAURI_SIGNING_PRIVATE_KEY` with the content of `~/.tauri/voicebox.key`
 - Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (empty string if no password)
 
-## 5. Frontend Integration (Already Completed)
+## Frontend Integration
 
-The frontend integration is already complete in this project with the following components:
+The frontend integration is complete with automatic update notifications and manual update checks:
 
-### Automatic Update Notifications
-- `app/src/components/UpdateNotification.tsx` - Shows a banner when updates are available
-- Automatically checks for updates on app startup
-- Displays download/install progress
-- Only shows in Tauri desktop builds
+- **Update Notification Banner** - Appears automatically when updates are available
+- **Settings Panel** - Manual "Check for Updates" button in Settings tab
+- **Update Hook** - React hook handles all update operations
 
-### Manual Update Check
-- `app/src/components/ServerSettings/UpdateStatus.tsx` - Settings panel for updates
-- Allows manual update checks via "Check for Updates" button
-- Shows current version and update status
-- Located in the Settings tab (only visible in Tauri builds)
-
-### Update Hook
-- `app/src/hooks/useAutoUpdater.ts` - React hook for update functionality
-- Handles update checking, downloading, and installation
-- Includes Tauri context detection (won't run in web builds)
-
-The components are already integrated into the main App layout.
+See `docs/AUTOUPDATER_QUICKSTART.md` for a quick setup guide.
 
 ## Security Notes
 
