@@ -10,7 +10,7 @@ export function DownloadSection() {
     {
       platform: 'Mac',
       icon: Laptop,
-      link: DOWNLOAD_LINKS.mac,
+      link: DOWNLOAD_LINKS.macArm,
       description: 'macOS (Intel + Apple Silicon)',
     },
     {
