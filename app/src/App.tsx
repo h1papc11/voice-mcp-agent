@@ -1,24 +1,49 @@
 import { useState, useEffect } from 'react';
+import voiceboxLogo from '@/assets/voicebox-logo.png';
+import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
 import { GenerationForm } from '@/components/Generation/GenerationForm';
 import { HistoryTable } from '@/components/History/HistoryTable';
 import { ConnectionForm } from '@/components/ServerSettings/ConnectionForm';
+import { ModelManagement } from '@/components/ServerSettings/ModelManagement';
 import { ServerStatus } from '@/components/ServerSettings/ServerStatus';
 import { UpdateStatus } from '@/components/ServerSettings/UpdateStatus';
-import { ModelManagement } from '@/components/ServerSettings/ModelManagement';
+import ShinyText from '@/components/ShinyText';
+import { Sidebar } from '@/components/Sidebar';
+import { UpdateNotification } from '@/components/UpdateNotification';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
-import { Sidebar } from '@/components/Sidebar';
-import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
-import { UpdateNotification } from '@/components/UpdateNotification';
-import { isTauri, startServer, setupWindowCloseHandler } from '@/lib/tauri';
-import voiceboxLogo from '@/assets/voicebox-logo.png';
+import { isTauri, setupWindowCloseHandler, startServer } from '@/lib/tauri';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
 
+const LOADING_MESSAGES = [
+  'Warming up tensors...',
+  'Calibrating synthesizer engine...',
+  'Initializing voice models...',
+  'Loading neural networks...',
+  'Preparing audio pipelines...',
+  'Optimizing waveform generators...',
+  'Tuning frequency analyzers...',
+  'Building voice embeddings...',
+  'Configuring text-to-speech cores...',
+  'Syncing audio buffers...',
+  'Establishing model connections...',
+  'Preprocessing training data...',
+  'Validating voice samples...',
+  'Compiling inference engines...',
+  'Mapping phoneme sequences...',
+  'Aligning prosody parameters...',
+  'Activating speech synthesis...',
+  'Fine-tuning acoustic models...',
+  'Preparing voice cloning matrices...',
+  'Initializing Qwen TTS framework...',
+];
+
 function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [serverReady, setServerReady] = useState(false);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
   // Setup window close handler and auto-start server when running in Tauri (production only)
   useEffect(() => {
@@ -74,21 +99,43 @@ function App() {
     };
   }, []);
 
+  // Cycle through loading messages every 3 seconds
+  useEffect(() => {
+    if (!isTauri() || serverReady) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [serverReady]);
+
   // Show loading screen while server is starting in Tauri
   if (isTauri() && !serverReady) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-6">
-          <div className="flex justify-center">
+          <div className="flex justify-center relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-48 h-48 rounded-full bg-accent/20 blur-3xl" />
+            </div>
             <img
               src={voiceboxLogo}
               alt="Voicebox"
-              className="w-16 h-16 object-contain animate-fade-in-scale"
+              className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
             />
           </div>
-          <p className="text-muted-foreground text-lg animate-fade-in-delayed">
-            Starting voicebox...
-          </p>
+          <div className="animate-fade-in-delayed">
+            <ShinyText
+              text={LOADING_MESSAGES[loadingMessageIndex]}
+              className="text-lg font-medium text-muted-foreground"
+              speed={2}
+              color="hsl(var(--muted-foreground))"
+              shineColor="hsl(var(--foreground))"
+            />
+          </div>
         </div>
       </div>
     );
