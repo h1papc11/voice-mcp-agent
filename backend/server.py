@@ -25,14 +25,19 @@ logger.info(f"Arguments: {sys.argv}")
 logger.info("=" * 60)
 
 try:
+    logger.info("Importing argparse...")
     import argparse
+    logger.info("Importing uvicorn...")
     import uvicorn
     logger.info("Standard library imports successful")
 
     # Import the FastAPI app from the backend package
-    logger.info("Importing backend modules...")
+    logger.info("Importing backend.config...")
+    from backend import config
+    logger.info("Importing backend.database...")
+    from backend import database
+    logger.info("Importing backend.main (this may take a while due to torch/transformers)...")
     from backend.main import app
-    from backend import config, database
     logger.info("Backend imports successful")
 except Exception as e:
     logger.error(f"Failed to import required modules: {e}", exc_info=True)

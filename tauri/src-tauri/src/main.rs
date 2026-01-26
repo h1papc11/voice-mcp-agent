@@ -79,13 +79,14 @@ async fn start_server(
     *state.child.lock().unwrap() = Some(child);
 
     // Wait for server to be ready by listening for startup log
-    let timeout = tokio::time::Duration::from_secs(30);
+    // PyInstaller bundles can be slow on first import, especially torch/transformers
+    let timeout = tokio::time::Duration::from_secs(120);
     let start_time = tokio::time::Instant::now();
     let mut error_output = Vec::new();
 
     loop {
         if start_time.elapsed() > timeout {
-            eprintln!("Server startup timeout after 30 seconds");
+            eprintln!("Server startup timeout after 120 seconds");
             if !error_output.is_empty() {
                 eprintln!("Collected error output:");
                 for line in &error_output {
