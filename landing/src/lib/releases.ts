@@ -52,13 +52,18 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
       const name = asset.name.toLowerCase();
       const url = asset.browser_download_url;
 
-      if ((name.includes('aarch64') || name.includes('arm64')) && name.includes('.app.tar.gz')) {
+      // Skip signature files and other non-downloadable files
+      if (name.endsWith('.sig') || name.endsWith('.json') || name.endsWith('.txt')) {
+        continue;
+      }
+
+      if ((name.includes('aarch64') || name.includes('arm64')) && name.endsWith('.app.tar.gz')) {
         downloadLinks.macArm = url;
-      } else if (name.includes('x64') && name.includes('.app.tar.gz')) {
+      } else if (name.includes('x64') && name.endsWith('.app.tar.gz')) {
         downloadLinks.macIntel = url;
-      } else if (name.includes('.msi')) {
+      } else if (name.endsWith('.msi')) {
         downloadLinks.windows = url;
-      } else if (name.includes('.appimage') || name.includes('.deb')) {
+      } else if (name.endsWith('.appimage') || name.endsWith('.deb')) {
         downloadLinks.linux = url;
       }
     }
