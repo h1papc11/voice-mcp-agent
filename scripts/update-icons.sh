@@ -161,14 +161,21 @@ sips -s format png -z 1024 1024 "$SOURCE_ICON" --out "$LANDING_LOGO" 2>/dev/null
 echo "Generating landing page favicon..."
 # Generate favicon.png (32x32 is standard for favicons)
 sips -s format png -z 32 32 "$SOURCE_ICON" --out "$LANDING_PUBLIC/favicon.png" 2>/dev/null
-# Generate favicon.ico - try ImageMagick if available, otherwise use PNG (Next.js handles PNG favicons)
+
+# Generate proper multi-size favicon.ico using ImageMagick if available
 if command -v convert &> /dev/null; then
-  convert "$LANDING_PUBLIC/favicon.png" "$LANDING_PUBLIC/favicon.ico" 2>/dev/null || \
-    cp "$LANDING_PUBLIC/favicon.png" "$LANDING_PUBLIC/favicon.ico" 2>/dev/null
+  # Create temporary PNG files at different sizes for ICO
+  sips -s format png -z 16 16 "$SOURCE_ICON" --out /tmp/favicon-16.png 2>/dev/null
+  sips -s format png -z 32 32 "$SOURCE_ICON" --out /tmp/favicon-32.png 2>/dev/null
+  # Combine into proper multi-size ICO file
+  convert /tmp/favicon-16.png /tmp/favicon-32.png "$LANDING_PUBLIC/favicon.ico" 2>/dev/null
+  rm -f /tmp/favicon-16.png /tmp/favicon-32.png 2>/dev/null
+  echo "  ✓ Generated proper multi-size favicon.ico"
 else
-  # Fallback: copy PNG as ICO (Next.js and modern browsers handle this)
-  cp "$LANDING_PUBLIC/favicon.png" "$LANDING_PUBLIC/favicon.ico" 2>/dev/null
+  # Fallback: skip ICO if ImageMagick not available (PNG will be used)
+  echo "  ⚠ ImageMagick not found - skipping favicon.ico (using favicon.png instead)"
 fi
+
 # Also generate apple-touch-icon (180x180 for iOS)
 sips -s format png -z 180 180 "$SOURCE_ICON" --out "$LANDING_PUBLIC/apple-touch-icon.png" 2>/dev/null
 
