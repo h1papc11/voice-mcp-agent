@@ -26,20 +26,6 @@ def build_server():
         args.extend(['--paths', str(local_qwen_path)])
         print(f"Using local qwen_tts source from: {local_qwen_path}")
 
-    # Exclude only truly unnecessary modules
-    # Don't exclude anything torch or the standard library might need internally
-    args.extend([
-        '--exclude-module', 'matplotlib',
-        '--exclude-module', 'IPython',
-        '--exclude-module', 'notebook',
-        '--exclude-module', 'pytest',
-        '--exclude-module', 'tensorboard',
-        '--exclude-module', 'tkinter',
-        '--exclude-module', 'sklearn',
-        '--exclude-module', 'pandas',
-        '--exclude-module', 'torchaudio',
-    ])
-
     # Add hidden imports
     args.extend([
         '--hidden-import', 'backend',
