@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
 import { GenerationForm } from '@/components/Generation/GenerationForm';

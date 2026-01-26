@@ -1,6 +1,8 @@
-import { Home, Settings } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
+import { Home, Loader2, Settings } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
+import { cn } from '@/lib/utils/cn';
+import { useGenerationStore } from '@/stores/generationStore';
+import { usePlayerStore } from '@/stores/playerStore';
 
 interface SidebarProps {
   activeTab: string;
@@ -13,15 +15,15 @@ const tabs = [
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+  const isGenerating = useGenerationStore((state) => state.isGenerating);
+  const audioUrl = usePlayerStore((state) => state.audioUrl);
+  const isPlayerVisible = !!audioUrl;
+
   return (
     <div className="fixed left-0 top-0 h-full w-20 bg-sidebar border-r border-border flex flex-col items-center py-6 gap-6">
       {/* Logo */}
       <div className="mb-2">
-        <img
-          src={voiceboxLogo}
-          alt="Voicebox"
-          className="w-12 h-12 object-contain"
-        />
+        <img src={voiceboxLogo} alt="Voicebox" className="w-12 h-12 object-contain" />
       </div>
 
       {/* Navigation Buttons */}
@@ -48,6 +50,21 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           );
         })}
       </div>
+
+      {/* Spacer to push loader to bottom */}
+      <div className="flex-1" />
+
+      {/* Generation Loader */}
+      {isGenerating && (
+        <div
+          className={cn(
+            'w-full flex items-center justify-center transition-all duration-200',
+            isPlayerVisible ? 'mb-[120px]' : 'mb-0',
+          )}
+        >
+          <Loader2 className="h-6 w-6 text-accent animate-spin" />
+        </div>
+      )}
     </div>
   );
 }

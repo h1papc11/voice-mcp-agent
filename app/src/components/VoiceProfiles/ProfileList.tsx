@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useProfiles, useImportProfile } from '@/lib/hooks/useProfiles';
+import { useImportProfile, useProfiles } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
 import { ProfileCard } from './ProfileCard';
 import { ProfileForm } from './ProfileForm';
@@ -128,7 +128,8 @@ export function ProfileList() {
           <DialogHeader>
             <DialogTitle>Import Profile</DialogTitle>
             <DialogDescription>
-              Import the profile from "{selectedFile?.name}". This will create a new profile with all samples.
+              Import the profile from "{selectedFile?.name}". This will create a new profile with
+              all samples.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -26,6 +26,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import { useGeneration } from '@/lib/hooks/useGeneration';
 import { useProfile } from '@/lib/hooks/useProfiles';
+import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useUIStore } from '@/stores/uiStore';
 
@@ -45,6 +46,7 @@ export function GenerationForm() {
   const generation = useGeneration();
   const { toast } = useToast();
   const setAudio = usePlayerStore((state) => state.setAudio);
+  const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
 
   const form = useForm<GenerationFormValues>({
     resolver: zodResolver(generationSchema),
@@ -68,6 +70,7 @@ export function GenerationForm() {
     }
 
     try {
+      setIsGenerating(true);
       const result = await generation.mutateAsync({
         profile_id: selectedProfileId,
         text: data.text,
@@ -93,6 +96,8 @@ export function GenerationForm() {
         description: error instanceof Error ? error.message : 'Failed to generate audio',
         variant: 'destructive',
       });
+    } finally {
+      setIsGenerating(false);
     }
   }
 
