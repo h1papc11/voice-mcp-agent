@@ -1,5 +1,5 @@
 import { AudioWaveform, Download, MoreHorizontal, Play, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -20,6 +20,8 @@ import { usePlayerStore } from '@/stores/playerStore';
 // NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS
 export function HistoryTable() {
   const [page, setPage] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const limit = 20;
 
   const { data: historyData, isLoading } = useHistory({
@@ -33,6 +35,18 @@ export function HistoryTable() {
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const audioUrl = usePlayerStore((state) => state.audioUrl);
   const isPlayerVisible = !!audioUrl;
+
+  useEffect(() => {
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+
+    const handleScroll = () => {
+      setIsScrolled(scrollEl.scrollTop > 0);
+    };
+
+    scrollEl.addEventListener('scroll', handleScroll);
+    return () => scrollEl.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handlePlay = (audioId: string, text: string) => {
     const audioUrl = apiClient.getAudioUrl(audioId);
@@ -64,14 +78,18 @@ export function HistoryTable() {
   const hasMore = history.length === limit && (page + 1) * limit < total;
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 relative">
       {history.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground flex-1 flex items-center justify-center">
           No generation history yet. Generate your first audio to see it here.
         </div>
       ) : (
         <>
+          {isScrolled && (
+            <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+          )}
           <div
+            ref={scrollRef}
             className={cn(
               'flex-1 min-h-0 overflow-y-auto space-y-2',
               isPlayerVisible && 'max-h-[calc(100vh-117px)]',

@@ -314,9 +314,9 @@ async def generate_speech(
         
         # Generate audio
         tts_model = tts.get_tts_model()
-        # Load the requested model size if different from current
+        # Load the requested model size if different from current (async to not block)
         model_size = data.model_size or "1.7B"
-        tts_model.load_model(model_size)
+        await tts_model.load_model_async(model_size)
         audio, sample_rate = await tts_model.generate(
             data.text,
             voice_prompt,
@@ -519,7 +519,7 @@ async def load_model(model_size: str = "1.7B"):
     """Manually load TTS model."""
     try:
         tts_model = tts.get_tts_model()
-        tts_model.load_model(model_size)
+        await tts_model.load_model_async(model_size)
         return {"message": f"Model {model_size} loaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -782,6 +782,88 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
         return {"message": f"Model {request.model_name} download started"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/models/{model_name}")
+async def delete_model(model_name: str):
+    """Delete a downloaded model from the HuggingFace cache."""
+    import shutil
+    import os
+    
+    # Map model names to HuggingFace repo IDs
+    model_configs = {
+        "qwen-tts-1.7B": {
+            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+            "model_size": "1.7B",
+            "model_type": "tts",
+        },
+        "qwen-tts-0.6B": {
+            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+            "model_size": "0.6B",
+            "model_type": "tts",
+        },
+        "whisper-base": {
+            "hf_repo_id": "openai/whisper-base",
+            "model_size": "base",
+            "model_type": "whisper",
+        },
+        "whisper-small": {
+            "hf_repo_id": "openai/whisper-small",
+            "model_size": "small",
+            "model_type": "whisper",
+        },
+        "whisper-medium": {
+            "hf_repo_id": "openai/whisper-medium",
+            "model_size": "medium",
+            "model_type": "whisper",
+        },
+        "whisper-large": {
+            "hf_repo_id": "openai/whisper-large",
+            "model_size": "large",
+            "model_type": "whisper",
+        },
+    }
+    
+    if model_name not in model_configs:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
+    
+    config = model_configs[model_name]
+    hf_repo_id = config["hf_repo_id"]
+    
+    try:
+        # Check if model is loaded and unload it first
+        if config["model_type"] == "tts":
+            tts_model = tts.get_tts_model()
+            if tts_model.is_loaded() and tts_model.model_size == config["model_size"]:
+                tts.unload_tts_model()
+        elif config["model_type"] == "whisper":
+            whisper_model = transcribe.get_whisper_model()
+            if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:
+                transcribe.unload_whisper_model()
+        
+        # Find and delete the cache directory
+        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+        repo_cache_dir = Path(cache_dir) / ("models--" + hf_repo_id.replace("/", "--"))
+        
+        # Check if the cache directory exists
+        if not repo_cache_dir.exists():
+            raise HTTPException(status_code=404, detail=f"Model {model_name} not found in cache")
+        
+        # Delete the entire cache directory for this model
+        try:
+            shutil.rmtree(repo_cache_dir)
+        except OSError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to delete model cache directory: {str(e)}"
+            )
+        
+        return {"message": f"Model {model_name} deleted successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
 
 
 # ============================================

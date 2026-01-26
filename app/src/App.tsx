@@ -9,10 +9,11 @@ import { ServerStatus } from '@/components/ServerSettings/ServerStatus';
 import { UpdateStatus } from '@/components/ServerSettings/UpdateStatus';
 import ShinyText from '@/components/ShinyText';
 import { Sidebar } from '@/components/Sidebar';
+import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { UpdateNotification } from '@/components/UpdateNotification';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
-import { isTauri, setupWindowCloseHandler, startServer } from '@/lib/tauri';
+import { isTauri, isMacOS, setupWindowCloseHandler, startServer } from '@/lib/tauri';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -115,36 +116,38 @@ function App() {
   // Show loading screen while server is starting in Tauri
   if (isTauri() && !serverReady) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-6">
-          <div className="flex justify-center relative">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-48 h-48 rounded-full bg-accent/20 blur-3xl" />
+      <div className="min-h-screen bg-background flex items-center justify-center pt-12">
+        <TitleBarDragRegion />
+          <div className="text-center space-y-6">
+            <div className="flex justify-center relative">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-48 h-48 rounded-full bg-accent/20 blur-3xl" />
+              </div>
+              <img
+                src={voiceboxLogo}
+                alt="Voicebox"
+                className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
+              />
             </div>
-            <img
-              src={voiceboxLogo}
-              alt="Voicebox"
-              className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
-            />
+            <div className="animate-fade-in-delayed">
+              <ShinyText
+                text={LOADING_MESSAGES[loadingMessageIndex]}
+                className="text-lg font-medium text-muted-foreground"
+                speed={2}
+                color="hsl(var(--muted-foreground))"
+                shineColor="hsl(var(--foreground))"
+              />
+            </div>
           </div>
-          <div className="animate-fade-in-delayed">
-            <ShinyText
-              text={LOADING_MESSAGES[loadingMessageIndex]}
-              className="text-lg font-medium text-muted-foreground"
-              speed={2}
-              color="hsl(var(--muted-foreground))"
-              shineColor="hsl(var(--foreground))"
-            />
-          </div>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex flex-col overflow-hidden pt-12">
+      <TitleBarDragRegion />
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isMacOS={isMacOS()} />
 
         <main className="flex-1 ml-20 overflow-hidden flex flex-col">
           <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">

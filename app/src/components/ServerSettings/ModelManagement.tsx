@@ -4,14 +4,26 @@ import { apiClient } from '@/lib/api/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, CheckCircle2 } from 'lucide-react';
+import { Loader2, Download, CheckCircle2, Trash2 } from 'lucide-react';
 import { ModelProgress } from './ModelProgress';
 import { useToast } from '@/components/ui/use-toast';
+import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function ModelManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
 
   const { data: modelStatus, isLoading } = useQuery({
     queryKey: ['modelStatus'],
@@ -19,16 +31,29 @@ export function ModelManagement() {
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
+  // Use progress toast hook for the downloading model
+  useModelDownloadToast({
+    modelName: downloadingModel || '',
+    displayName: downloadingDisplayName || '',
+    enabled: !!downloadingModel && !!downloadingDisplayName,
+  });
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [modelToDelete, setModelToDelete] = useState<{
+    name: string;
+    displayName: string;
+    sizeMb?: number;
+  } | null>(null);
+
   const downloadMutation = useMutation({
     mutationFn: (modelName: string) => {
       setDownloadingModel(modelName);
+      // Find display name from model status
+      const model = modelStatus?.models.find((m) => m.model_name === modelName);
+      setDownloadingDisplayName(model?.display_name || modelName);
       return apiClient.triggerModelDownload(modelName);
     },
-    onSuccess: (_, modelName) => {
-      toast({
-        title: 'Download started',
-        description: `Downloading ${modelName}...`,
-      });
+    onSuccess: () => {
       // Refetch status after a delay to see progress
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['modelStatus'] });
@@ -36,6 +61,7 @@ export function ModelManagement() {
     },
     onError: (error: Error) => {
       setDownloadingModel(null);
+      setDownloadingDisplayName(null);
       toast({
         title: 'Download failed',
         description: error.message,
@@ -46,7 +72,29 @@ export function ModelManagement() {
       // Clear downloading state after a delay to allow progress to show
       setTimeout(() => {
         setDownloadingModel(null);
+        setDownloadingDisplayName(null);
       }, 2000);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (modelName: string) => apiClient.deleteModel(modelName),
+    onSuccess: () => {
+      toast({
+        title: 'Model deleted',
+        description: `${modelToDelete?.displayName || 'Model'} has been deleted successfully.`,
+      });
+      setDeleteDialogOpen(false);
+      setModelToDelete(null);
+      // Refetch status to update UI
+      queryClient.invalidateQueries({ queryKey: ['modelStatus'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -84,6 +132,14 @@ export function ModelManagement() {
                       key={model.model_name}
                       model={model}
                       onDownload={() => downloadMutation.mutate(model.model_name)}
+                      onDelete={() => {
+                        setModelToDelete({
+                          name: model.model_name,
+                          displayName: model.display_name,
+                          sizeMb: model.size_mb,
+                        });
+                        setDeleteDialogOpen(true);
+                      }}
                       isDownloading={downloadingModel === model.model_name}
                       formatSize={formatSize}
                     />
@@ -104,6 +160,14 @@ export function ModelManagement() {
                       key={model.model_name}
                       model={model}
                       onDownload={() => downloadMutation.mutate(model.model_name)}
+                      onDelete={() => {
+                        setModelToDelete({
+                          name: model.model_name,
+                          displayName: model.display_name,
+                          sizeMb: model.size_mb,
+                        });
+                        setDeleteDialogOpen(true);
+                      }}
                       isDownloading={downloadingModel === model.model_name}
                       formatSize={formatSize}
                     />
@@ -129,6 +193,46 @@ export function ModelManagement() {
           </div>
         ) : null}
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Model</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{modelToDelete?.displayName}</strong>?
+              {modelToDelete?.sizeMb && (
+                <>
+                  {' '}
+                  This will free up {formatSize(modelToDelete.sizeMb)} of disk space. The model
+                  will need to be re-downloaded if you want to use it again.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (modelToDelete) {
+                  deleteMutation.mutate(modelToDelete.name);
+                }
+              }}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -142,11 +246,18 @@ interface ModelItemProps {
     loaded: boolean;
   };
   onDownload: () => void;
+  onDelete: () => void;
   isDownloading: boolean;
   formatSize: (sizeMb?: number) => string;
 }
 
-function ModelItem({ model, onDownload, isDownloading, formatSize }: ModelItemProps) {
+function ModelItem({
+  model,
+  onDownload,
+  onDelete,
+  isDownloading,
+  formatSize,
+}: ModelItemProps) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div className="flex-1">
@@ -171,9 +282,21 @@ function ModelItem({ model, onDownload, isDownloading, formatSize }: ModelItemPr
       </div>
       <div className="flex items-center gap-2">
         {model.downloaded ? (
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span>Ready</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span>Ready</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={onDelete}
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+              disabled={model.loaded}
+              title={model.loaded ? 'Unload model before deleting' : 'Delete model'}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         ) : (
           <Button size="sm" onClick={onDownload} disabled={isDownloading} variant="outline">

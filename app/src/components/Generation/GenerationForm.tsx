@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Mic } from 'lucide-react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import { useGeneration } from '@/lib/hooks/useGeneration';
+import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { useProfile } from '@/lib/hooks/useProfiles';
 import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
@@ -47,6 +49,15 @@ export function GenerationForm() {
   const { toast } = useToast();
   const setAudio = usePlayerStore((state) => state.setAudio);
   const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
+  const [downloadingModelName, setDownloadingModelName] = useState<string | null>(null);
+  const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
+
+  // Use the download toast hook to show progress when model is downloading
+  useModelDownloadToast({
+    modelName: downloadingModelName || '',
+    displayName: downloadingDisplayName || '',
+    enabled: !!downloadingModelName,
+  });
 
   const form = useForm<GenerationFormValues>({
     resolver: zodResolver(generationSchema),
@@ -71,6 +82,27 @@ export function GenerationForm() {
 
     try {
       setIsGenerating(true);
+
+      // Determine model name and display name
+      const modelName = `qwen-tts-${data.modelSize}`;
+      const displayName = data.modelSize === '1.7B' ? 'Qwen TTS 1.7B' : 'Qwen TTS 0.6B';
+
+      // Check if model is downloaded before starting generation
+      try {
+        const modelStatus = await apiClient.getModelStatus();
+        const model = modelStatus.models.find((m) => m.model_name === modelName);
+
+        if (model && !model.downloaded) {
+          // Model is not downloaded, enable download toast
+          setDownloadingModelName(modelName);
+          setDownloadingDisplayName(displayName);
+        }
+      } catch (error) {
+        // If status check fails, continue anyway - generation will handle it
+        console.error('Failed to check model status:', error);
+      }
+
+      // Proceed with generation (which will trigger download if needed)
       const result = await generation.mutateAsync({
         profile_id: selectedProfileId,
         text: data.text,
@@ -98,6 +130,9 @@ export function GenerationForm() {
       });
     } finally {
       setIsGenerating(false);
+      // Clear download state after generation completes
+      setDownloadingModelName(null);
+      setDownloadingDisplayName(null);
     }
   }
 

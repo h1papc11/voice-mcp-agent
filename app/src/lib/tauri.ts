@@ -13,6 +13,13 @@ export function isTauri(): boolean {
 }
 
 /**
+ * Check if running on macOS
+ */
+export function isMacOS(): boolean {
+  return navigator.platform.toLowerCase().includes('mac');
+}
+
+/**
  * Start the bundled Python server (Tauri only)
  */
 export async function startServer(remote = false): Promise<string> {

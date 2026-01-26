@@ -7,6 +7,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  isMacOS?: boolean;
 }
 
 const tabs = [
@@ -14,13 +15,16 @@ const tabs = [
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, isMacOS }: SidebarProps) {
   const isGenerating = useGenerationStore((state) => state.isGenerating);
   const audioUrl = usePlayerStore((state) => state.audioUrl);
   const isPlayerVisible = !!audioUrl;
 
   return (
-    <div className="fixed left-0 top-0 h-full w-20 bg-sidebar border-r border-border flex flex-col items-center py-6 gap-6">
+    <div className={cn(
+      "fixed left-0 top-0 h-full w-20 bg-sidebar border-r border-border flex flex-col items-center py-6 gap-6",
+      isMacOS && "pt-14"
+    )}>
       {/* Logo */}
       <div className="mb-2">
         <img src={voiceboxLogo} alt="Voicebox" className="w-12 h-12 object-contain" />

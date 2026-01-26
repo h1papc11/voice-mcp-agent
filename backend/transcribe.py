@@ -3,6 +3,7 @@ Whisper ASR module for transcription.
 """
 
 from typing import Optional, List, Dict
+import asyncio
 import torch
 import numpy as np
 from pathlib import Path
@@ -79,6 +80,22 @@ class WhisperModel:
             progress_manager.mark_error(f"whisper-{model_size}", str(e))
             raise
     
+    async def load_model_async(self, model_size: Optional[str] = None):
+        """
+        Async version of load_model that runs in thread pool.
+        
+        This prevents blocking the event loop during model loading.
+        """
+        if model_size is None:
+            model_size = self.model_size
+            
+        # If already loaded with correct size, return immediately
+        if self.model is not None and self.model_size == model_size:
+            return
+        
+        # Run the blocking load operation in a thread pool
+        await asyncio.to_thread(self.load_model, model_size)
+    
     def unload_model(self):
         """Unload the model to free memory."""
         if self.model is not None:
@@ -107,44 +124,49 @@ class WhisperModel:
         Returns:
             Transcribed text
         """
-        self.load_model()
+        await self.load_model_async()
         
         from .utils.audio import load_audio
         
-        # Load audio
-        audio, sr = load_audio(audio_path, sample_rate=16000)
-        
-        # Process audio
-        inputs = self.processor(
-            audio,
-            sampling_rate=16000,
-            return_tensors="pt",
-        )
-        inputs = inputs.to(self.device)
-        
-        # Set language if provided
-        forced_decoder_ids = None
-        if language:
-            lang_code = "en" if language == "en" else "zh"
-            forced_decoder_ids = self.processor.get_decoder_prompt_ids(
-                language=lang_code,
-                task="transcribe",
+        def _transcribe_sync():
+            """Run synchronous transcription in thread pool."""
+            # Load audio
+            audio, sr = load_audio(audio_path, sample_rate=16000)
+            
+            # Process audio
+            inputs = self.processor(
+                audio,
+                sampling_rate=16000,
+                return_tensors="pt",
             )
+            inputs = inputs.to(self.device)
+            
+            # Set language if provided
+            forced_decoder_ids = None
+            if language:
+                lang_code = "en" if language == "en" else "zh"
+                forced_decoder_ids = self.processor.get_decoder_prompt_ids(
+                    language=lang_code,
+                    task="transcribe",
+                )
+            
+            # Generate transcription
+            with torch.no_grad():
+                predicted_ids = self.model.generate(
+                    inputs["input_features"],
+                    forced_decoder_ids=forced_decoder_ids,
+                )
+            
+            # Decode
+            transcription = self.processor.batch_decode(
+                predicted_ids,
+                skip_special_tokens=True,
+            )[0]
+            
+            return transcription.strip()
         
-        # Generate transcription
-        with torch.no_grad():
-            predicted_ids = self.model.generate(
-                inputs["input_features"],
-                forced_decoder_ids=forced_decoder_ids,
-            )
-        
-        # Decode
-        transcription = self.processor.batch_decode(
-            predicted_ids,
-            skip_special_tokens=True,
-        )[0]
-        
-        return transcription.strip()
+        # Run blocking transcription in thread pool
+        return await asyncio.to_thread(_transcribe_sync)
     
     async def transcribe_with_timestamps(
         self,
@@ -161,59 +183,58 @@ class WhisperModel:
         Returns:
             List of word segments with timestamps
         """
-        self.load_model()
+        await self.load_model_async()
         
         from .utils.audio import load_audio
         
-        # Load audio
-        audio, sr = load_audio(audio_path, sample_rate=16000)
-        
-        # Process audio
-        inputs = self.processor(
-            audio,
-            sampling_rate=16000,
-            return_tensors="pt",
-        )
-        inputs = inputs.to(self.device)
-        
-        # Set language if provided
-        forced_decoder_ids = None
-        if language:
-            lang_code = "en" if language == "en" else "zh"
-            forced_decoder_ids = self.processor.get_decoder_prompt_ids(
-                language=lang_code,
-                task="transcribe",
+        def _transcribe_timestamps_sync():
+            """Run synchronous transcription with timestamps in thread pool."""
+            # Load audio
+            audio, sr = load_audio(audio_path, sample_rate=16000)
+            
+            # Process audio
+            inputs = self.processor(
+                audio,
+                sampling_rate=16000,
+                return_tensors="pt",
             )
+            inputs = inputs.to(self.device)
+            
+            # Set language if provided
+            forced_decoder_ids = None
+            if language:
+                lang_code = "en" if language == "en" else "zh"
+                forced_decoder_ids = self.processor.get_decoder_prompt_ids(
+                    language=lang_code,
+                    task="transcribe",
+                )
+            
+            # Generate with timestamps
+            with torch.no_grad():
+                predicted_ids = self.model.generate(
+                    inputs["input_features"],
+                    forced_decoder_ids=forced_decoder_ids,
+                    return_timestamps=True,
+                )
+            
+            # Parse timestamps (simplified - would need more robust parsing)
+            # For now, return basic transcription
+            # TODO: Implement proper timestamp parsing
+            transcription = self.processor.batch_decode(
+                predicted_ids,
+                skip_special_tokens=True,
+            )[0]
+            
+            return [
+                {
+                    "text": transcription,
+                    "start": 0.0,
+                    "end": len(audio) / sr,
+                }
+            ]
         
-        # Generate with timestamps
-        with torch.no_grad():
-            predicted_ids = self.model.generate(
-                inputs["input_features"],
-                forced_decoder_ids=forced_decoder_ids,
-                return_timestamps=True,
-            )
-        
-        # Decode with timestamps
-        result = self.processor.batch_decode(
-            predicted_ids,
-            skip_special_tokens=False,
-        )[0]
-        
-        # Parse timestamps (simplified - would need more robust parsing)
-        # For now, return basic transcription
-        # TODO: Implement proper timestamp parsing
-        transcription = self.processor.batch_decode(
-            predicted_ids,
-            skip_special_tokens=True,
-        )[0]
-        
-        return [
-            {
-                "text": transcription,
-                "start": 0.0,
-                "end": len(audio) / sr,
-            }
-        ]
+        # Run blocking transcription in thread pool
+        return await asyncio.to_thread(_transcribe_timestamps_sync)
 
 
 # Global model instance

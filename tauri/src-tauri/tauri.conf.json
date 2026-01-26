@@ -48,7 +48,8 @@
         "resizable": true,
         "fullscreen": false,
         "devtools": true,
-        "userAgent": null
+        "userAgent": null,
+        "titleBarStyle": "Overlay"
       }
     ],
     "withGlobalTauri": true

@@ -219,6 +219,12 @@ class ApiClient {
       body: JSON.stringify({ model_name: modelName } as ModelDownloadRequest),
     });
   }
+
+  async deleteModel(modelName: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/models/${modelName}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

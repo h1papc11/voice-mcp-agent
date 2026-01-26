@@ -3,6 +3,7 @@ TTS inference module using Qwen3-TTS.
 """
 
 from typing import Optional, List, Tuple
+import asyncio
 import torch
 import numpy as np
 import io
@@ -110,6 +111,15 @@ class TTSModel:
             if model_path.startswith("Qwen/"):
                 print(f"Loading TTS model {model_size} on {self.device}...")
                 
+                # Initialize progress state to show download has started
+                progress_manager.update_progress(
+                    model_name=model_name,
+                    current=0,
+                    total=1,  # Set to 1 initially, will be updated by callback
+                    filename="",
+                    status="downloading",
+                )
+                
                 # Set up progress callback
                 progress_callback = create_hf_progress_callback(model_name, progress_manager)
                 tracker = HFProgressTracker(progress_callback)
@@ -151,6 +161,22 @@ class TTSModel:
             progress_manager.mark_error(f"qwen-tts-{model_size}", str(e))
             raise
     
+    async def load_model_async(self, model_size: Optional[str] = None):
+        """
+        Async version of load_model that runs in thread pool.
+        
+        This prevents blocking the event loop during model loading.
+        """
+        if model_size is None:
+            model_size = self.model_size
+            
+        # If already loaded with correct size, return immediately
+        if self.model is not None and self._current_model_size == model_size:
+            return
+        
+        # Run the blocking load operation in a thread pool
+        await asyncio.to_thread(self.load_model, model_size)
+    
     def unload_model(self):
         """Unload the model to free memory."""
         if self.model is not None:
@@ -180,7 +206,7 @@ class TTSModel:
         Returns:
             Tuple of (voice_prompt_dict, was_cached)
         """
-        self.load_model()
+        await self.load_model_async()
         
         # Check cache if enabled
         if use_cache:
@@ -189,12 +215,16 @@ class TTSModel:
             if cached_prompt is not None:
                 return cached_prompt, True
         
-        # Create new voice prompt
-        voice_prompt_items = self.model.create_voice_clone_prompt(
-            ref_audio=str(audio_path),
-            ref_text=reference_text,
-            x_vector_only_mode=False,
-        )
+        def _create_prompt_sync():
+            """Run synchronous voice prompt creation in thread pool."""
+            return self.model.create_voice_clone_prompt(
+                ref_audio=str(audio_path),
+                ref_text=reference_text,
+                x_vector_only_mode=False,
+            )
+        
+        # Run blocking operation in thread pool
+        voice_prompt_items = await asyncio.to_thread(_create_prompt_sync)
         
         # Cache if enabled
         if use_cache:
@@ -256,22 +286,27 @@ class TTSModel:
         Returns:
             Tuple of (audio_array, sample_rate)
         """
-        self.load_model()
+        # Load model (already handles async via to_thread if needed)
+        await self.load_model_async()
 
-        # Set seed if provided
-        if seed is not None:
-            torch.manual_seed(seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed(seed)
+        def _generate_sync():
+            """Run synchronous generation in thread pool."""
+            # Set seed if provided
+            if seed is not None:
+                torch.manual_seed(seed)
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed(seed)
 
-        # Generate audio
-        wavs, sample_rate = self.model.generate_voice_clone(
-            text=text,
-            voice_clone_prompt=voice_prompt,
-            instruct=instruct,
-        )
+            # Generate audio - this is the blocking operation
+            wavs, sample_rate = self.model.generate_voice_clone(
+                text=text,
+                voice_clone_prompt=voice_prompt,
+                instruct=instruct,
+            )
+            return wavs[0], sample_rate
 
-        audio = wavs[0]  # Get first result
+        # Run blocking inference in thread pool to avoid blocking event loop
+        audio, sample_rate = await asyncio.to_thread(_generate_sync)
 
         return audio, sample_rate
     
