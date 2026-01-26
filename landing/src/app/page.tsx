@@ -4,7 +4,6 @@ import { Cloud, Code, Cpu, Github, Shield, Zap } from 'lucide-react';
 import Image from 'next/image';
 import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/PlatformIcons';
 import { Button } from '@/components/ui/button';
-import { Hero } from '@/components/ui/hero';
 import { Section, SectionTitle } from '@/components/ui/section';
 import { DOWNLOAD_LINKS, GITHUB_REPO } from '@/lib/constants';
 import { FeatureCard } from '../components/ui/feature-card';
@@ -50,88 +49,110 @@ export default function Home() {
   return (
     <div className="space-y-12 sm:space-y-16 md:space-y-20">
       {/* Hero Section */}
-      <Hero
-        title="voicebox"
-        description="Open source voice cloning powered by Qwen3-TTS. Create natural-sounding speech from text with near-perfect voice replication."
-        actions={
-          <div className="space-y-4 w-full lg:w-auto">
-            <div className="w-full max-w-2xl mb-6">
-              <Image
-                src="/App.webp"
-                alt="Voicebox Application Screenshot"
-                width={1920}
-                height={1080}
-                className="w-full h-auto rounded-lg border border-border shadow-lg"
-                priority
-              />
+      <section className="relative py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+            {/* Left side - Content */}
+            <div className="space-y-6 lg:pr-8">
+              <div className="flex lg:justify-start justify-center mb-6">
+                <Image
+                  src="/voicebox-logo-2.png"
+                  alt="Voicebox Logo"
+                  width={1024}
+                  height={1024}
+                  className="w-32 sm:w-40 md:w-48 h-auto"
+                  priority
+                />
+              </div>
+              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight text-left">
+                Voicebox
+              </h1>
+              <p className="text-lg sm:text-xl md:text-2xl text-foreground/70 max-w-xl text-left">
+                Open source voice cloning powered by Qwen3-TTS. Create natural-sounding speech from
+                text with near-perfect voice replication.
+              </p>
+
+              {/* Download buttons under left content */}
+              <div className="space-y-4 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
+                  <Button asChild size="lg" className="w-full px-0">
+                    <a
+                      href={DOWNLOAD_LINKS.macArm}
+                      download
+                      className="flex items-center w-full relative"
+                    >
+                      <div className="flex items-center gap-2 flex-shrink-0 pl-4">
+                        <AppleIcon className="h-5 w-5" />
+                        <div className="h-5 w-px bg-border" />
+                      </div>
+                      <span className="flex-1 text-center px-4">macOS (ARM)</span>
+                    </a>
+                  </Button>
+                  <Button asChild size="lg" className="w-full px-0">
+                    <a
+                      href={DOWNLOAD_LINKS.macIntel}
+                      download
+                      className="flex items-center w-full relative"
+                    >
+                      <div className="flex items-center gap-2 flex-shrink-0 pl-4">
+                        <AppleIcon className="h-5 w-5" />
+                        <div className="h-5 w-px bg-border" />
+                      </div>
+                      <span className="flex-1 text-center px-4">macOS (Intel)</span>
+                    </a>
+                  </Button>
+                  <Button asChild size="lg" className="w-full px-0">
+                    <a
+                      href={DOWNLOAD_LINKS.windows}
+                      download
+                      className="flex items-center w-full relative"
+                    >
+                      <div className="flex items-center gap-2 flex-shrink-0 pl-4">
+                        <WindowsIcon className="h-5 w-5" />
+                        <div className="h-5 w-px bg-border" />
+                      </div>
+                      <span className="flex-1 text-center px-4">Windows</span>
+                    </a>
+                  </Button>
+                  <Button asChild size="lg" className="w-full px-0">
+                    <a
+                      href={DOWNLOAD_LINKS.linux}
+                      download
+                      className="flex items-center w-full relative"
+                    >
+                      <div className="flex items-center gap-2 flex-shrink-0 pl-4">
+                        <LinuxIcon className="h-5 w-5" />
+                        <div className="h-5 w-px bg-border" />
+                      </div>
+                      <span className="flex-1 text-center px-4">Linux</span>
+                    </a>
+                  </Button>
+                </div>
+                <Button variant="outline" size="lg" asChild className="w-full max-w-2xl">
+                  <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer">
+                    <Github className="h-4 w-4 mr-2" />
+                    View on GitHub
+                  </a>
+                </Button>
+              </div>
             </div>
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-1">Download</h2>
-              <p className="text-sm text-muted-foreground">Choose your platform</p>
+
+            {/* Right side - Large screenshot positioned off-screen */}
+            <div className="hidden lg:block relative">
+              <div className="absolute right-0 top-0 -mt-10 w-[200%] -mr-[100%]">
+                <Image
+                  src="/AppScreenshot.webp"
+                  alt="Voicebox Application Screenshot"
+                  width={1920}
+                  height={1080}
+                  className="w-full h-auto"
+                  priority
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
-              <Button asChild size="lg" className="w-full px-0">
-                <a
-                  href={DOWNLOAD_LINKS.macArm}
-                  download
-                  className="flex items-center w-full relative"
-                >
-                  <div className="flex items-center gap-2 flex-shrink-0 pl-4">
-                    <AppleIcon className="h-5 w-5" />
-                    <div className="h-5 w-px bg-border" />
-                  </div>
-                  <span className="flex-1 text-center px-4">macOS (ARM)</span>
-                </a>
-              </Button>
-              <Button asChild size="lg" className="w-full px-0">
-                <a
-                  href={DOWNLOAD_LINKS.macIntel}
-                  download
-                  className="flex items-center w-full relative"
-                >
-                  <div className="flex items-center gap-2 flex-shrink-0 pl-4">
-                    <AppleIcon className="h-5 w-5" />
-                    <div className="h-5 w-px bg-border" />
-                  </div>
-                  <span className="flex-1 text-center px-4">macOS (Intel)</span>
-                </a>
-              </Button>
-              <Button asChild size="lg" className="w-full px-0">
-                <a
-                  href={DOWNLOAD_LINKS.windows}
-                  download
-                  className="flex items-center w-full relative"
-                >
-                  <div className="flex items-center gap-2 flex-shrink-0 pl-4">
-                    <WindowsIcon className="h-5 w-5" />
-                    <div className="h-5 w-px bg-border" />
-                  </div>
-                  <span className="flex-1 text-center px-4">Windows</span>
-                </a>
-              </Button>
-              <Button asChild size="lg" className="w-full px-0">
-                <a
-                  href={DOWNLOAD_LINKS.linux}
-                  download
-                  className="flex items-center w-full relative"
-                >
-                  <div className="flex items-center gap-2 flex-shrink-0 pl-4">
-                    <LinuxIcon className="h-5 w-5" />
-                    <div className="h-5 w-px bg-border" />
-                  </div>
-                  <span className="flex-1 text-center px-4">Linux</span>
-                </a>
-              </Button>
-            </div>
-            <Button variant="outline" size="lg" asChild className="w-full">
-              <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer">
-                <Github className="h-4 w-4 mr-2" />
-                View on GitHub
-              </a>
-            </Button>
           </div>
-        }
-      />
+        </div>
+      </section>
 
       {/* Features Section */}
       <Section id="features">

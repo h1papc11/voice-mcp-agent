@@ -108,9 +108,7 @@ export function HistoryTable() {
                       {gen.profile_name}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {gen.language}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{gen.language}</span>
                       <span className="text-xs text-muted-foreground">
                         {formatDuration(gen.duration)}
                       </span>
@@ -131,7 +129,10 @@ export function HistoryTable() {
                   </div>
 
                   {/* Far right - Ellipsis actions */}
-                  <div className="w-10 shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="w-10 shrink-0 flex justify-end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button

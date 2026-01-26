@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { Github } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { GITHUB_REPO } from '@/lib/constants';
 
@@ -15,7 +15,7 @@ export function Header() {
             href="/"
             className="flex items-center gap-2 font-bold text-xl sm:text-2xl hover:opacity-80 transition-opacity tracking-tight"
           >
-            voicebox
+            Voicebox
           </Link>
 
           {/* Actions */}
