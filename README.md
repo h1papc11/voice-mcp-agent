@@ -55,9 +55,9 @@ Voicebox is available now for macOS, Windows, and Linux.
 
 ## See it in action...
 
-[![Watch the demo video](https://github.com/jamiepine/voicebox/raw/refs/heads/main/landing/public/VoiceBoxAppScreenshot.webp)](https://github.com/jamiepine/voicebox/raw/refs/heads/main/landing/public/voicebox-demo.webm)
+[![Watch the demo video](https://github.com/jamiepine/voicebox/raw/refs/heads/main/landing/public/VoiceBoxAppScreenshot.webp)](https://voicebox.sh)
 
-_Click the image above to watch the demo video_
+_Click the image above to watch the demo video on [voicebox.sh](https://voicebox.sh)_
 
 ---
 
