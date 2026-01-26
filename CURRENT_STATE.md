@@ -437,7 +437,7 @@ projects
 
 ## 💡 Development Workflow
 
-1. **Start backend**: `bun run dev:backend` (or via Tauri)
+1. **Start backend**: `bun run dev:server` (or via Tauri)
 2. **Start frontend**: `bun run dev` (Tauri) or `bun run dev:web` (web)
 3. **Generate API client**: `bun run generate:api` (after backend changes)
 4. **Build server binary**: `bun run build:server` (for Tauri bundling)

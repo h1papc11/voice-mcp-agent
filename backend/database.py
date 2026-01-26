@@ -39,7 +39,7 @@ class ProfileSample(Base):
 class Generation(Base):
     """Generation history database model."""
     __tablename__ = "generations"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     profile_id = Column(String, ForeignKey("profiles.id"), nullable=False)
     text = Column(Text, nullable=False)
@@ -47,6 +47,7 @@ class Generation(Base):
     audio_path = Column(String, nullable=False)
     duration = Column(Float, nullable=False)
     seed = Column(Integer)
+    instruct = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

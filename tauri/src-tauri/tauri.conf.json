@@ -12,9 +12,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": [
-      "binaries/voicebox-server"
-    ],
+    "createUpdaterArtifacts": true,
+    "externalBin": ["binaries/voicebox-server"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -24,7 +23,13 @@
     ],
     "macOS": {
       "frameworks": [],
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "11.0",
+      "infoPlist": "Info.plist"
+    },
+    "resources": {
+      "gen/Assets.car": "./",
+      "gen/voicebox.icns": "./",
+      "gen/partial.plist": "./"
     }
   },
   "app": {
@@ -41,7 +46,8 @@
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,
-        "devtools": true
+        "devtools": true,
+        "userAgent": null
       }
     ],
     "withGlobalTauri": true
@@ -49,6 +55,12 @@
   "plugins": {
     "shell": {
       "open": true
+    },
+    "updater": {
+      "pubkey": "REPLACE_WITH_YOUR_PUBLIC_KEY",
+      "endpoints": [
+        "https://github.com/YOUR_USERNAME/voicebox/releases/latest/download/latest.json"
+      ]
     }
   }
 }

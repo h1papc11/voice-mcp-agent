@@ -259,18 +259,19 @@ async def generate_speech(
             voice_prompt,
             data.language,
             data.seed,
+            data.instruct,
         )
-        
+
         # Calculate duration
         duration = len(audio) / sample_rate
-        
+
         # Save audio
         generation_id = str(uuid.uuid4())
         audio_path = config.get_generations_dir() / f"{generation_id}.wav"
-        
+
         from .utils.audio import save_audio
         save_audio(audio, str(audio_path), sample_rate)
-        
+
         # Create history entry
         generation = await history.create_generation(
             profile_id=data.profile_id,
@@ -280,6 +281,7 @@ async def generate_speech(
             duration=duration,
             seed=data.seed,
             db=db,
+            instruct=data.instruct,
         )
         
         return generation
@@ -342,6 +344,7 @@ async def get_generation(
         audio_path=gen.audio_path,
         duration=gen.duration,
         seed=gen.seed,
+        instruct=gen.instruct,
         created_at=gen.created_at,
     )
 
@@ -706,6 +709,7 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
 async def startup_event():
     """Run on application startup."""
     print("voicebox API starting up...")
+    database.init_db()
     print(f"Database initialized at {database._db_path}")
     print(f"GPU available: {torch.cuda.is_available()}")
 

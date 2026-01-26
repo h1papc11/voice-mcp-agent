@@ -6,9 +6,8 @@
  * Response model for profile sample.
  */
 export type ProfileSampleResponse = {
-    id: string;
-    profile_id: string;
-    audio_path: string;
-    reference_text: string;
+  id: string;
+  profile_id: string;
+  audio_path: string;
+  reference_text: string;
 };
-

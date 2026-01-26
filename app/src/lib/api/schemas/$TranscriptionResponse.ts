@@ -3,15 +3,15 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $TranscriptionResponse = {
-    description: `Response model for transcription.`,
-    properties: {
-        text: {
-            type: 'string',
-            isRequired: true,
-        },
-        duration: {
-            type: 'number',
-            isRequired: true,
-        },
+  description: `Response model for transcription.`,
+  properties: {
+    text: {
+      type: 'string',
+      isRequired: true,
     },
+    duration: {
+      type: 'number',
+      isRequired: true,
+    },
+  },
 } as const;

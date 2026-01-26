@@ -20,10 +20,7 @@ class ApiClient {
     return serverUrl;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${this.getBaseUrl()}${endpoint}`;
     const response = await fetch(url, {
       ...options,
@@ -64,10 +61,7 @@ class ApiClient {
     return this.request<VoiceProfileResponse>(`/profiles/${profileId}`);
   }
 
-  async updateProfile(
-    profileId: string,
-    data: VoiceProfileCreate,
-  ): Promise<VoiceProfileResponse> {
+  async updateProfile(profileId: string, data: VoiceProfileCreate): Promise<VoiceProfileResponse> {
     return this.request<VoiceProfileResponse>(`/profiles/${profileId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -105,12 +99,8 @@ class ApiClient {
     return response.json();
   }
 
-  async listProfileSamples(
-    profileId: string,
-  ): Promise<ProfileSampleResponse[]> {
-    return this.request<ProfileSampleResponse[]>(
-      `/profiles/${profileId}/samples`,
-    );
+  async listProfileSamples(profileId: string): Promise<ProfileSampleResponse[]> {
+    return this.request<ProfileSampleResponse[]>(`/profiles/${profileId}/samples`);
   }
 
   async deleteProfileSample(sampleId: string): Promise<void> {
@@ -120,9 +110,7 @@ class ApiClient {
   }
 
   // Generation
-  async generateSpeech(
-    data: GenerationRequest,
-  ): Promise<GenerationResponse> {
+  async generateSpeech(data: GenerationRequest): Promise<GenerationResponse> {
     return this.request<GenerationResponse>('/generate', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -159,10 +147,7 @@ class ApiClient {
   }
 
   // Transcription
-  async transcribeAudio(
-    file: File,
-    language?: 'en' | 'zh',
-  ): Promise<TranscriptionResponse> {
+  async transcribeAudio(file: File, language?: 'en' | 'zh'): Promise<TranscriptionResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (language) {

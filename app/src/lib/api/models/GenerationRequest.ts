@@ -6,10 +6,10 @@
  * Request model for voice generation.
  */
 export type GenerationRequest = {
-    profile_id: string;
-    text: string;
-    language?: string;
-    seed?: (number | null);
-    model_size?: (string | null);
+  profile_id: string;
+  text: string;
+  language?: string;
+  seed?: number | null;
+  model_size?: string | null;
+  instruct?: string | null;
 };
-

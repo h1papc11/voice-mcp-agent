@@ -241,35 +241,38 @@ class TTSModel:
         voice_prompt: dict,
         language: str = "en",
         seed: Optional[int] = None,
+        instruct: Optional[str] = None,
     ) -> Tuple[np.ndarray, int]:
         """
         Generate audio from text using voice prompt.
-        
+
         Args:
             text: Text to synthesize
             voice_prompt: Voice prompt dictionary from create_voice_prompt
             language: Language code (en or zh)
             seed: Random seed for reproducibility
-            
+            instruct: Natural language instruction for speech delivery control
+
         Returns:
             Tuple of (audio_array, sample_rate)
         """
         self.load_model()
-        
+
         # Set seed if provided
         if seed is not None:
             torch.manual_seed(seed)
             if torch.cuda.is_available():
                 torch.cuda.manual_seed(seed)
-        
+
         # Generate audio
         wavs, sample_rate = self.model.generate_voice_clone(
             text=text,
             voice_clone_prompt=voice_prompt,
+            instruct=instruct,
         )
-        
+
         audio = wavs[0]  # Get first result
-        
+
         return audio, sample_rate
     
     async def generate_from_reference(

@@ -99,6 +99,8 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: tauri
           tagName: v__VERSION__
@@ -111,6 +113,9 @@ jobs:
             - **macOS**: Download the `.dmg` file
             - **Windows**: Download the `.msi` installer
             - **Linux**: Download the `.AppImage` or `.deb` package
+
+            The app includes automatic updates - future updates will be installed automatically.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+          includeUpdaterJson: true

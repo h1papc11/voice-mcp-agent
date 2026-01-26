@@ -14,6 +14,10 @@ interface UIStore {
   generationDialogOpen: boolean;
   setGenerationDialogOpen: (open: boolean) => void;
 
+  // Selected profile for generation
+  selectedProfileId: string | null;
+  setSelectedProfileId: (id: string | null) => void;
+
   // Theme
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
@@ -30,6 +34,9 @@ export const useUIStore = create<UIStore>((set) => ({
 
   generationDialogOpen: false,
   setGenerationDialogOpen: (open) => set({ generationDialogOpen: open }),
+
+  selectedProfileId: null,
+  setSelectedProfileId: (id) => set({ selectedProfileId: id }),
 
   theme: 'light',
   setTheme: (theme) => {

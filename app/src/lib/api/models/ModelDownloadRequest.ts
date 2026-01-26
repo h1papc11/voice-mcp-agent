@@ -6,6 +6,5 @@
  * Request model for triggering model download.
  */
 export type ModelDownloadRequest = {
-    model_name: string;
+  model_name: string;
 };
-

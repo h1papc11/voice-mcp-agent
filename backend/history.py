@@ -28,10 +28,11 @@ async def create_generation(
     duration: float,
     seed: Optional[int],
     db: Session,
+    instruct: Optional[str] = None,
 ) -> GenerationResponse:
     """
     Create a new generation history entry.
-    
+
     Args:
         profile_id: Profile ID used for generation
         text: Generated text
@@ -40,7 +41,8 @@ async def create_generation(
         duration: Audio duration in seconds
         seed: Random seed used (if any)
         db: Database session
-        
+        instruct: Natural language instruction used (if any)
+
     Returns:
         Created generation entry
     """
@@ -52,13 +54,14 @@ async def create_generation(
         audio_path=audio_path,
         duration=duration,
         seed=seed,
+        instruct=instruct,
         created_at=datetime.utcnow(),
     )
-    
+
     db.add(db_generation)
     db.commit()
     db.refresh(db_generation)
-    
+
     return GenerationResponse.model_validate(db_generation)
 
 
@@ -139,6 +142,7 @@ async def list_generations(
             audio_path=generation.audio_path,
             duration=generation.duration,
             seed=generation.seed,
+            instruct=generation.instruct,
             created_at=generation.created_at,
         ))
     

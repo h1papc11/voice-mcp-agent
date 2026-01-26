@@ -9,7 +9,7 @@ __pycache__/
 venv/
 env/
 ENV/
-
+*.prompt
 # Build outputs
 dist/
 build/

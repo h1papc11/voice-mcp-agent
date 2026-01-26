@@ -73,7 +73,9 @@ export function ModelManagement() {
           <div className="space-y-4">
             {/* TTS Models */}
             <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Voice Generation Models</h3>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                Voice Generation Models
+              </h3>
               <div className="space-y-2">
                 {modelStatus.models
                   .filter((m) => m.model_name.startsWith('qwen-tts'))
@@ -91,7 +93,9 @@ export function ModelManagement() {
 
             {/* Whisper Models */}
             <div>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Transcription Models</h3>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                Transcription Models
+              </h3>
               <div className="space-y-2">
                 {modelStatus.models
                   .filter((m) => m.model_name.startsWith('whisper'))
@@ -109,7 +113,9 @@ export function ModelManagement() {
 
             {/* Progress indicators */}
             <div className="pt-4 border-t">
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Download Progress</h3>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                Download Progress
+              </h3>
               <div className="space-y-2">
                 {modelStatus.models.map((model) => (
                   <ModelProgress
@@ -147,10 +153,14 @@ function ModelItem({ model, onDownload, isDownloading, formatSize }: ModelItemPr
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm">{model.display_name}</span>
           {model.loaded && (
-            <Badge variant="default" className="text-xs">Loaded</Badge>
+            <Badge variant="default" className="text-xs">
+              Loaded
+            </Badge>
           )}
           {model.downloaded && !model.loaded && (
-            <Badge variant="secondary" className="text-xs">Downloaded</Badge>
+            <Badge variant="secondary" className="text-xs">
+              Downloaded
+            </Badge>
           )}
         </div>
         {model.downloaded && model.size_mb && (
@@ -166,12 +176,7 @@ function ModelItem({ model, onDownload, isDownloading, formatSize }: ModelItemPr
             <span>Ready</span>
           </div>
         ) : (
-          <Button
-            size="sm"
-            onClick={onDownload}
-            disabled={isDownloading}
-            variant="outline"
-          >
+          <Button size="sm" onClick={onDownload} disabled={isDownloading} variant="outline">
             {isDownloading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

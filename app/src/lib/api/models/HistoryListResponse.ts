@@ -7,7 +7,6 @@ import type { HistoryResponse } from './HistoryResponse';
  * Response model for history list.
  */
 export type HistoryListResponse = {
-    items: Array<HistoryResponse>;
-    total: number;
+  items: Array<HistoryResponse>;
+  total: number;
 };
-

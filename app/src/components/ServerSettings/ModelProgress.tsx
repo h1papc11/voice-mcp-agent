@@ -25,7 +25,7 @@ export function ModelProgress({ modelName, displayName }: ModelProgressProps) {
       try {
         const data = JSON.parse(event.data) as ModelProgressType;
         setProgress(data);
-        
+
         // Close connection if complete or error
         if (data.status === 'complete' || data.status === 'error') {
           eventSource.close();
@@ -51,7 +51,10 @@ export function ModelProgress({ modelName, displayName }: ModelProgressProps) {
   }, [serverUrl, modelName, isSubscribed]);
 
   // Don't render if no progress or if complete/error and some time has passed
-  if (!progress || (progress.status === 'complete' && Date.now() - new Date(progress.timestamp).getTime() > 5000)) {
+  if (
+    !progress ||
+    (progress.status === 'complete' && Date.now() - new Date(progress.timestamp).getTime() > 5000)
+  ) {
     return null;
   }
 
@@ -111,9 +114,7 @@ export function ModelProgress({ modelName, displayName }: ModelProgressProps) {
               </span>
             )}
           </div>
-          {progress.total > 0 && (
-            <Progress value={progress.progress} className="h-2" />
-          )}
+          {progress.total > 0 && <Progress value={progress.progress} className="h-2" />}
         </div>
       </CardContent>
     </Card>

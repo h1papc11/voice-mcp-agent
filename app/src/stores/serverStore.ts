@@ -10,6 +10,9 @@ interface ServerStore {
 
   mode: 'local' | 'remote';
   setMode: (mode: 'local' | 'remote') => void;
+
+  keepServerRunningOnClose: boolean;
+  setKeepServerRunningOnClose: (keepRunning: boolean) => void;
 }
 
 export const useServerStore = create<ServerStore>()(
@@ -23,6 +26,9 @@ export const useServerStore = create<ServerStore>()(
 
       mode: 'local',
       setMode: (mode) => set({ mode }),
+
+      keepServerRunningOnClose: false,
+      setKeepServerRunningOnClose: (keepRunning) => set({ keepServerRunningOnClose: keepRunning }),
     }),
     {
       name: 'voicebox-server',

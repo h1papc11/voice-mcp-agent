@@ -3,11 +3,11 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ModelDownloadRequest = {
-    description: `Request model for triggering model download.`,
-    properties: {
-        model_name: {
-            type: 'string',
-            isRequired: true,
-        },
+  description: `Request model for triggering model download.`,
+  properties: {
+    model_name: {
+      type: 'string',
+      isRequired: true,
     },
+  },
 } as const;

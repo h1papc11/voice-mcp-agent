@@ -50,6 +50,7 @@ class GenerationRequest(BaseModel):
     language: str = Field(default="en", pattern="^(en|zh)$")
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B)$")
+    instruct: Optional[str] = Field(None, max_length=500)
 
 
 class GenerationResponse(BaseModel):
@@ -61,6 +62,7 @@ class GenerationResponse(BaseModel):
     audio_path: str
     duration: float
     seed: Optional[int]
+    instruct: Optional[str]
     created_at: datetime
 
     class Config:
@@ -85,6 +87,7 @@ class HistoryResponse(BaseModel):
     audio_path: str
     duration: float
     seed: Optional[int]
+    instruct: Optional[str]
     created_at: datetime
 
     class Config:

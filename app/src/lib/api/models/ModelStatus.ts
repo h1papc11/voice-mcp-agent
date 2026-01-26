@@ -6,10 +6,9 @@
  * Response model for model status.
  */
 export type ModelStatus = {
-    model_name: string;
-    display_name: string;
-    downloaded: boolean;
-    size_mb?: (number | null);
-    loaded?: boolean;
+  model_name: string;
+  display_name: string;
+  downloaded: boolean;
+  size_mb?: number | null;
+  loaded?: boolean;
 };
-

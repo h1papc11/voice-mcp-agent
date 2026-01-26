@@ -7,6 +7,5 @@ import type { ModelStatus } from './ModelStatus';
  * Response model for model status list.
  */
 export type ModelStatusListResponse = {
-    models: Array<ModelStatus>;
+  models: Array<ModelStatus>;
 };
-

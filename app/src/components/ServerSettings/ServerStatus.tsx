@@ -47,7 +47,9 @@ export function ServerStatus() {
               <span className="text-sm">Connected</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant={health.model_loaded || health.model_downloaded ? 'default' : 'secondary'}>
+              <Badge
+                variant={health.model_loaded || health.model_downloaded ? 'default' : 'secondary'}
+              >
                 {health.model_loaded || health.model_downloaded ? 'Model Ready' : 'No Model'}
               </Badge>
               <Badge variant={health.gpu_available ? 'default' : 'secondary'}>

@@ -1,7 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mic } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,42 +25,54 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { useGeneration } from '@/lib/hooks/useGeneration';
-import { useProfiles } from '@/lib/hooks/useProfiles';
+import { useProfile } from '@/lib/hooks/useProfiles';
+import { useUIStore } from '@/stores/uiStore';
 
 const generationSchema = z.object({
-  profileId: z.string().min(1, 'Please select a voice profile'),
   text: z.string().min(1, 'Text is required').max(5000),
   language: z.enum(['en', 'zh']),
   seed: z.number().int().optional(),
   modelSize: z.enum(['1.7B', '0.6B']).optional(),
+  instruct: z.string().max(500).optional(),
 });
 
 type GenerationFormValues = z.infer<typeof generationSchema>;
 
 export function GenerationForm() {
-  const { data: profiles } = useProfiles();
+  const selectedProfileId = useUIStore((state) => state.selectedProfileId);
+  const { data: selectedProfile } = useProfile(selectedProfileId || '');
   const generation = useGeneration();
   const { toast } = useToast();
 
   const form = useForm<GenerationFormValues>({
     resolver: zodResolver(generationSchema),
     defaultValues: {
-      profileId: '',
       text: '',
       language: 'en',
       seed: undefined,
       modelSize: '1.7B',
+      instruct: '',
     },
   });
 
   async function onSubmit(data: GenerationFormValues) {
+    if (!selectedProfileId) {
+      toast({
+        title: 'No profile selected',
+        description: 'Please select a voice profile from the cards above.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const result = await generation.mutateAsync({
-        profile_id: data.profileId,
+        profile_id: selectedProfileId,
         text: data.text,
         language: data.language,
         seed: data.seed,
         model_size: data.modelSize,
+        instruct: data.instruct || undefined,
       });
 
       toast({
@@ -85,30 +98,20 @@ export function GenerationForm() {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="profileId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Voice Profile</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a voice" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {profiles?.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+            <div>
+              <FormLabel>Voice Profile</FormLabel>
+              {selectedProfile ? (
+                <div className="mt-2 p-3 border rounded-md bg-muted/50 flex items-center gap-2">
+                  <Mic className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{selectedProfile.name}</span>
+                  <Badge variant="outline">{selectedProfile.language}</Badge>
+                </div>
+              ) : (
+                <div className="mt-2 p-3 border border-dashed rounded-md text-sm text-muted-foreground">
+                  Click on a profile card above to select a voice profile
+                </div>
               )}
-            />
+            </div>
 
             <FormField
               control={form.control}
@@ -119,11 +122,33 @@ export function GenerationForm() {
                   <FormControl>
                     <Textarea
                       placeholder="Enter the text you want to generate..."
-                      className="min-h-[200px]"
+                      className="min-h-[150px]"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>Max 5000 characters</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="instruct"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Delivery Instructions (optional)</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="e.g. Speak slowly with emphasis, Warm and friendly tone, Professional and authoritative..."
+                      className="min-h-[80px]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Natural language instructions to control speech delivery (tone, emotion, pace).
+                    Max 500 characters
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -198,7 +223,11 @@ export function GenerationForm() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={generation.isPending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={generation.isPending || !selectedProfileId}
+            >
               {generation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

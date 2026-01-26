@@ -2,8 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Mutex;
-use tauri::{command, State, Manager};
+use tauri::{command, State, Manager, WindowEvent, Emitter, Listener};
 use tauri_plugin_shell::ShellExt;
+use tokio::sync::mpsc;
 
 struct ServerState {
     child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
@@ -131,12 +132,14 @@ pub fn run() {
         .manage(ServerState {
             child: Mutex::new(None),
         })
-        .invoke_handler(tauri::generate_handler![start_server, stop_server])
-        .setup(|_app| {
+        .setup(|app| {
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+
             #[cfg(debug_assertions)]
             {
                 // Get all windows and open devtools on the first one
-                if let Some((_, window)) = _app.webview_windows().iter().next() {
+                if let Some((_, window)) = app.webview_windows().iter().next() {
                     window.open_devtools();
                     println!("Dev tools opened");
                 } else {
@@ -144,6 +147,51 @@ pub fn run() {
                 }
             }
             Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![start_server, stop_server])
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // Prevent automatic close
+                api.prevent_close();
+
+                // Emit event to frontend to check setting and stop server if needed
+                let app_handle = window.app_handle();
+
+                if let Err(e) = app_handle.emit("window-close-requested", ()) {
+                    eprintln!("Failed to emit window-close-requested event: {}", e);
+                    // If event emission fails, allow close anyway
+                    window.close().ok();
+                    return;
+                }
+
+                // Set up listener for frontend response
+                let window_for_close = window.clone();
+                let (tx, mut rx) = mpsc::unbounded_channel::<()>();
+
+                // Listen for response from frontend using window's listen method
+                let listener_id = window.listen("window-close-allowed", move |_| {
+                    // Frontend has checked setting and stopped server if needed
+                    // Signal that we can close
+                    let _ = tx.send(());
+                });
+
+                // Wait for frontend response or timeout
+                tokio::spawn(async move {
+                    tokio::select! {
+                        _ = rx.recv() => {
+                            // Frontend responded, close window
+                            window_for_close.close().ok();
+                        }
+                        _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
+                            // Timeout - close anyway
+                            eprintln!("Window close timeout, closing anyway");
+                            window_for_close.close().ok();
+                        }
+                    }
+                    // Clean up listener
+                    window_for_close.unlisten(listener_id);
+                });
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

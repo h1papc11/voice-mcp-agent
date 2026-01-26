@@ -5,16 +5,22 @@
   "workspaces": [
     "app",
     "tauri",
-    "web"
+    "web",
+    "landing"
   ],
   "scripts": {
     "dev": "cd tauri && bun run tauri dev",
     "dev:web": "cd web && bun run dev",
-    "dev:backend": "source backend/venv/bin/activate && uvicorn backend.main:app --reload --port 8000",
+    "dev:landing": "cd landing && bun run dev",
+    "dev:server": "source backend/venv/bin/activate && uvicorn backend.main:app --reload --port 8000",
     "build": "cd tauri && bun run tauri build",
     "build:web": "cd web && bun run build",
+    "build:landing": "cd landing && bun run build",
+    "build:release": "./scripts/prepare-release.sh",
     "generate:api": "./scripts/generate-api.sh",
+    "generate:keys": "cd tauri && bun tauri signer generate -w ~/.tauri/voicebox.key",
     "build:server": "./scripts/build-server.sh",
+    "update:icons": "./scripts/update-icons.sh",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",

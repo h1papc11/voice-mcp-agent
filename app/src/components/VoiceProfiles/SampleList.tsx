@@ -1,9 +1,10 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Play } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { useDeleteSample, useProfileSamples } from '@/lib/hooks/useProfiles';
 import { useServerStore } from '@/stores/serverStore';
+import { usePlayerStore } from '@/stores/playerStore';
 import { SampleUpload } from './SampleUpload';
 
 interface SampleListProps {
@@ -16,6 +17,9 @@ export function SampleList({ profileId }: SampleListProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const { toast } = useToast();
   const serverUrl = useServerStore((state) => state.serverUrl);
+  const setAudio = usePlayerStore((state) => state.setAudio);
+  const currentAudioId = usePlayerStore((state) => state.audioId);
+  const isPlaying = usePlayerStore((state) => state.isPlaying);
 
   const handleDelete = (sampleId: string) => {
     if (confirm('Are you sure you want to delete this sample?')) {
@@ -23,16 +27,9 @@ export function SampleList({ profileId }: SampleListProps) {
     }
   };
 
-  const handlePlay = (audioPath: string) => {
+  const handlePlay = (audioPath: string, referenceText: string, sampleId: string) => {
     const audioUrl = `${serverUrl}${audioPath}`;
-    const audio = new Audio(audioUrl);
-    audio.play().catch((_error) => {
-      toast({
-        title: 'Error',
-        description: 'Failed to play audio',
-        variant: 'destructive',
-      });
-    });
+    setAudio(audioUrl, sampleId, referenceText.substring(0, 50));
   };
 
   if (isLoading) {
@@ -65,7 +62,13 @@ export function SampleList({ profileId }: SampleListProps) {
                 <p className="text-xs text-muted-foreground mt-1">{sample.audio_path}</p>
               </div>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => handlePlay(sample.audio_path)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handlePlay(sample.audio_path, sample.reference_text, sample.id)}
+                  className={currentAudioId === sample.id && isPlaying ? 'text-primary' : ''}
+                >
+                  <Play className="h-4 w-4 mr-1" />
                   Play
                 </Button>
                 <Button
