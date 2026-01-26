@@ -81,14 +81,7 @@ def build_server():
         '--collect-data', 'qwen_tts',
         # Fix for pkg_resources and jaraco namespace packages
         '--hidden-import', 'pkg_resources.extern',
-        '--hidden-import', 'jaraco',
-        '--hidden-import', 'jaraco.text',
-        '--hidden-import', 'jaraco.functools',
-        '--hidden-import', 'jaraco.context',
         '--collect-submodules', 'jaraco',
-        '--copy-metadata', 'jaraco.text',
-        '--copy-metadata', 'jaraco.functools',
-        '--copy-metadata', 'jaraco.context',
         '--noconfirm',
         '--clean',
     ])
