@@ -5,116 +5,124 @@ HuggingFace Hub download progress tracking.
 from typing import Optional, Callable
 from contextlib import contextmanager
 import threading
+import sys
 
 
 class HFProgressTracker:
-    """Tracks HuggingFace Hub download progress by intercepting hf_hub_download and snapshot_download."""
+    """Tracks HuggingFace Hub download progress by intercepting tqdm."""
     
     def __init__(self, progress_callback: Optional[Callable] = None):
         self.progress_callback = progress_callback
-        self._original_hf_hub_download = None
-        self._original_snapshot_download = None
+        self._original_tqdm_class = None
         self._lock = threading.Lock()
         self._total_downloaded = 0
         self._total_size = 0
         self._file_sizes = {}  # Track sizes of individual files
         self._file_downloaded = {}  # Track downloaded bytes per file
         self._current_filename = ""
+        self._active_tqdms = {}  # Track active tqdm instances
     
-    def _tracked_hf_hub_download(self, *args, **kwargs):
-        """Wrapper for hf_hub_download with progress tracking."""
-        import huggingface_hub
+    def _create_tracked_tqdm_class(self):
+        """Create a tqdm subclass that tracks progress."""
+        tracker = self
+        original_tqdm = self._original_tqdm_class
         
-        # Get original callback if present
-        original_resume_callback = kwargs.get("resume_download", None)
-        
-        # Extract filename if available
-        filename = kwargs.get("filename", "")
-        if not filename and len(args) > 1:
-            filename = args[1] if isinstance(args[1], str) else ""
-        
-        with self._lock:
-            self._current_filename = filename
-        
-        def combined_callback(downloaded: int, total: int):
-            """Combined callback that tracks progress."""
-            # Update per-file tracking
-            with self._lock:
-                if filename:
-                    self._file_sizes[filename] = total
-                    self._file_downloaded[filename] = downloaded
+        class TrackedTqdm(original_tqdm):
+            """A tqdm subclass that reports progress to our tracker."""
+            
+            def __init__(self, *args, **kwargs):
+                # Extract filename from desc before passing to parent
+                desc = kwargs.get("desc", "")
+                if not desc and args:
+                    first_arg = args[0]
+                    if isinstance(first_arg, str):
+                        desc = first_arg
                 
-                # Calculate totals across all files
-                self._total_size = sum(self._file_sizes.values())
-                self._total_downloaded = sum(self._file_downloaded.values())
+                filename = ""
+                if desc:
+                    # Try to extract filename from description
+                    # HuggingFace Hub uses format like "model.safetensors: 0%|..."
+                    if ":" in desc:
+                        filename = desc.split(":")[0].strip()
+                    else:
+                        filename = desc.strip()
+                
+                # Filter out non-standard kwargs that huggingface_hub might pass
+                # These are custom kwargs that tqdm doesn't understand
+                filtered_kwargs = {}
+                # Known tqdm kwargs - pass these through
+                tqdm_kwargs = {
+                    'iterable', 'desc', 'total', 'leave', 'file', 'ncols', 'mininterval',
+                    'maxinterval', 'miniters', 'ascii', 'disable', 'unit', 'unit_scale',
+                    'dynamic_ncols', 'smoothing', 'bar_format', 'initial', 'position',
+                    'postfix', 'unit_divisor', 'write_bytes', 'lock_args', 'nrows',
+                    'colour', 'color', 'delay', 'gui', 'disable_default', 'pos'
+                }
+                for key, value in kwargs.items():
+                    if key in tqdm_kwargs:
+                        filtered_kwargs[key] = value
+                
+                # Try to initialize with filtered kwargs, fall back to all kwargs if that fails
+                try:
+                    super().__init__(*args, **filtered_kwargs)
+                except TypeError:
+                    # If filtering failed, try with all kwargs (maybe tqdm version accepts them)
+                    super().__init__(*args, **kwargs)
+                
+                self._tracker_filename = filename or "unknown"
+                
+                with tracker._lock:
+                    if filename:
+                        tracker._current_filename = filename
+                    tracker._active_tqdms[id(self)] = {
+                        "filename": self._tracker_filename,
+                    }
             
-            # Call original callback if present
-            if original_resume_callback:
-                original_resume_callback(downloaded, total)
+            def update(self, n=1):
+                result = super().update(n)
+                
+                # Report progress
+                with tracker._lock:
+                    if id(self) in tracker._active_tqdms:
+                        filename = tracker._active_tqdms[id(self)]["filename"]
+                        current = getattr(self, "n", 0)
+                        total = getattr(self, "total", 0)
+                        
+                        if total and total > 0:
+                            # Update per-file tracking
+                            tracker._file_sizes[filename] = total
+                            tracker._file_downloaded[filename] = current
+                            
+                            # Calculate totals across all files
+                            tracker._total_size = sum(tracker._file_sizes.values())
+                            tracker._total_downloaded = sum(tracker._file_downloaded.values())
+                            
+                            # Call progress callback
+                            if tracker.progress_callback:
+                                tracker.progress_callback(
+                                    tracker._total_downloaded,
+                                    tracker._total_size,
+                                    filename
+                                )
+                
+                return result
             
-            # Call our progress callback
-            if self.progress_callback:
-                with self._lock:
-                    # Pass filename for better progress display
-                    self.progress_callback(self._total_downloaded, self._total_size, filename)
+            def close(self):
+                with tracker._lock:
+                    if id(self) in tracker._active_tqdms:
+                        del tracker._active_tqdms[id(self)]
+                return super().close()
         
-        # Replace callback
-        kwargs["resume_download"] = combined_callback
-        
-        # Call original download
-        return self._original_hf_hub_download(*args, **kwargs)
-    
-    def _tracked_snapshot_download(self, *args, **kwargs):
-        """Wrapper for snapshot_download with progress tracking."""
-        import huggingface_hub
-        
-        # snapshot_download also uses resume_download callback
-        original_resume_callback = kwargs.get("resume_download", None)
-        
-        def combined_callback(downloaded: int, total: int):
-            """Combined callback that tracks progress."""
-            with self._lock:
-                # For snapshot_download, we track overall progress
-                if total > 0:
-                    self._total_size = max(self._total_size, total)
-                    self._total_downloaded = downloaded
-            
-            # Call original callback if present
-            if original_resume_callback:
-                original_resume_callback(downloaded, total)
-            
-            # Call our progress callback
-            if self.progress_callback:
-                with self._lock:
-                    self.progress_callback(self._total_downloaded, self._total_size, "")
-        
-        # Replace callback
-        kwargs["resume_download"] = combined_callback
-        
-        # Call original download
-        return self._original_snapshot_download(*args, **kwargs)
-    
-    def _tracked_tqdm_update(self, n=1):
-        """Track tqdm updates for progress."""
-        if self._original_tqdm:
-            # Get current tqdm instance
-            import tqdm
-            # Try to get progress info from tqdm
-            # This is a fallback if hf_hub_download callback doesn't work
-            pass
+        return TrackedTqdm
     
     @contextmanager
     def patch_download(self):
-        """Context manager to patch hf_hub_download and snapshot_download for progress tracking."""
+        """Context manager to patch tqdm for progress tracking."""
         try:
-            import huggingface_hub
-            self._original_hf_hub_download = huggingface_hub.hf_hub_download
+            import tqdm as tqdm_module
             
-            # Also patch snapshot_download if available (used by from_pretrained)
-            try:
-                self._original_snapshot_download = huggingface_hub.snapshot_download
-            except AttributeError:
-                self._original_snapshot_download = None
+            # Store original tqdm class
+            self._original_tqdm_class = tqdm_module.tqdm
             
             # Reset totals
             with self._lock:
@@ -123,29 +131,62 @@ class HFProgressTracker:
                 self._file_sizes = {}
                 self._file_downloaded = {}
                 self._current_filename = ""
+                self._active_tqdms = {}
             
-            # Patch the functions
-            huggingface_hub.hf_hub_download = self._tracked_hf_hub_download
-            if self._original_snapshot_download:
-                huggingface_hub.snapshot_download = self._tracked_snapshot_download
+            # Create our tracked tqdm class
+            tracked_tqdm = self._create_tracked_tqdm_class()
+            
+            # Patch tqdm.tqdm
+            tqdm_module.tqdm = tracked_tqdm
+            
+            # Also patch tqdm.auto.tqdm if it exists (used by huggingface_hub)
+            self._original_tqdm_auto = None
+            if hasattr(tqdm_module, "auto") and hasattr(tqdm_module.auto, "tqdm"):
+                self._original_tqdm_auto = tqdm_module.auto.tqdm
+                tqdm_module.auto.tqdm = tracked_tqdm
+            
+            # Patch in sys.modules to catch already-imported references
+            self._patched_modules = {}
+            for module_name in list(sys.modules.keys()):
+                if "huggingface" in module_name or module_name.startswith("tqdm"):
+                    try:
+                        module = sys.modules[module_name]
+                        if hasattr(module, "tqdm"):
+                            attr = getattr(module, "tqdm")
+                            # Only patch if it's the original tqdm class (not already patched)
+                            if attr is self._original_tqdm_class or (
+                                hasattr(attr, "__name__") and attr.__name__ == "tqdm"
+                            ):
+                                self._patched_modules[module_name] = attr
+                                setattr(module, "tqdm", tracked_tqdm)
+                    except (AttributeError, TypeError):
+                        pass
             
             yield
+            
         except ImportError:
-            # If huggingface_hub not available, just yield without patching
+            # If tqdm not available, just yield without patching
             yield
         finally:
-            # Restore original functions
-            if self._original_hf_hub_download:
+            # Restore original tqdm
+            if self._original_tqdm_class:
                 try:
-                    import huggingface_hub
-                    huggingface_hub.hf_hub_download = self._original_hf_hub_download
-                except ImportError:
-                    pass
-            
-            if self._original_snapshot_download:
-                try:
-                    import huggingface_hub
-                    huggingface_hub.snapshot_download = self._original_snapshot_download
+                    import tqdm as tqdm_module
+                    tqdm_module.tqdm = self._original_tqdm_class
+                    
+                    if self._original_tqdm_auto:
+                        tqdm_module.auto.tqdm = self._original_tqdm_auto
+                    
+                    # Restore patched modules
+                    for module_name, original in self._patched_modules.items():
+                        try:
+                            module = sys.modules.get(module_name)
+                            if module and original:
+                                setattr(module, "tqdm", original)
+                        except (AttributeError, TypeError):
+                            pass
+                    self._patched_modules = {}
+                    
                 except (ImportError, AttributeError):
                     pass
 

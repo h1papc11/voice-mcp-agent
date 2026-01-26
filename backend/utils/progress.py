@@ -2,7 +2,7 @@
 Progress tracking for model downloads using Server-Sent Events.
 """
 
-from typing import Optional, Callable, Dict
+from typing import Optional, Callable, Dict, List
 from fastapi.responses import StreamingResponse
 import asyncio
 import json
@@ -57,6 +57,15 @@ class ProgressManager:
     def get_progress(self, model_name: str) -> Optional[Dict]:
         """Get current progress for a model."""
         return self._progress.get(model_name)
+    
+    def get_all_active(self) -> List[Dict]:
+        """Get all active downloads (status is 'downloading' or 'extracting')."""
+        active = []
+        for model_name, progress in self._progress.items():
+            status = progress.get("status", "")
+            if status in ("downloading", "extracting"):
+                active.append(progress.copy())
+        return active
     
     def create_progress_callback(self, model_name: str, filename: Optional[str] = None):
         """

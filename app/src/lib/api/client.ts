@@ -12,6 +12,7 @@ import type {
   HealthResponse,
   ModelStatusListResponse,
   ModelDownloadRequest,
+  ActiveTasksResponse,
 } from './types';
 
 class ApiClient {
@@ -224,6 +225,11 @@ class ApiClient {
     return this.request<{ message: string }>(`/models/${modelName}`, {
       method: 'DELETE',
     });
+  }
+
+  // Task Management
+  async getActiveTasks(): Promise<ActiveTasksResponse> {
+    return this.request<ActiveTasksResponse>('/tasks/active');
   }
 }
 

@@ -11,7 +11,7 @@ class VoiceProfileCreate(BaseModel):
     """Request model for creating a voice profile."""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
-    language: str = Field(default="en", pattern="^(en|zh)$")
+    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it)$")
 
 
 class VoiceProfileResponse(BaseModel):
@@ -47,7 +47,7 @@ class GenerationRequest(BaseModel):
     """Request model for voice generation."""
     profile_id: str
     text: str = Field(..., min_length=1, max_length=5000)
-    language: str = Field(default="en", pattern="^(en|zh)$")
+    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it)$")
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B)$")
     instruct: Optional[str] = Field(None, max_length=500)
@@ -138,3 +138,24 @@ class ModelStatusListResponse(BaseModel):
 class ModelDownloadRequest(BaseModel):
     """Request model for triggering model download."""
     model_name: str
+
+
+class ActiveDownloadTask(BaseModel):
+    """Response model for active download task."""
+    model_name: str
+    status: str
+    started_at: datetime
+
+
+class ActiveGenerationTask(BaseModel):
+    """Response model for active generation task."""
+    task_id: str
+    profile_id: str
+    text_preview: str
+    started_at: datetime
+
+
+class ActiveTasksResponse(BaseModel):
+    """Response model for active tasks."""
+    downloads: List[ActiveDownloadTask]
+    generations: List[ActiveGenerationTask]

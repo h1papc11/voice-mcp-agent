@@ -54,10 +54,10 @@ export function ModelManagement() {
       return apiClient.triggerModelDownload(modelName);
     },
     onSuccess: () => {
-      // Refetch status after a delay to see progress
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['modelStatus'] });
-      }, 1000);
+      // Download completed - clear state and refetch status
+      setDownloadingModel(null);
+      setDownloadingDisplayName(null);
+      queryClient.invalidateQueries({ queryKey: ['modelStatus'] });
     },
     onError: (error: Error) => {
       setDownloadingModel(null);
@@ -67,13 +67,6 @@ export function ModelManagement() {
         description: error.message,
         variant: 'destructive',
       });
-    },
-    onSettled: () => {
-      // Clear downloading state after a delay to allow progress to show
-      setTimeout(() => {
-        setDownloadingModel(null);
-        setDownloadingDisplayName(null);
-      }, 2000);
     },
   });
 

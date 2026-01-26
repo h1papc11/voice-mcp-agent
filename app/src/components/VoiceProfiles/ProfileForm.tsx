@@ -30,6 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
+import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
 import {
   useCreateProfile,
   useProfile,
@@ -68,7 +69,7 @@ const profileSchema = z
   .object({
     name: z.string().min(1, 'Name is required').max(100),
     description: z.string().max(500).optional(),
-    language: z.enum(['en', 'zh']),
+    language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
     // Sample fields - only required when creating (not editing)
     sampleFile: z.instanceof(File).optional(),
     referenceText: z.string().max(1000).optional(),
@@ -186,7 +187,7 @@ export function ProfileForm() {
       form.reset({
         name: editingProfile.name,
         description: editingProfile.description || '',
-        language: editingProfile.language as 'en' | 'zh',
+        language: editingProfile.language as LanguageCode,
         sampleFile: undefined,
         referenceText: undefined,
       });
@@ -214,7 +215,7 @@ export function ProfileForm() {
     }
 
     try {
-      const language = form.getValues('language') as 'en' | 'zh' | undefined;
+      const language = form.getValues('language');
       const result = await transcribe.mutateAsync({ file, language });
 
       form.setValue('referenceText', result.text, { shouldValidate: true });
@@ -405,8 +406,11 @@ export function ProfileForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="en">English</SelectItem>
-                          <SelectItem value="zh">Chinese</SelectItem>
+                          {LANGUAGE_OPTIONS.map((lang) => (
+                            <SelectItem key={lang.value} value={lang.value}>
+                              {lang.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />

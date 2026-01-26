@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 from .utils.progress import get_progress_manager
 from .utils.hf_progress import HFProgressTracker, create_hf_progress_callback
+from .utils.tasks import get_task_manager
 
 
 class WhisperModel:
@@ -55,7 +56,20 @@ class WhisperModel:
             progress_manager = get_progress_manager()
             progress_model_name = f"whisper-{model_size}"
             
+            # Start tracking download task
+            task_manager = get_task_manager()
+            task_manager.start_download(progress_model_name)
+            
             print(f"Loading Whisper model {model_size} on {self.device}...")
+            
+            # Initialize progress state to show download has started
+            progress_manager.update_progress(
+                model_name=progress_model_name,
+                current=0,
+                total=1,  # Set to 1 initially, will be updated by callback
+                filename="",
+                status="downloading",
+            )
             
             # Set up progress callback
             progress_callback = create_hf_progress_callback(progress_model_name, progress_manager)
@@ -71,13 +85,17 @@ class WhisperModel:
             
             # Mark as complete
             progress_manager.mark_complete(progress_model_name)
+            task_manager.complete_download(progress_model_name)
             
             print(f"Whisper model {model_size} loaded successfully")
             
         except Exception as e:
             print(f"Error loading Whisper model: {e}")
             progress_manager = get_progress_manager()
-            progress_manager.mark_error(f"whisper-{model_size}", str(e))
+            task_manager = get_task_manager()
+            progress_model_name = f"whisper-{model_size}"
+            progress_manager.mark_error(progress_model_name, str(e))
+            task_manager.error_download(progress_model_name, str(e))
             raise
     
     async def load_model_async(self, model_size: Optional[str] = None):

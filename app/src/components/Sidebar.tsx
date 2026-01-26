@@ -1,4 +1,4 @@
-import { Home, Loader2, Settings } from 'lucide-react';
+import { Volume2, Loader2, Settings } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
 import { useGenerationStore } from '@/stores/generationStore';
@@ -11,7 +11,7 @@ interface SidebarProps {
 }
 
 const tabs = [
-  { id: 'main', icon: Home, label: 'Main' },
+  { id: 'main', icon: Volume2, label: 'Main' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 

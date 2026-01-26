@@ -16,18 +16,19 @@ export function AudioPlayer() {
     duration,
     volume,
     isLooping,
+    shouldRestart,
     setIsPlaying,
     setCurrentTime,
     setDuration,
     setVolume,
     toggleLoop,
+    clearRestartFlag,
   } = usePlayerStore();
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
   const loadingRef = useRef(false);
   const previousAudioIdRef = useRef<string | null>(null);
-  const previousCurrentTimeRef = useRef<number>(0);
   const hasInitializedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -367,51 +368,30 @@ export function AudioPlayer() {
     if (audioId !== previousAudioIdRef.current && previousAudioIdRef.current !== null) {
       hasInitializedRef.current = false;
     }
+    if (audioId !== null) {
+      previousAudioIdRef.current = audioId;
+    }
   }, [duration, audioId]);
 
-  // Handle clicking the same audio again - always restart from beginning
-  // When setAudio is called with the same audioId, it sets currentTime to 0 in the store
-  // but WaveSurfer's actual position is still wherever it was. We detect this mismatch and reset.
+  // Handle restart flag - when history item is clicked again, restart from beginning
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
-    if (!wavesurfer || !audioId || duration === 0 || !hasInitializedRef.current) {
-      // Update the refs even if we don't process
-      if (audioId !== null) {
-        previousAudioIdRef.current = audioId;
-      }
-      previousCurrentTimeRef.current = currentTime;
+    if (!wavesurfer || !shouldRestart || duration === 0) {
       return;
     }
 
-    const previousAudioId = previousAudioIdRef.current;
-    const previousCurrentTime = previousCurrentTimeRef.current;
+    // Reset to beginning and play
+    console.log('Restarting current audio from beginning');
+    wavesurfer.seekTo(0);
+    wavesurfer.play().catch((error) => {
+      console.error('Failed to play after restart:', error);
+      setIsPlaying(false);
+      setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
+    });
     
-    // Check if the same audio was clicked again
-    // This happens when:
-    // 1. audioId matches the previous one (same audio)
-    // 2. currentTime was reset from a non-zero value to 0 (setAudio was called)
-    // 3. WaveSurfer is not at the beginning (needs reset)
-    const wasResetToZero = previousCurrentTime > 0.1 && currentTime < 0.1;
-    const isSameAudio = audioId === previousAudioId;
-    const wavesurferPosition = wavesurfer.getCurrentTime();
-    const wavesurferNotAtStart = wavesurferPosition > 0.1;
-
-    // Update refs for next time
-    previousAudioIdRef.current = audioId;
-    previousCurrentTimeRef.current = currentTime;
-
-    // If same audio was clicked (reset to 0) and WaveSurfer is not at start, reset it
-    if (isSameAudio && wasResetToZero && wavesurferNotAtStart) {
-      // Reset to beginning and play
-      console.log('Same audio clicked again, resetting to beginning');
-      wavesurfer.seekTo(0);
-      wavesurfer.play().catch((error) => {
-        console.error('Failed to play after reset:', error);
-        setIsPlaying(false);
-        setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
-      });
-    }
-  }, [audioId, duration, currentTime, setIsPlaying]);
+    // Clear the restart flag
+    clearRestartFlag();
+  }, [shouldRestart, duration, setIsPlaying, clearRestartFlag]);
 
   // Handle loop - WaveSurfer handles this via the 'finish' event
 

@@ -105,3 +105,21 @@ export interface ModelStatusListResponse {
 export interface ModelDownloadRequest {
   model_name: string;
 }
+
+export interface ActiveDownloadTask {
+  model_name: string;
+  status: string;
+  started_at: string;
+}
+
+export interface ActiveGenerationTask {
+  task_id: string;
+  profile_id: string;
+  text_preview: string;
+  started_at: string;
+}
+
+export interface ActiveTasksResponse {
+  downloads: ActiveDownloadTask[];
+  generations: ActiveGenerationTask[];
+}

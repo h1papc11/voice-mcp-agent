@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime
 import uvicorn
 import argparse
 import torch
@@ -21,6 +22,7 @@ import uuid
 from . import database, models, profiles, history, tts, transcribe, config, export_import
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
+from .utils.tasks import get_task_manager
 
 app = FastAPI(
     title="voicebox API",
@@ -300,7 +302,17 @@ async def generate_speech(
     db: Session = Depends(get_db),
 ):
     """Generate speech from text using a voice profile."""
+    task_manager = get_task_manager()
+    generation_id = str(uuid.uuid4())
+    
     try:
+        # Start tracking generation
+        task_manager.start_generation(
+            task_id=generation_id,
+            profile_id=data.profile_id,
+            text=data.text,
+        )
+        
         # Get profile
         profile = await profiles.get_profile(data.profile_id, db)
         if not profile:
@@ -329,7 +341,6 @@ async def generate_speech(
         duration = len(audio) / sample_rate
 
         # Save audio
-        generation_id = str(uuid.uuid4())
         audio_path = config.get_generations_dir() / f"{generation_id}.wav"
 
         from .utils.audio import save_audio
@@ -347,11 +358,16 @@ async def generate_speech(
             instruct=data.instruct,
         )
         
+        # Mark generation as complete
+        task_manager.complete_generation(generation_id)
+        
         return generation
         
     except ValueError as e:
+        task_manager.complete_generation(generation_id)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        task_manager.complete_generation(generation_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -742,6 +758,8 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     """Trigger download of a specific model."""
     import asyncio
     
+    task_manager = get_task_manager()
+    
     model_configs = {
         "qwen-tts-1.7B": {
             "model_size": "1.7B",
@@ -775,12 +793,20 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     config = model_configs[request.model_name]
     
     try:
+        # Start tracking download
+        task_manager.start_download(request.model_name)
+        
         # Trigger download by loading the model (which will download if not cached)
         # Run in background to avoid blocking
         await asyncio.to_thread(config["load_func"])
         
+        # Mark download as complete
+        task_manager.complete_download(request.model_name)
+        
         return {"message": f"Model {request.model_name} download started"}
     except Exception as e:
+        # Mark download as failed
+        task_manager.error_download(request.model_name, str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -864,6 +890,72 @@ async def delete_model(model_name: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
+
+
+# ============================================
+# TASK MANAGEMENT
+# ============================================
+
+@app.get("/tasks/active", response_model=models.ActiveTasksResponse)
+async def get_active_tasks():
+    """Return all currently active downloads and generations."""
+    task_manager = get_task_manager()
+    progress_manager = get_progress_manager()
+    
+    # Get active downloads from both task manager and progress manager
+    # Task manager tracks which downloads are active
+    # Progress manager has the actual progress data
+    active_downloads = []
+    task_manager_downloads = task_manager.get_active_downloads()
+    progress_active = progress_manager.get_all_active()
+    
+    # Combine data from both sources
+    download_map = {task.model_name: task for task in task_manager_downloads}
+    progress_map = {p["model_name"]: p for p in progress_active}
+    
+    # Create unified list
+    all_model_names = set(download_map.keys()) | set(progress_map.keys())
+    for model_name in all_model_names:
+        task = download_map.get(model_name)
+        progress = progress_map.get(model_name)
+        
+        if task:
+            active_downloads.append(models.ActiveDownloadTask(
+                model_name=model_name,
+                status=task.status,
+                started_at=task.started_at,
+            ))
+        elif progress:
+            # Progress exists but no task - create from progress data
+            timestamp_str = progress.get("timestamp")
+            if timestamp_str:
+                try:
+                    started_at = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                except (ValueError, AttributeError):
+                    started_at = datetime.utcnow()
+            else:
+                started_at = datetime.utcnow()
+            
+            active_downloads.append(models.ActiveDownloadTask(
+                model_name=model_name,
+                status=progress.get("status", "downloading"),
+                started_at=started_at,
+            ))
+    
+    # Get active generations
+    active_generations = []
+    for gen_task in task_manager.get_active_generations():
+        active_generations.append(models.ActiveGenerationTask(
+            task_id=gen_task.task_id,
+            profile_id=gen_task.profile_id,
+            text_preview=gen_task.text_preview,
+            started_at=gen_task.started_at,
+        ))
+    
+    return models.ActiveTasksResponse(
+        downloads=active_downloads,
+        generations=active_generations,
+    )
 
 
 # ============================================

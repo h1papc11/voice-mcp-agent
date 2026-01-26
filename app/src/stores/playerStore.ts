@@ -9,6 +9,7 @@ interface PlayerState {
   duration: number;
   volume: number;
   isLooping: boolean;
+  shouldRestart: boolean;
 
   setAudio: (url: string, id: string, title?: string) => void;
   setIsPlaying: (playing: boolean) => void;
@@ -16,6 +17,8 @@ interface PlayerState {
   setDuration: (duration: number) => void;
   setVolume: (volume: number) => void;
   toggleLoop: () => void;
+  restartCurrentAudio: () => void;
+  clearRestartFlag: () => void;
   reset: () => void;
 }
 
@@ -28,6 +31,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   duration: 0,
   volume: 1,
   isLooping: false,
+  shouldRestart: false,
 
   setAudio: (url, id, title) =>
     set({
@@ -36,12 +40,15 @@ export const usePlayerStore = create<PlayerState>((set) => ({
       title: title || null,
       currentTime: 0,
       isPlaying: false,
+      shouldRestart: false,
     }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (duration) => set({ duration }),
   setVolume: (volume) => set({ volume }),
   toggleLoop: () => set((state) => ({ isLooping: !state.isLooping })),
+  restartCurrentAudio: () => set({ shouldRestart: true }),
+  clearRestartFlag: () => set({ shouldRestart: false }),
   reset: () =>
     set({
       audioUrl: null,
@@ -51,5 +58,6 @@ export const usePlayerStore = create<PlayerState>((set) => ({
       currentTime: 0,
       duration: 0,
       isLooping: false,
+      shouldRestart: false,
     }),
 }));

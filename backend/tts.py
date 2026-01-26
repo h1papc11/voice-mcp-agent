@@ -14,6 +14,7 @@ from .utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_pro
 from .utils.audio import normalize_audio
 from .utils.progress import get_progress_manager
 from .utils.hf_progress import HFProgressTracker, create_hf_progress_callback
+from .utils.tasks import get_task_manager
 from . import config
 
 
@@ -111,6 +112,10 @@ class TTSModel:
             if model_path.startswith("Qwen/"):
                 print(f"Loading TTS model {model_size} on {self.device}...")
                 
+                # Start tracking download task
+                task_manager = get_task_manager()
+                task_manager.start_download(model_name)
+                
                 # Initialize progress state to show download has started
                 progress_manager.update_progress(
                     model_name=model_name,
@@ -135,6 +140,7 @@ class TTSModel:
                 
                 # Mark as complete
                 progress_manager.mark_complete(model_name)
+                task_manager.complete_download(model_name)
             else:
                 # Local model, no download needed
                 print(f"Loading TTS model {model_size} on {self.device}...")
@@ -152,13 +158,19 @@ class TTSModel:
         except ImportError as e:
             print(f"Error: qwen_tts package not found. Install with: pip install git+https://github.com/QwenLM/Qwen3-TTS.git")
             progress_manager = get_progress_manager()
-            progress_manager.mark_error(f"qwen-tts-{model_size}", str(e))
+            task_manager = get_task_manager()
+            model_name = f"qwen-tts-{model_size}"
+            progress_manager.mark_error(model_name, str(e))
+            task_manager.error_download(model_name, str(e))
             raise
         except Exception as e:
             print(f"Error loading TTS model: {e}")
             print(f"Tip: The model will be automatically downloaded from HuggingFace Hub on first use.")
             progress_manager = get_progress_manager()
-            progress_manager.mark_error(f"qwen-tts-{model_size}", str(e))
+            task_manager = get_task_manager()
+            model_name = f"qwen-tts-{model_size}"
+            progress_manager.mark_error(model_name, str(e))
+            task_manager.error_download(model_name, str(e))
             raise
     
     async def load_model_async(self, model_size: Optional[str] = None):

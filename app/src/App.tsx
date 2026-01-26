@@ -13,7 +13,9 @@ import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { UpdateNotification } from '@/components/UpdateNotification';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
-import { isTauri, isMacOS, setupWindowCloseHandler, startServer } from '@/lib/tauri';
+import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
+import { useRestoreActiveTasks, MODEL_DISPLAY_NAMES } from '@/lib/hooks/useRestoreActiveTasks';
+import { isMacOS, isTauri, setupWindowCloseHandler, startServer } from '@/lib/tauri';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -45,6 +47,9 @@ function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
+  // Monitor active downloads/generations and show toasts for them
+  const activeDownloads = useRestoreActiveTasks();
 
   // Setup window close handler and auto-start server when running in Tauri (production only)
   useEffect(() => {
@@ -118,27 +123,27 @@ function App() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center pt-12">
         <TitleBarDragRegion />
-          <div className="text-center space-y-6">
-            <div className="flex justify-center relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 rounded-full bg-accent/20 blur-3xl" />
-              </div>
-              <img
-                src={voiceboxLogo}
-                alt="Voicebox"
-                className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
-              />
+        <div className="text-center space-y-6">
+          <div className="flex justify-center relative">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-48 h-48 rounded-full bg-accent/20 blur-3xl" />
             </div>
-            <div className="animate-fade-in-delayed">
-              <ShinyText
-                text={LOADING_MESSAGES[loadingMessageIndex]}
-                className="text-lg font-medium text-muted-foreground"
-                speed={2}
-                color="hsl(var(--muted-foreground))"
-                shineColor="hsl(var(--foreground))"
-              />
-            </div>
+            <img
+              src={voiceboxLogo}
+              alt="Voicebox"
+              className="w-48 h-48 object-contain animate-fade-in-scale relative z-10"
+            />
           </div>
+          <div className="animate-fade-in-delayed">
+            <ShinyText
+              text={LOADING_MESSAGES[loadingMessageIndex]}
+              className="text-lg font-medium text-muted-foreground"
+              speed={2}
+              color="hsl(var(--muted-foreground))"
+              shineColor="hsl(var(--foreground))"
+            />
+          </div>
+        </div>
       </div>
     );
   }
@@ -202,9 +207,41 @@ function App() {
       {/* Audio Player - always visible except on settings */}
       {activeTab !== 'settings' && <AudioPlayer />}
 
+      {/* Show download toasts for any active downloads (from anywhere) */}
+      {activeDownloads.map((download) => {
+        const displayName = MODEL_DISPLAY_NAMES[download.model_name] || download.model_name;
+        return (
+          <DownloadToastRestorer
+            key={download.model_name}
+            modelName={download.model_name}
+            displayName={displayName}
+          />
+        );
+      })}
+
       <Toaster />
     </div>
   );
+}
+
+/**
+ * Component that restores a download toast for a specific model.
+ */
+function DownloadToastRestorer({
+  modelName,
+  displayName,
+}: {
+  modelName: string;
+  displayName: string;
+}) {
+  // Use the download toast hook to restore the toast
+  useModelDownloadToast({
+    modelName,
+    displayName,
+    enabled: true,
+  });
+
+  return null;
 }
 
 export default App;

@@ -31,6 +31,7 @@ export function HistoryTable() {
 
   const deleteGeneration = useDeleteGeneration();
   const setAudio = usePlayerStore((state) => state.setAudio);
+  const restartCurrentAudio = usePlayerStore((state) => state.restartCurrentAudio);
   const currentAudioId = usePlayerStore((state) => state.audioId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const audioUrl = usePlayerStore((state) => state.audioUrl);
@@ -49,9 +50,14 @@ export function HistoryTable() {
   }, []);
 
   const handlePlay = (audioId: string, text: string) => {
-    const audioUrl = apiClient.getAudioUrl(audioId);
-    // If clicking the same audio that's playing, it will be handled by the player
-    setAudio(audioUrl, audioId, text.substring(0, 50));
+    // If clicking the same audio, restart it from the beginning
+    if (currentAudioId === audioId) {
+      restartCurrentAudio();
+    } else {
+      // Otherwise, load the new audio
+      const audioUrl = apiClient.getAudioUrl(audioId);
+      setAudio(audioUrl, audioId, text.substring(0, 50));
+    }
   };
 
   const handleDownload = (audioId: string, text: string) => {
