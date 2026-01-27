@@ -28,6 +28,57 @@ async fn start_server(
         return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
     }
 
+    // Check if a voicebox server is already running on our port (from previous session with keep_running=true)
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("lsof")
+            .args(["-i", &format!(":{}", SERVER_PORT), "-sTCP:LISTEN"])
+            .output()
+        {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines().skip(1) {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let command = parts[0];
+                    if command.contains("voicebox") {
+                        println!("Found existing voicebox-server on port {}, reusing it", SERVER_PORT);
+                        return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                    }
+                }
+            }
+        }
+    }
+    
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        if let Ok(output) = Command::new("netstat")
+            .args(["-ano"])
+            .output()
+        {
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines() {
+                if line.contains(&format!(":{}", SERVER_PORT)) && line.contains("LISTENING") {
+                    if let Some(pid_str) = line.split_whitespace().last() {
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            if let Ok(tasklist_output) = Command::new("tasklist")
+                                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+                                .output()
+                            {
+                                let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
+                                if tasklist_str.to_lowercase().contains("voicebox") {
+                                    println!("Found existing voicebox-server on port {}, reusing it", SERVER_PORT);
+                                    return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Kill any orphaned voicebox-server from previous session on legacy port 8000
     // This handles upgrades from older versions that used a fixed port
     #[cfg(unix)]

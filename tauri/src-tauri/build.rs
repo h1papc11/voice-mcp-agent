@@ -7,12 +7,15 @@ fn main() {
         // Add Swift runtime library paths to RPATH
         println!("cargo:rustc-link-arg=-Wl,-rpath,/usr/lib/swift");
         println!("cargo:rustc-link-arg=-L/usr/lib/swift");
-        
+
         // Also try Xcode's Swift libraries
         if let Ok(output) = Command::new("xcode-select").arg("-p").output() {
             if output.status.success() {
                 let xcode_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                let swift_lib_path = format!("{}/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx", xcode_path);
+                let swift_lib_path = format!(
+                    "{}/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx",
+                    xcode_path
+                );
                 println!("cargo:rustc-link-arg=-Wl,-rpath,{}", swift_lib_path);
                 println!("cargo:rustc-link-arg=-L{}", swift_lib_path);
             }
@@ -38,14 +41,21 @@ fn main() {
             let output = Command::new("xcrun")
                 .args([
                     "actool",
-                    "--compile", &gen_dir,
-                    "--output-format", "human-readable-text",
-                    "--output-partial-info-plist", &partial_plist,
-                    "--app-icon", "voicebox",
+                    "--compile",
+                    &gen_dir,
+                    "--output-format",
+                    "human-readable-text",
+                    "--output-partial-info-plist",
+                    &partial_plist,
+                    "--app-icon",
+                    "voicebox",
                     "--include-all-app-icons",
-                    "--target-device", "mac",
-                    "--minimum-deployment-target", "11.0",
-                    "--platform", "macosx",
+                    "--target-device",
+                    "mac",
+                    "--minimum-deployment-target",
+                    "11.0",
+                    "--platform",
+                    "macosx",
                     &icon_source,
                 ])
                 .output();
@@ -66,7 +76,10 @@ fn main() {
                 }
             }
         } else {
-            println!("cargo:warning=Icon source not found at {}, skipping icon compilation", icon_source);
+            println!(
+                "cargo:warning=Icon source not found at {}, skipping icon compilation",
+                icon_source
+            );
         }
     }
 
