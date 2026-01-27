@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { isTauri } from '@/lib/tauri';
+import { convertToWav } from '@/lib/utils/audio';
 
 interface UseAudioRecordingOptions {
   maxDurationSeconds?: number;
@@ -85,13 +86,26 @@ export function useAudioRecording({
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        // Pass the actual recorded duration
-        const recordedDuration = startTimeRef.current 
-          ? (Date.now() - startTimeRef.current) / 1000 
-          : undefined;
-        onRecordingComplete?.(blob, recordedDuration);
+      mediaRecorder.onstop = async () => {
+        const webmBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+
+        // Convert to WAV format to avoid needing ffmpeg on backend
+        try {
+          const wavBlob = await convertToWav(webmBlob);
+
+          // Pass the actual recorded duration
+          const recordedDuration = startTimeRef.current
+            ? (Date.now() - startTimeRef.current) / 1000
+            : undefined;
+          onRecordingComplete?.(wavBlob, recordedDuration);
+        } catch (err) {
+          console.error('Error converting audio to WAV:', err);
+          // Fallback to original blob if conversion fails
+          const recordedDuration = startTimeRef.current
+            ? (Date.now() - startTimeRef.current) / 1000
+            : undefined;
+          onRecordingComplete?.(webmBlob, recordedDuration);
+        }
 
         // Stop all tracks
         streamRef.current?.getTracks().forEach((track) => {
