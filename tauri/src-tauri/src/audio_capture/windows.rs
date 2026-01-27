@@ -2,7 +2,6 @@ use crate::audio_capture::AudioCaptureState;
 use base64::{engine::general_purpose, Engine as _};
 use hound::{WavSpec, WavWriter};
 use std::io::Cursor;
-use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use wasapi::*;
 
@@ -16,7 +15,7 @@ pub async fn start_capture(
     // Get default audio render device for loopback
     let device = DeviceEnumerator::new()
         .map_err(|e| format!("Failed to create device enumerator: {}", e))?
-        .get_default_audio_endpoint(&Direction::Render)
+        .get_default_device(&Direction::Render)
         .map_err(|e| format!("Failed to get default render device: {}", e))?;
 
     // Create audio client for loopback capture
@@ -72,14 +71,8 @@ pub async fn start_capture(
                         Ok(available) => {
                             if available > 0 {
                                 match capture_client.get_buffer::<f32>() {
-                                    Ok((data, flags)) => {
-                                        if flags.contains(&StreamFlags::SILENT) {
-                                            // Silent buffer, skip
-                                            capture_client.release_buffer(available).ok();
-                                            continue;
-                                        }
-                                        
-                                        // Convert samples to f32 and store
+                                    Ok((data, _flags)) => {
+                                        // Store samples (wasapi handles silence flags internally)
                                         let mut samples_guard = samples.lock().unwrap();
                                         samples_guard.extend_from_slice(data);
                                         capture_client.release_buffer(available).ok();
