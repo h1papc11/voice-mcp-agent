@@ -8,7 +8,7 @@ import { useAutoUpdater } from '@/hooks/useAutoUpdater';
 import { getVersion } from '@tauri-apps/api/app';
 
 export function UpdateStatus() {
-  const { status, checkForUpdates, downloadAndInstall } = useAutoUpdater(false);
+  const { status, checkForUpdates, downloadAndInstall, restartAndInstall } = useAutoUpdater(false);
   const [currentVersion, setCurrentVersion] = useState<string>('');
 
   useEffect(() => {
@@ -30,7 +30,7 @@ export function UpdateStatus() {
           </div>
           <Button
             onClick={checkForUpdates}
-            disabled={status.checking || status.downloading || status.installing}
+            disabled={status.checking || status.downloading || status.readyToInstall}
             variant="outline"
             size="sm"
           >
@@ -53,7 +53,7 @@ export function UpdateStatus() {
           </div>
         )}
 
-        {status.available && !status.downloading && !status.installing && (
+        {status.available && !status.downloading && !status.readyToInstall && (
           <div className="space-y-3 p-4 border rounded-lg bg-primary/5">
             <div className="flex items-center justify-between">
               <div>
@@ -64,7 +64,7 @@ export function UpdateStatus() {
             </div>
             <Button onClick={downloadAndInstall} className="w-full" size="sm">
               <Download className="h-4 w-4 mr-2" />
-              Install Update
+              Download Update
             </Button>
           </div>
         )}
@@ -91,13 +91,22 @@ export function UpdateStatus() {
           </div>
         )}
 
-        {status.installing && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              Installing update...
+        {status.readyToInstall && (
+          <div className="space-y-3 p-4 border rounded-lg bg-green-500/10 border-green-500/20">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+              <div>
+                <div className="font-semibold">Update Ready to Install</div>
+                <div className="text-sm text-muted-foreground">Version {status.version} has been downloaded</div>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground">App will restart automatically</div>
+            <div className="text-sm text-muted-foreground">
+              The app needs to restart to complete the installation. You can do this now or later at your convenience.
+            </div>
+            <Button onClick={restartAndInstall} className="w-full" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Restart Now
+            </Button>
           </div>
         )}
 

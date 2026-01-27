@@ -525,94 +525,72 @@ export function ProfileForm() {
                       </p>
                     </div>
 
-                  <Tabs
-                    value={sampleMode}
-                    onValueChange={(v) => {
-                      const newMode = v as 'upload' | 'record' | 'system';
-                      // Cancel any active recordings when switching modes
-                      if (isRecording && newMode !== 'record') {
-                        cancelRecording();
-                      }
-                      if (isSystemRecording && newMode !== 'system') {
-                        cancelSystemRecording();
-                      }
-                      setSampleMode(newMode);
-                    }}
-                  >
-                    <TabsList
-                      className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                    <Tabs
+                      value={sampleMode}
+                      onValueChange={(v) => {
+                        const newMode = v as 'upload' | 'record' | 'system';
+                        // Cancel any active recordings when switching modes
+                        if (isRecording && newMode !== 'record') {
+                          cancelRecording();
+                        }
+                        if (isSystemRecording && newMode !== 'system') {
+                          cancelSystemRecording();
+                        }
+                        setSampleMode(newMode);
+                      }}
                     >
-                      <TabsTrigger value="upload" className="flex items-center gap-2">
-                        <Upload className="h-4 w-4 shrink-0" />
-                        Upload
-                      </TabsTrigger>
-                      <TabsTrigger value="record" className="flex items-center gap-2">
-                        <Mic className="h-4 w-4 shrink-0" />
-                        Record
-                      </TabsTrigger>
-                      {isTauri() && isSystemAudioSupported && (
-                        <TabsTrigger value="system" className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4 shrink-0" />
-                          System Audio
+                      <TabsList
+                        className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                      >
+                        <TabsTrigger value="upload" className="flex items-center gap-2">
+                          <Upload className="h-4 w-4 shrink-0" />
+                          Upload
                         </TabsTrigger>
-                      )}
-                    </TabsList>
-
-                    <TabsContent value="upload" className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="sampleFile"
-                        render={({ field: { onChange, name } }) => (
-                          <AudioSampleUpload
-                            file={selectedFile}
-                            onFileChange={onChange}
-                            onTranscribe={handleTranscribe}
-                            onPlayPause={handlePlayPause}
-                            isPlaying={isPlaying}
-                            isValidating={isValidatingAudio}
-                            isTranscribing={transcribe.isPending}
-                            isDisabled={
-                              audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS
-                            }
-                            fieldName={name}
-                          />
+                        <TabsTrigger value="record" className="flex items-center gap-2">
+                          <Mic className="h-4 w-4 shrink-0" />
+                          Record
+                        </TabsTrigger>
+                        {isTauri() && isSystemAudioSupported && (
+                          <TabsTrigger value="system" className="flex items-center gap-2">
+                            <Monitor className="h-4 w-4 shrink-0" />
+                            System Audio
+                          </TabsTrigger>
                         )}
-                      />
-                    </TabsContent>
+                      </TabsList>
 
-                    <TabsContent value="record" className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="sampleFile"
-                        render={() => (
-                          <AudioSampleRecording
-                            file={selectedFile}
-                            isRecording={isRecording}
-                            duration={duration}
-                            onStart={startRecording}
-                            onStop={stopRecording}
-                            onCancel={handleCancelRecording}
-                            onTranscribe={handleTranscribe}
-                            onPlayPause={handlePlayPause}
-                            isPlaying={isPlaying}
-                            isTranscribing={transcribe.isPending}
-                          />
-                        )}
-                      />
-                    </TabsContent>
+                      <TabsContent value="upload" className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="sampleFile"
+                          render={({ field: { onChange, name } }) => (
+                            <AudioSampleUpload
+                              file={selectedFile}
+                              onFileChange={onChange}
+                              onTranscribe={handleTranscribe}
+                              onPlayPause={handlePlayPause}
+                              isPlaying={isPlaying}
+                              isValidating={isValidatingAudio}
+                              isTranscribing={transcribe.isPending}
+                              isDisabled={
+                                audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS
+                              }
+                              fieldName={name}
+                            />
+                          )}
+                        />
+                      </TabsContent>
 
-                    {isTauri() && isSystemAudioSupported && (
-                      <TabsContent value="system" className="space-y-4">
+                      <TabsContent value="record" className="space-y-4">
                         <FormField
                           control={form.control}
                           name="sampleFile"
                           render={() => (
-                            <AudioSampleSystem
+                            <AudioSampleRecording
                               file={selectedFile}
-                              isRecording={isSystemRecording}
-                              duration={systemDuration}
-                              onStart={startSystemRecording}
-                              onStop={stopSystemRecording}
+                              isRecording={isRecording}
+                              duration={duration}
+                              onStart={startRecording}
+                              onStop={stopRecording}
                               onCancel={handleCancelRecording}
                               onTranscribe={handleTranscribe}
                               onPlayPause={handlePlayPause}
@@ -622,8 +600,30 @@ export function ProfileForm() {
                           )}
                         />
                       </TabsContent>
-                    )}
-                  </Tabs>
+
+                      {isTauri() && isSystemAudioSupported && (
+                        <TabsContent value="system" className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="sampleFile"
+                            render={() => (
+                              <AudioSampleSystem
+                                file={selectedFile}
+                                isRecording={isSystemRecording}
+                                duration={systemDuration}
+                                onStart={startSystemRecording}
+                                onStop={stopSystemRecording}
+                                onCancel={handleCancelRecording}
+                                onTranscribe={handleTranscribe}
+                                onPlayPause={handlePlayPause}
+                                isPlaying={isPlaying}
+                                isTranscribing={transcribe.isPending}
+                              />
+                            )}
+                          />
+                        </TabsContent>
+                      )}
+                    </Tabs>
 
                     <FormField
                       control={form.control}
