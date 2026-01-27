@@ -41,9 +41,14 @@ async fn start_server(
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {
                     let command = parts[0];
+                    let pid_str = parts[1];
                     if command.contains("voicebox") {
-                        println!("Found existing voicebox-server on port {}, reusing it", SERVER_PORT);
-                        return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            println!("Found existing voicebox-server on port {} (PID: {}), reusing it", SERVER_PORT, pid);
+                            // Store the PID so we can kill it on exit if needed
+                            *state.server_pid.lock().unwrap() = Some(pid);
+                            return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                        }
                     }
                 }
             }
@@ -68,7 +73,9 @@ async fn start_server(
                             {
                                 let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
                                 if tasklist_str.to_lowercase().contains("voicebox") {
-                                    println!("Found existing voicebox-server on port {}, reusing it", SERVER_PORT);
+                                    println!("Found existing voicebox-server on port {} (PID: {}), reusing it", SERVER_PORT, pid);
+                                    // Store the PID so we can kill it on exit if needed
+                                    *state.server_pid.lock().unwrap() = Some(pid);
                                     return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
                                 }
                             }

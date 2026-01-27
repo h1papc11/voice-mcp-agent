@@ -15,7 +15,13 @@ import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
-import { isMacOS, isTauri, setupWindowCloseHandler, startServer, setKeepServerRunning } from '@/lib/tauri';
+import {
+  isMacOS,
+  isTauri,
+  setKeepServerRunning,
+  setupWindowCloseHandler,
+  startServer,
+} from '@/lib/tauri';
 import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
