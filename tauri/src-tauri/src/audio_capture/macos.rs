@@ -163,25 +163,67 @@ fn extract_audio_samples(sample_buffer: CMSampleBuffer) -> Result<Vec<f32>, Stri
         .audio_buffer_list()
         .ok_or_else(|| "Failed to get audio buffer list".to_string())?;
 
-    let mut samples = Vec::new();
+    let buffers: Vec<_> = audio_buffer_list.iter().collect();
+    let num_buffers = buffers.len();
+    
+    if num_buffers == 0 {
+        return Ok(Vec::new());
+    }
 
-    // Iterate through audio buffers
-    for buffer in audio_buffer_list.iter() {
-        // Get raw bytes and interpret as f32 samples
+    // ScreenCaptureKit on macOS provides audio in Float32 format
+    // The audio can be either:
+    // - Interleaved (1 buffer with L,R,L,R,... samples)
+    // - Planar (2 buffers, one for L channel, one for R channel)
+    
+    if num_buffers == 1 {
+        // Interleaved stereo or mono in a single buffer
+        let buffer = &buffers[0];
         let data_bytes = buffer.data();
         let num_samples = data_bytes.len() / std::mem::size_of::<f32>();
         
         if num_samples > 0 {
             unsafe {
-                // Interpret bytes as f32 samples
                 let data_ptr = data_bytes.as_ptr() as *const f32;
                 let data = std::slice::from_raw_parts(data_ptr, num_samples);
-                samples.extend_from_slice(data);
+                return Ok(data.to_vec());
             }
         }
+    } else {
+        // Planar format - separate buffer for each channel
+        // We need to interleave them: L0, R0, L1, R1, ...
+        let mut channel_data: Vec<Vec<f32>> = Vec::new();
+        let mut max_samples = 0;
+        
+        for buffer in &buffers {
+            let data_bytes = buffer.data();
+            let num_samples = data_bytes.len() / std::mem::size_of::<f32>();
+            
+            if num_samples > 0 {
+                unsafe {
+                    let data_ptr = data_bytes.as_ptr() as *const f32;
+                    let data = std::slice::from_raw_parts(data_ptr, num_samples);
+                    channel_data.push(data.to_vec());
+                    max_samples = max_samples.max(num_samples);
+                }
+            }
+        }
+        
+        // Interleave the channels
+        let mut interleaved = Vec::with_capacity(max_samples * num_buffers);
+        for i in 0..max_samples {
+            for channel in &channel_data {
+                if i < channel.len() {
+                    interleaved.push(channel[i]);
+                } else {
+                    interleaved.push(0.0); // Pad with silence if needed
+                }
+            }
+        }
+        
+        return Ok(interleaved);
     }
 
-    Ok(samples)
+    Ok(Vec::new())
 }
 
 fn samples_to_wav(samples: &[f32], sample_rate: u32, channels: u16) -> Result<Vec<u8>, String> {

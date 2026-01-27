@@ -18,6 +18,7 @@ pub struct AudioCaptureState {
     pub sample_rate: Arc<Mutex<u32>>,
     pub channels: Arc<Mutex<u16>>,
     pub stop_tx: Arc<Mutex<Option<tokio::sync::mpsc::Sender<()>>>>,
+    pub error: Arc<Mutex<Option<String>>>,
     #[cfg(target_os = "macos")]
     pub stream: Arc<Mutex<Option<SCStream>>>,
 }
@@ -29,6 +30,7 @@ impl AudioCaptureState {
             sample_rate: Arc::new(Mutex::new(44100)),
             channels: Arc::new(Mutex::new(2)),
             stop_tx: Arc::new(Mutex::new(None)),
+            error: Arc::new(Mutex::new(None)),
             #[cfg(target_os = "macos")]
             stream: Arc::new(Mutex::new(None)),
         }
@@ -36,5 +38,6 @@ impl AudioCaptureState {
 
     pub fn reset(&self) {
         *self.samples.lock().unwrap() = Vec::new();
+        *self.error.lock().unwrap() = None;
     }
 }

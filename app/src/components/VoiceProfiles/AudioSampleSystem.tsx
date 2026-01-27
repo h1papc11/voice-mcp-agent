@@ -1,4 +1,4 @@
-import { Monitor, Square, Play, Pause, Mic } from 'lucide-react';
+import { Mic, Monitor, Pause, Play, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { formatAudioDuration } from '@/lib/utils/audio';
@@ -35,12 +35,7 @@ export function AudioSampleSystem({
         <div className="space-y-4">
           {!isRecording && !file && (
             <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
-              <Button
-                type="button"
-                onClick={onStart}
-                size="lg"
-                className="flex items-center gap-2"
-              >
+              <Button type="button" onClick={onStart} size="lg" className="flex items-center gap-2">
                 <Monitor className="h-5 w-5" />
                 Start Capture
               </Button>
@@ -81,16 +76,9 @@ export function AudioSampleSystem({
                 <Monitor className="h-5 w-5 text-primary" />
                 <span className="font-medium">Capture complete</span>
               </div>
-              <p className="text-sm text-muted-foreground text-center">
-                File: {file.name}
-              </p>
+              <p className="text-sm text-muted-foreground text-center">File: {file.name}</p>
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={onPlayPause}
-                >
+                <Button type="button" size="icon" variant="outline" onClick={onPlayPause}>
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
                 <Button

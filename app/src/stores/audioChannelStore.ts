@@ -28,9 +28,7 @@ export const useAudioChannelStore = create<AudioChannelStore>()(
         })),
       updateChannel: (id, updates) =>
         set((state) => ({
-          channels: state.channels.map((ch) =>
-            ch.id === id ? { ...ch, ...updates } : ch,
-          ),
+          channels: state.channels.map((ch) => (ch.id === id ? { ...ch, ...updates } : ch)),
         })),
       removeChannel: (id) =>
         set((state) => ({

@@ -47,6 +47,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
+import { SampleList } from './SampleList';
 
 // Helper function to get audio duration from File
 async function getAudioDuration(file: File & { recordedDuration?: number }): Promise<number> {
@@ -325,7 +326,7 @@ export function ProfileForm() {
           },
         });
         toast({
-          title: 'Profile updated',
+          title: 'Voice updated',
           description: `"${data.name}" has been updated successfully.`,
         });
       } else {
@@ -446,17 +447,17 @@ export function ProfileForm() {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{editingProfileId ? 'Edit Profile' : 'Create Voice Profile'}</DialogTitle>
+          <DialogTitle>{editingProfileId ? 'Edit Voice' : 'Create Voice Profile'}</DialogTitle>
           <DialogDescription>
             {editingProfileId
-              ? 'Update your voice profile details.'
+              ? 'Update your voice profile details and manage samples.'
               : 'Create a new voice profile with an audio sample to clone the voice.'}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className={`grid gap-6 ${isCreating ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div className="grid gap-6 grid-cols-2">
               {/* Left column: Profile info */}
               <div className="space-y-4">
                 <FormField
@@ -513,104 +514,83 @@ export function ProfileForm() {
                 />
               </div>
 
-              {/* Right column: Sample upload section - only show when creating */}
-              {isCreating && (
-                <div className="space-y-4 border-l pl-6">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Add Sample</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Provide an audio sample to clone the voice. You can add more samples later.
-                    </p>
-                  </div>
+              {/* Right column: Sample management */}
+              <div className="space-y-4 border-l pl-6">
+                {isCreating ? (
+                  <>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Add Sample</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Provide an audio sample to clone the voice. You can add more samples later.
+                      </p>
+                    </div>
 
-                  <Tabs
-                    value={sampleMode}
-                    onValueChange={(v) => {
-                      const newMode = v as 'upload' | 'record' | 'system';
-                      // Cancel any active recordings when switching modes
-                      if (isRecording && newMode !== 'record') {
-                        cancelRecording();
-                      }
-                      if (isSystemRecording && newMode !== 'system') {
-                        cancelSystemRecording();
-                      }
-                      setSampleMode(newMode);
-                    }}
-                  >
-                    <TabsList
-                      className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                    <Tabs
+                      value={sampleMode}
+                      onValueChange={(v) => {
+                        const newMode = v as 'upload' | 'record' | 'system';
+                        // Cancel any active recordings when switching modes
+                        if (isRecording && newMode !== 'record') {
+                          cancelRecording();
+                        }
+                        if (isSystemRecording && newMode !== 'system') {
+                          cancelSystemRecording();
+                        }
+                        setSampleMode(newMode);
+                      }}
                     >
-                      <TabsTrigger value="upload" className="flex items-center gap-2">
-                        <Upload className="h-4 w-4 shrink-0" />
-                        Upload
-                      </TabsTrigger>
-                      <TabsTrigger value="record" className="flex items-center gap-2">
-                        <Mic className="h-4 w-4 shrink-0" />
-                        Record
-                      </TabsTrigger>
-                      {isTauri() && isSystemAudioSupported && (
-                        <TabsTrigger value="system" className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4 shrink-0" />
-                          System Audio
+                      <TabsList
+                        className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                      >
+                        <TabsTrigger value="upload" className="flex items-center gap-2">
+                          <Upload className="h-4 w-4 shrink-0" />
+                          Upload
                         </TabsTrigger>
-                      )}
-                    </TabsList>
-
-                    <TabsContent value="upload" className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="sampleFile"
-                        render={({ field: { onChange, name } }) => (
-                          <AudioSampleUpload
-                            file={selectedFile}
-                            onFileChange={onChange}
-                            onTranscribe={handleTranscribe}
-                            onPlayPause={handlePlayPause}
-                            isPlaying={isPlaying}
-                            isValidating={isValidatingAudio}
-                            isTranscribing={transcribe.isPending}
-                            isDisabled={
-                              audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS
-                            }
-                            fieldName={name}
-                          />
+                        <TabsTrigger value="record" className="flex items-center gap-2">
+                          <Mic className="h-4 w-4 shrink-0" />
+                          Record
+                        </TabsTrigger>
+                        {isTauri() && isSystemAudioSupported && (
+                          <TabsTrigger value="system" className="flex items-center gap-2">
+                            <Monitor className="h-4 w-4 shrink-0" />
+                            System Audio
+                          </TabsTrigger>
                         )}
-                      />
-                    </TabsContent>
+                      </TabsList>
 
-                    <TabsContent value="record" className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="sampleFile"
-                        render={() => (
-                          <AudioSampleRecording
-                            file={selectedFile}
-                            isRecording={isRecording}
-                            duration={duration}
-                            onStart={startRecording}
-                            onStop={stopRecording}
-                            onCancel={handleCancelRecording}
-                            onTranscribe={handleTranscribe}
-                            onPlayPause={handlePlayPause}
-                            isPlaying={isPlaying}
-                            isTranscribing={transcribe.isPending}
-                          />
-                        )}
-                      />
-                    </TabsContent>
+                      <TabsContent value="upload" className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="sampleFile"
+                          render={({ field: { onChange, name } }) => (
+                            <AudioSampleUpload
+                              file={selectedFile}
+                              onFileChange={onChange}
+                              onTranscribe={handleTranscribe}
+                              onPlayPause={handlePlayPause}
+                              isPlaying={isPlaying}
+                              isValidating={isValidatingAudio}
+                              isTranscribing={transcribe.isPending}
+                              isDisabled={
+                                audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS
+                              }
+                              fieldName={name}
+                            />
+                          )}
+                        />
+                      </TabsContent>
 
-                    {isTauri() && isSystemAudioSupported && (
-                      <TabsContent value="system" className="space-y-4">
+                      <TabsContent value="record" className="space-y-4">
                         <FormField
                           control={form.control}
                           name="sampleFile"
                           render={() => (
-                            <AudioSampleSystem
+                            <AudioSampleRecording
                               file={selectedFile}
-                              isRecording={isSystemRecording}
-                              duration={systemDuration}
-                              onStart={startSystemRecording}
-                              onStop={stopSystemRecording}
+                              isRecording={isRecording}
+                              duration={duration}
+                              onStart={startRecording}
+                              onStop={stopRecording}
                               onCancel={handleCancelRecording}
                               onTranscribe={handleTranscribe}
                               onPlayPause={handlePlayPause}
@@ -620,28 +600,58 @@ export function ProfileForm() {
                           )}
                         />
                       </TabsContent>
-                    )}
-                  </Tabs>
 
-                  <FormField
-                    control={form.control}
-                    name="referenceText"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reference Text</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter the exact text spoken in the audio..."
-                            className="min-h-[100px]"
-                            {...field}
+                      {isTauri() && isSystemAudioSupported && (
+                        <TabsContent value="system" className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="sampleFile"
+                            render={() => (
+                              <AudioSampleSystem
+                                file={selectedFile}
+                                isRecording={isSystemRecording}
+                                duration={systemDuration}
+                                onStart={startSystemRecording}
+                                onStop={stopSystemRecording}
+                                onCancel={handleCancelRecording}
+                                onTranscribe={handleTranscribe}
+                                onPlayPause={handlePlayPause}
+                                isPlaying={isPlaying}
+                                isTranscribing={transcribe.isPending}
+                              />
+                            )}
                           />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
+                        </TabsContent>
+                      )}
+                    </Tabs>
+
+                    <FormField
+                      control={form.control}
+                      name="referenceText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reference Text</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter the exact text spoken in the audio..."
+                              className="min-h-[100px]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                ) : (
+                  // Show sample list when editing
+                  editingProfileId && (
+                    <div>
+                      <SampleList profileId={editingProfileId} />
+                    </div>
+                  )
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end mt-6 pt-4 border-t">
@@ -655,7 +665,7 @@ export function ProfileForm() {
                 {createProfile.isPending || updateProfile.isPending || addSample.isPending
                   ? 'Saving...'
                   : editingProfileId
-                    ? 'Update Profile'
+                    ? 'Save Changes'
                     : 'Create Profile'}
               </Button>
             </div>

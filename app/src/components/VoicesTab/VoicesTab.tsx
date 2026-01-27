@@ -1,3 +1,4 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useProfiles, useProfileSamples, useDeleteProfile } from '@/lib/hooks/useProfiles';
-import { useHistory } from '@/lib/hooks/useHistory';
-import { useUIStore } from '@/stores/uiStore';
 import { apiClient } from '@/lib/api/client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useHistory } from '@/lib/hooks/useHistory';
+import { useDeleteProfile, useProfileSamples, useProfiles } from '@/lib/hooks/useProfiles';
+import { useUIStore } from '@/stores/uiStore';
 
 export function VoicesTab() {
   const { data: profiles, isLoading } = useProfiles();

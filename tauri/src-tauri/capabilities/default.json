@@ -17,6 +17,7 @@
     "shell:allow-execute",
     "shell:allow-spawn",
     "updater:default",
+    "process:default",
     "dialog:default",
     "dialog:allow-save",
     "dialog:allow-open",

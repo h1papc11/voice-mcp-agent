@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
-import { GenerationForm } from '@/components/Generation/GenerationForm';
+// import { GenerationForm } from '@/components/Generation/GenerationForm';
+import { FloatingGenerateBox } from '@/components/Generation/FloatingGenerateBox';
 import { HistoryTable } from '@/components/History/HistoryTable';
 import ShinyText from '@/components/ShinyText';
 import { Sidebar } from '@/components/Sidebar';
@@ -20,6 +21,7 @@ import {
   setupWindowCloseHandler,
   startServer,
 } from '@/lib/tauri';
+import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
@@ -52,6 +54,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const audioUrl = usePlayerStore((state) => state.audioUrl);
 
   // Monitor active downloads/generations and show toasts for them
   const activeDownloads = useRestoreActiveTasks();
@@ -175,7 +178,7 @@ function App() {
           <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
             {activeTab === 'main' && (
               // Main view: Profiles top left, Generator bottom left, History right
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0 overflow-hidden">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0 overflow-hidden relative">
                 {/* Left Column */}
                 <div className="flex flex-col gap-6 min-h-0 overflow-y-auto pb-32">
                   {/* Profiles - Top Left */}
@@ -184,15 +187,18 @@ function App() {
                   </div>
 
                   {/* Generator - Bottom Left */}
-                  <div className="shrink-0">
+                  {/* <div className="shrink-0">
                     <GenerationForm />
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Right Column - History */}
                 <div className="flex flex-col min-h-0 overflow-hidden">
                   <HistoryTable />
                 </div>
+
+                {/* Floating Generate Box */}
+                <FloatingGenerateBox isPlayerOpen={!!audioUrl} />
               </div>
             )}
             {activeTab === 'voices' && <VoicesTab />}

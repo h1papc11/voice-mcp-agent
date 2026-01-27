@@ -37,7 +37,7 @@ export function SampleList({ profileId }: SampleListProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Audio Samples</h3>
-        <Button size="sm" onClick={() => setUploadOpen(true)}>
+        <Button type="button" size="sm" onClick={() => setUploadOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Add Sample
         </Button>
@@ -60,6 +60,7 @@ export function SampleList({ profileId }: SampleListProps) {
               </div>
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => handlePlay(sample.reference_text, sample.id)}
@@ -69,6 +70,7 @@ export function SampleList({ profileId }: SampleListProps) {
                   Play
                 </Button>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDelete(sample.id)}

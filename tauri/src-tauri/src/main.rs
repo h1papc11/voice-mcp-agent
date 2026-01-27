@@ -400,7 +400,10 @@ pub fn run() {
         .manage(audio_output::AudioOutputState::new())
         .setup(|app| {
             #[cfg(desktop)]
-            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            {
+                app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+                app.handle().plugin(tauri_plugin_process::init())?;
+            }
 
             // Hide title bar icon on Windows
             #[cfg(windows)]

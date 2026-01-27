@@ -22,6 +22,7 @@ export function useSystemAudioCapture({
   const timerRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const stopRecordingRef = useRef<(() => Promise<void>) | null>(null);
+  const isRecordingRef = useRef(false);
 
   // Check if system audio capture is supported
   useEffect(() => {
@@ -62,6 +63,7 @@ export function useSystemAudioCapture({
       });
 
       setIsRecording(true);
+      isRecordingRef.current = true;
       startTimeRef.current = Date.now();
 
       // Start timer
@@ -93,6 +95,7 @@ export function useSystemAudioCapture({
 
     try {
       setIsRecording(false);
+      isRecordingRef.current = false;
 
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -130,32 +133,37 @@ export function useSystemAudioCapture({
   }, [stopRecording]);
 
   const cancelRecording = useCallback(async () => {
-    if (isRecording) {
+    if (isRecordingRef.current) {
       await stopRecording();
     }
 
     setIsRecording(false);
+    isRecordingRef.current = false;
     setDuration(0);
 
     if (timerRef.current !== null) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-  }, [isRecording, stopRecording]);
+  }, [stopRecording]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount only
   useEffect(() => {
     return () => {
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
       // Cancel recording on unmount if still recording
-      if (isRecording) {
-        void cancelRecording();
+      if (isRecordingRef.current && isTauri()) {
+        // Call stop directly without the callback to avoid stale closure
+        invoke('stop_system_audio_capture').catch((err) => {
+          console.error('Error stopping audio capture on unmount:', err);
+        });
       }
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: cancelRecording is stable
-  }, [isRecording]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: Only run on unmount
+  }, []);
 
   return {
     isRecording,

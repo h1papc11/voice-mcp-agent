@@ -1,6 +1,6 @@
 {
   "name": "voicebox",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "private": true,
   "workspaces": [
     "app",
@@ -12,7 +12,7 @@
     "dev": "cd tauri && bun run tauri dev",
     "dev:web": "cd web && bun run dev",
     "dev:landing": "cd landing && bun run dev",
-    "dev:server": "source backend/venv/bin/activate && uvicorn backend.main:app --reload --port 8000",
+    "dev:server": "uvicorn backend.main:app --reload --port 8000",
     "build": "cd tauri && bun run tauri build",
     "build:web": "cd web && bun run build",
     "build:landing": "cd landing && bun run build",
