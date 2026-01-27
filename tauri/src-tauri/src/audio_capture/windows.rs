@@ -2,7 +2,10 @@ use crate::audio_capture::AudioCaptureState;
 use base64::{engine::general_purpose, Engine as _};
 use hound::{WavSpec, WavWriter};
 use std::io::Cursor;
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
+use std::time::Duration;
 use wasapi::*;
 
 pub async fn start_capture(
@@ -12,85 +15,140 @@ pub async fn start_capture(
     // Reset previous samples
     state.reset();
 
-    // Get default audio render device for loopback
-    let device = DeviceEnumerator::new()
-        .map_err(|e| format!("Failed to create device enumerator: {}", e))?
-        .get_default_device(&Direction::Render)
-        .map_err(|e| format!("Failed to get default render device: {}", e))?;
-
-    // Create audio client for loopback capture
-    let audio_client = device
-        .get_iaudioclient()
-        .map_err(|e| format!("Failed to get audio client: {}", e))?;
-
-    // Get mix format
-    let mix_format = audio_client
-        .get_mixformat()
-        .map_err(|e| format!("Failed to get mix format: {}", e))?;
-
-    // Set sample rate and channels
-    *state.sample_rate.lock().unwrap() = mix_format.get_samples_per_sec();
-    *state.channels.lock().unwrap() = mix_format.get_nchannels();
-
-    // Initialize audio client for loopback
-    audio_client
-        .initialize_client(
-            &mix_format,
-            0, // Buffer duration (0 = default)
-            &Direction::Capture,
-            ShareMode::Shared,
-            true, // Loopback mode
-        )
-        .map_err(|e| format!("Failed to initialize audio client: {}", e))?;
-
-    // Get capture client
-    let capture_client = audio_client
-        .get_audiocaptureclient()
-        .map_err(|e| format!("Failed to get capture client: {}", e))?;
-
-    // Start capture
-    audio_client
-        .start_stream()
-        .map_err(|e| format!("Failed to start stream: {}", e))?;
-
     let samples = state.samples.clone();
+    let sample_rate_arc = state.sample_rate.clone();
+    let channels_arc = state.channels.clone();
     let stop_tx = state.stop_tx.clone();
-    let (tx, mut rx) = mpsc::channel::<()>(1);
+
+    // Use AtomicBool for stop signal (works with non-Send types)
+    let stop_flag = Arc::new(AtomicBool::new(false));
+    let stop_flag_clone = stop_flag.clone();
+
+    // Create tokio channel and spawn a task to bridge it to the AtomicBool
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(1);
     *stop_tx.lock().unwrap() = Some(tx);
 
-    // Spawn capture task - move audio_client and capture_client into the task
     tokio::spawn(async move {
+        rx.recv().await;
+        stop_flag_clone.store(true, Ordering::Relaxed);
+    });
+
+    // Spawn capture task on a dedicated thread (WASAPI COM objects are not Send)
+    // All WASAPI objects must be created and used on the same thread
+    thread::spawn(move || {
+        // Initialize WASAPI on this thread
+        let device = match DeviceEnumerator::new()
+            .and_then(|enumerator| enumerator.get_default_device(&Direction::Render))
+        {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Failed to get audio device: {}", e);
+                return;
+            }
+        };
+
+        let mut audio_client = match device.get_iaudioclient() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to get audio client: {}", e);
+                return;
+            }
+        };
+
+        let mix_format = match audio_client.get_mixformat() {
+            Ok(format) => format,
+            Err(e) => {
+                eprintln!("Failed to get mix format: {}", e);
+                return;
+            }
+        };
+
+        // Set sample rate and channels
+        let channels = mix_format.get_nchannels() as usize;
+        let bytes_per_sample = (mix_format.get_bitspersample() / 8) as usize;
+        *sample_rate_arc.lock().unwrap() = mix_format.get_samplespersec();
+        *channels_arc.lock().unwrap() = mix_format.get_nchannels();
+
+        // Initialize audio client for loopback with StreamMode
+        let stream_mode = StreamMode::EventsShared {
+            autoconvert: false,
+            buffer_duration_hns: 0, // 0 = use default buffer size
+        };
+
+        if let Err(e) = audio_client.initialize_client(&mix_format, &Direction::Capture, &stream_mode) {
+            eprintln!("Failed to initialize audio client: {}", e);
+            return;
+        }
+
+        let capture_client = match audio_client.get_audiocaptureclient() {
+            Ok(client) => client,
+            Err(e) => {
+                eprintln!("Failed to get capture client: {}", e);
+                return;
+            }
+        };
+
+        if let Err(e) = audio_client.start_stream() {
+            eprintln!("Failed to start stream: {}", e);
+            return;
+        }
+
         loop {
-            tokio::select! {
-                _ = rx.recv() => {
-                    break;
-                }
-                _ = tokio::time::sleep(tokio::time::Duration::from_millis(10)) => {
-                    // Try to get available data
-                    match capture_client.get_available_samples() {
-                        Ok(available) => {
-                            if available > 0 {
-                                match capture_client.get_buffer::<f32>() {
-                                    Ok((data, _flags)) => {
-                                        // Store samples (wasapi handles silence flags internally)
-                                        let mut samples_guard = samples.lock().unwrap();
-                                        samples_guard.extend_from_slice(data);
-                                        capture_client.release_buffer(available).ok();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Error getting buffer: {}", e);
+            // Check if stop signal was received
+            if stop_flag.load(Ordering::Relaxed) {
+                break;
+            }
+
+            // Try to get available data
+            match capture_client.get_next_packet_size() {
+                Ok(Some(frames_available)) => {
+                    if frames_available > 0 {
+                        // Calculate buffer size needed (frames * channels * bytes_per_sample)
+                        let buffer_size = frames_available as usize * channels * bytes_per_sample;
+
+                        let mut buffer = vec![0u8; buffer_size];
+                        match capture_client.read_from_device(&mut buffer) {
+                            Ok((frames_read, _buffer_info)) => {
+                                if frames_read > 0 {
+                                    // Convert bytes to f32 samples
+                                    let samples_read = (frames_read as usize * channels) as usize;
+                                    let mut samples_guard = samples.lock().unwrap();
+
+                                    // Assuming 32-bit float format
+                                    if bytes_per_sample == 4 {
+                                        for i in 0..samples_read {
+                                            let byte_offset = i * 4;
+                                            if byte_offset + 4 <= buffer.len() {
+                                                let sample = f32::from_le_bytes([
+                                                    buffer[byte_offset],
+                                                    buffer[byte_offset + 1],
+                                                    buffer[byte_offset + 2],
+                                                    buffer[byte_offset + 3],
+                                                ]);
+                                                samples_guard.push(sample);
+                                            }
+                                        }
                                     }
                                 }
                             }
-                        }
-                        Err(e) => {
-                            eprintln!("Error getting available samples: {}", e);
+                            Err(e) => {
+                                eprintln!("Error reading from device: {}", e);
+                            }
                         }
                     }
                 }
+                Ok(None) => {
+                    // Exclusive mode - handle differently if needed
+                }
+                Err(e) => {
+                    eprintln!("Error getting next packet size: {}", e);
+                }
             }
+
+            // Sleep briefly to avoid busy-waiting
+            thread::sleep(Duration::from_millis(10));
         }
-        
+
         // Stop the stream when done
         audio_client.stop_stream().ok();
     });
@@ -99,8 +157,10 @@ pub async fn start_capture(
     let stop_tx_clone = state.stop_tx.clone();
     tokio::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_secs(max_duration_secs as u64)).await;
-        if let Some(tx) = stop_tx_clone.lock().unwrap().take() {
-            let _ = tx.send(());
+        // Take the sender out of the mutex before awaiting
+        let tx = stop_tx_clone.lock().unwrap().take();
+        if let Some(tx) = tx {
+            let _ = tx.send(()).await;
         }
     });
 

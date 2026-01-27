@@ -4501,6 +4501,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "wasapi",
+ "windows 0.62.2",
 ]
 
 [[package]]
