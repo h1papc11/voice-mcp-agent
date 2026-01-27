@@ -47,6 +47,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
+import { SampleList } from './SampleList';
 
 // Helper function to get audio duration from File
 async function getAudioDuration(file: File & { recordedDuration?: number }): Promise<number> {
@@ -325,7 +326,7 @@ export function ProfileForm() {
           },
         });
         toast({
-          title: 'Profile updated',
+          title: 'Voice updated',
           description: `"${data.name}" has been updated successfully.`,
         });
       } else {
@@ -446,17 +447,17 @@ export function ProfileForm() {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>{editingProfileId ? 'Edit Profile' : 'Create Voice Profile'}</DialogTitle>
+          <DialogTitle>{editingProfileId ? 'Edit Voice' : 'Create Voice Profile'}</DialogTitle>
           <DialogDescription>
             {editingProfileId
-              ? 'Update your voice profile details.'
+              ? 'Update your voice profile details and manage samples.'
               : 'Create a new voice profile with an audio sample to clone the voice.'}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className={`grid gap-6 ${isCreating ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <div className="grid gap-6 grid-cols-2">
               {/* Left column: Profile info */}
               <div className="space-y-4">
                 <FormField
@@ -513,15 +514,16 @@ export function ProfileForm() {
                 />
               </div>
 
-              {/* Right column: Sample upload section - only show when creating */}
-              {isCreating && (
-                <div className="space-y-4 border-l pl-6">
-                  <div>
-                    <h3 className="text-sm font-medium mb-2">Add Sample</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Provide an audio sample to clone the voice. You can add more samples later.
-                    </p>
-                  </div>
+              {/* Right column: Sample management */}
+              <div className="space-y-4 border-l pl-6">
+                {isCreating ? (
+                  <>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2">Add Sample</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Provide an audio sample to clone the voice. You can add more samples later.
+                      </p>
+                    </div>
 
                   <Tabs
                     value={sampleMode}
@@ -623,25 +625,33 @@ export function ProfileForm() {
                     )}
                   </Tabs>
 
-                  <FormField
-                    control={form.control}
-                    name="referenceText"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Reference Text</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter the exact text spoken in the audio..."
-                            className="min-h-[100px]"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
+                    <FormField
+                      control={form.control}
+                      name="referenceText"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reference Text</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter the exact text spoken in the audio..."
+                              className="min-h-[100px]"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                ) : (
+                  // Show sample list when editing
+                  editingProfileId && (
+                    <div>
+                      <SampleList profileId={editingProfileId} />
+                    </div>
+                  )
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end mt-6 pt-4 border-t">
@@ -655,7 +665,7 @@ export function ProfileForm() {
                 {createProfile.isPending || updateProfile.isPending || addSample.isPending
                   ? 'Saving...'
                   : editingProfileId
-                    ? 'Update Profile'
+                    ? 'Save Changes'
                     : 'Create Profile'}
               </Button>
             </div>

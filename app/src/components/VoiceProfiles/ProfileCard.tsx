@@ -1,4 +1,4 @@
-import { Download, Edit, Eye, Mic, Trash2 } from 'lucide-react';
+import { Download, Edit, Mic, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,14 +16,12 @@ import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useDeleteProfile, useExportProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
 import { useUIStore } from '@/stores/uiStore';
-import { ProfileDetail } from './ProfileDetail';
 
 interface ProfileCardProps {
   profile: VoiceProfileResponse;
 }
 
 export function ProfileCard({ profile }: ProfileCardProps) {
-  const [detailOpen, setDetailOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const deleteProfile = useDeleteProfile();
   const exportProfile = useExportProfile();
@@ -86,14 +84,6 @@ export function ProfileCard({ profile }: ProfileCardProps) {
           </div>
           <div className="flex gap-0.5 justify-end items-end mt-auto">
             <CircleButton
-              icon={Eye}
-              onClick={(e) => {
-                e.stopPropagation();
-                setDetailOpen(true);
-              }}
-              aria-label="View details"
-            />
-            <CircleButton
               icon={Download}
               onClick={handleExport}
               disabled={exportProfile.isPending}
@@ -116,8 +106,6 @@ export function ProfileCard({ profile }: ProfileCardProps) {
           </div>
         </CardContent>
       </Card>
-
-      <ProfileDetail profileId={profile.id} open={detailOpen} onOpenChange={setDetailOpen} />
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
