@@ -71,11 +71,23 @@ export function UpdateStatus() {
 
         {status.downloading && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm">
-              <Download className="h-4 w-4" />
-              Downloading update...
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Downloading update...
+              </div>
+              {status.downloadProgress !== undefined && (
+                <span className="text-muted-foreground">
+                  {status.downloadProgress}%
+                </span>
+              )}
             </div>
-            <Progress />
+            <Progress value={status.downloadProgress} />
+            {status.downloadedBytes !== undefined && status.totalBytes !== undefined && status.totalBytes > 0 && (
+              <div className="text-xs text-muted-foreground">
+                {(status.downloadedBytes / 1024 / 1024).toFixed(1)} MB / {(status.totalBytes / 1024 / 1024).toFixed(1)} MB
+              </div>
+            )}
           </div>
         )}
 

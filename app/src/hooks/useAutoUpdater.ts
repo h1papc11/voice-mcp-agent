@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -9,6 +9,9 @@ export interface UpdateStatus {
   downloading: boolean;
   installing: boolean;
   error?: string;
+  downloadProgress?: number; // 0-100 percentage
+  downloadedBytes?: number;
+  totalBytes?: number;
 }
 
 const isTauri = () => {
@@ -25,7 +28,7 @@ export function useAutoUpdater(checkOnMount = false) {
 
   const [update, setUpdate] = useState<Update | null>(null);
 
-  const checkForUpdates = async () => {
+  const checkForUpdates = useCallback(async () => {
     if (!isTauri()) {
       return;
     }
@@ -61,7 +64,7 @@ export function useAutoUpdater(checkOnMount = false) {
         error: error instanceof Error ? error.message : 'Failed to check for updates',
       });
     }
-  };
+  }, []);
 
   const downloadAndInstall = async () => {
     if (!update || !isTauri()) return;
@@ -69,19 +72,40 @@ export function useAutoUpdater(checkOnMount = false) {
     try {
       setStatus((prev) => ({ ...prev, downloading: true, error: undefined }));
 
+      let downloadedBytes = 0;
+      let totalBytes = 0;
+
       await update.downloadAndInstall((event) => {
         switch (event.event) {
           case 'Started':
-            setStatus((prev) => ({ ...prev, downloading: true }));
+            totalBytes = event.data.contentLength || 0;
+            downloadedBytes = 0;
+            setStatus((prev) => ({ 
+              ...prev, 
+              downloading: true,
+              totalBytes,
+              downloadedBytes: 0,
+              downloadProgress: 0
+            }));
             break;
-          case 'Progress':
-            console.log(`Downloaded ${event.data.chunkLength} bytes`);
+          case 'Progress': {
+            downloadedBytes += event.data.chunkLength;
+            const progress = totalBytes > 0 
+              ? Math.round((downloadedBytes / totalBytes) * 100)
+              : undefined;
+            setStatus((prev) => ({
+              ...prev,
+              downloadedBytes,
+              downloadProgress: progress
+            }));
             break;
+          }
           case 'Finished':
             setStatus((prev) => ({
               ...prev,
               downloading: false,
               installing: true,
+              downloadProgress: 100
             }));
             break;
         }
@@ -93,6 +117,9 @@ export function useAutoUpdater(checkOnMount = false) {
         ...prev,
         downloading: false,
         installing: false,
+        downloadProgress: undefined,
+        downloadedBytes: undefined,
+        totalBytes: undefined,
         error: error instanceof Error ? error.message : 'Failed to install update',
       }));
     }
@@ -102,7 +129,7 @@ export function useAutoUpdater(checkOnMount = false) {
     if (checkOnMount && isTauri()) {
       checkForUpdates();
     }
-  }, [checkOnMount]);
+  }, [checkOnMount, checkForUpdates]);
 
   return {
     status,

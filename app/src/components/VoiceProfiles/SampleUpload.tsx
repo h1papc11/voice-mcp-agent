@@ -22,15 +22,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
+import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { isTauri } from '@/lib/tauri';
-import { AudioSampleUpload } from './AudioSampleUpload';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
+import { AudioSampleUpload } from './AudioSampleUpload';
 
 const sampleSchema = z.object({
   file: z.instanceof(File, { message: 'Please select an audio file' }),
