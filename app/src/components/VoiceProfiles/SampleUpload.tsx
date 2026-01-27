@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,13 +13,11 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
@@ -27,7 +25,7 @@ import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
-import { Mic, Square, Upload, Monitor } from 'lucide-react';
+import { Mic, Square, Upload, Monitor, Play, Pause } from 'lucide-react';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { isTauri } from '@/lib/tauri';
 
@@ -53,6 +51,10 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
   const { data: profile } = useProfile(profileId);
   const { toast } = useToast();
   const [mode, setMode] = useState<'upload' | 'record' | 'system'>('upload');
+  const [isDragging, setIsDragging] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const form = useForm<SampleFormValues>({
     resolver: zodResolver(sampleSchema),
@@ -201,6 +203,13 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
       if (isSystemRecording) {
         cancelSystemRecording();
       }
+      // Stop and cleanup audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+        audioRef.current = null;
+      }
+      setIsPlaying(false);
     }
     onOpenChange(newOpen);
   }
@@ -213,6 +222,54 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
     }
     // Reset file field by clearing the input
     form.resetField('file');
+    // Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+  }
+
+  function handlePlayPause() {
+    const file = form.getValues('file');
+    if (!file) return;
+
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+    } else {
+      const audio = new Audio(URL.createObjectURL(file));
+      audioRef.current = audio;
+      
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        if (audioRef.current) {
+          URL.revokeObjectURL(audioRef.current.src);
+        }
+        audioRef.current = null;
+      });
+
+      audio.addEventListener('error', () => {
+        setIsPlaying(false);
+        toast({
+          title: 'Playback error',
+          description: 'Failed to play audio file',
+          variant: 'destructive',
+        });
+        if (audioRef.current) {
+          URL.revokeObjectURL(audioRef.current.src);
+        }
+        audioRef.current = null;
+      });
+
+      audio.play();
+      setIsPlaying(true);
+    }
   }
 
   return (
@@ -235,16 +292,16 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                 className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
               >
                 <TabsTrigger value="upload" className="flex items-center gap-2">
-                  <Upload className="h-4 w-4" />
+                  <Upload className="h-4 w-4 shrink-0" />
                   Upload
                 </TabsTrigger>
                 <TabsTrigger value="record" className="flex items-center gap-2">
-                  <Mic className="h-4 w-4" />
+                  <Mic className="h-4 w-4 shrink-0" />
                   Record
                 </TabsTrigger>
                 {isTauri() && isSystemAudioSupported && (
                   <TabsTrigger value="system" className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
+                    <Monitor className="h-4 w-4 shrink-0" />
                     System Audio
                   </TabsTrigger>
                 )}
@@ -254,40 +311,118 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                 <FormField
                   control={form.control}
                   name="file"
-                  render={({ field: { onChange, value, ...field } }) => (
+                  render={({ field: { onChange, name } }) => (
                     <FormItem>
                       <FormLabel>Audio File</FormLabel>
                       <FormControl>
-                        <div className="flex items-center gap-2">
-                          <Input
+                        <div className="flex flex-col gap-2">
+                          <input
                             type="file"
                             accept="audio/*"
+                            name={name}
+                            ref={fileInputRef}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 onChange(file);
                               }
                             }}
-                            {...field}
+                            className="hidden"
                           />
-                          {selectedFile && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={handleTranscribe}
-                              disabled={transcribe.isPending}
-                              className="flex items-center gap-2"
-                            >
-                              <Mic className="h-4 w-4" />
-                              {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
-                            </Button>
-                          )}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setIsDragging(true);
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              setIsDragging(false);
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setIsDragging(false);
+                              const file = e.dataTransfer.files?.[0];
+                              if (file && file.type.startsWith('audio/')) {
+                                onChange(file);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                fileInputRef.current?.click();
+                              }
+                            }}
+                            className={`flex flex-col items-center justify-center gap-4 p-4 border-2 rounded-lg transition-colors min-h-[180px] ${
+                              selectedFile
+                                ? 'border-primary bg-primary/5'
+                                : isDragging
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-dashed border-muted-foreground/25 hover:border-muted-foreground/50'
+                            }`}
+                          >
+                            {!selectedFile ? (
+                              <>
+                                <Button
+                                  type="button"
+                                  size="lg"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  className="flex items-center gap-2"
+                                >
+                                  <Upload className="h-5 w-5" />
+                                  Choose File
+                                </Button>
+                                <p className="text-sm text-muted-foreground text-center">
+                                  Click to choose a file or drag and drop. Maximum duration: 30 seconds.
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Upload className="h-5 w-5 text-primary" />
+                                  <span className="font-medium">File uploaded</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground text-center">
+                                  File: {selectedFile.name}
+                                </p>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={handlePlayPause}
+                                  >
+                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleTranscribe}
+                                    disabled={transcribe.isPending}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Mic className="h-4 w-4" />
+                                    {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                      onChange(undefined);
+                                      if (fileInputRef.current) {
+                                        fileInputRef.current.value = '';
+                                      }
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </FormControl>
-                      <FormDescription>
-                        Supported formats: WAV, MP3, M4A. Click "Transcribe" to automatically
-                        extract text from the audio.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -304,7 +439,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                       <FormControl>
                         <div className="space-y-4">
                           {!isRecording && !selectedFile && (
-                            <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg">
+                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
                               <Button
                                 type="button"
                                 onClick={startRecording}
@@ -321,7 +456,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                           )}
 
                           {isRecording && (
-                            <div className="flex flex-col items-center gap-4 p-6 border-2 border-destructive rounded-lg bg-destructive/5">
+                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
                               <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
                                   <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
@@ -340,14 +475,13 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                                 Stop Recording
                               </Button>
                               <p className="text-sm text-muted-foreground text-center">
-                                Recording in progress... ({formatAudioDuration(30 - duration)}{' '}
-                                remaining)
+                                {formatAudioDuration(30 - duration)} remaining
                               </p>
                             </div>
                           )}
 
                           {selectedFile && !isRecording && (
-                            <div className="flex flex-col items-center gap-4 p-6 border-2 border-primary rounded-lg bg-primary/5">
+                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
                               <div className="flex items-center gap-2">
                                 <Mic className="h-5 w-5 text-primary" />
                                 <span className="font-medium">Recording complete</span>
@@ -356,6 +490,14 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                                 File: {selectedFile.name}
                               </p>
                               <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={handlePlayPause}
+                                >
+                                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
                                 <Button
                                   type="button"
                                   variant="outline"
@@ -379,9 +521,6 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                           )}
                         </div>
                       </FormControl>
-                      <FormDescription>
-                        Record audio directly from your microphone. Maximum duration is 30 seconds.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -399,7 +538,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                         <FormControl>
                           <div className="space-y-4">
                             {!isSystemRecording && !selectedFile && (
-                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg">
+                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
                                 <Button
                                   type="button"
                                   onClick={startSystemRecording}
@@ -416,7 +555,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                             )}
 
                             {isSystemRecording && (
-                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-destructive rounded-lg bg-destructive/5">
+                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
                                 <div className="flex items-center gap-4">
                                   <div className="flex items-center gap-2">
                                     <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
@@ -435,14 +574,13 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                                   Stop Capture
                                 </Button>
                                 <p className="text-sm text-muted-foreground text-center">
-                                  Capturing system audio... ({formatAudioDuration(30 - systemDuration)}{' '}
-                                  remaining)
+                                  {formatAudioDuration(30 - systemDuration)} remaining
                                 </p>
                               </div>
                             )}
 
                             {selectedFile && !isSystemRecording && mode === 'system' && (
-                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-primary rounded-lg bg-primary/5">
+                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
                                 <div className="flex items-center gap-2">
                                   <Monitor className="h-5 w-5 text-primary" />
                                   <span className="font-medium">Capture complete</span>
@@ -451,6 +589,14 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                                   File: {selectedFile.name}
                                 </p>
                                 <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={handlePlayPause}
+                                  >
+                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                  </Button>
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -474,10 +620,6 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                             )}
                           </div>
                         </FormControl>
-                        <FormDescription>
-                          Capture audio from your system (applications, browser tabs, etc.). Works
-                          natively without browser dialogs.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -499,9 +641,6 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    This should match exactly what is spoken in the audio file.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

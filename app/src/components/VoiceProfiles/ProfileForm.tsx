@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,6 @@ import {
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -41,7 +40,7 @@ import { useTranscription } from '@/lib/hooks/useTranscription';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useUIStore } from '@/stores/uiStore';
-import { Mic, Square, Upload, Monitor } from 'lucide-react';
+import { Mic, Square, Upload, Monitor, Play, Pause } from 'lucide-react';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { isTauri } from '@/lib/tauri';
 
@@ -79,28 +78,27 @@ async function getAudioDuration(file: File & { recordedDuration?: number }): Pro
 
 const MAX_AUDIO_DURATION_SECONDS = 30;
 
-const profileSchema = z
-  .object({
-    name: z.string().min(1, 'Name is required').max(100),
-    description: z.string().max(500).optional(),
-    language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
-    // Sample fields - only required when creating (not editing)
-    sampleFile: z.instanceof(File).optional(),
-    referenceText: z.string().max(1000).optional(),
-  })
-  .refine(
-    (data) => {
-      // If sample file is provided, reference text is required
-      if (data.sampleFile && (!data.referenceText || data.referenceText.trim().length === 0)) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: 'Reference text is required when adding a sample',
-      path: ['referenceText'],
-    },
-  );
+const baseProfileSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  description: z.string().max(500).optional(),
+  language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
+  sampleFile: z.instanceof(File).optional(),
+  referenceText: z.string().max(1000).optional(),
+});
+
+const profileSchema = baseProfileSchema.refine(
+  (data) => {
+    // If sample file is provided, reference text is required
+    if (data.sampleFile && (!data.referenceText || data.referenceText.trim().length === 0)) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'Reference text is required when adding a sample',
+    path: ['referenceText'],
+  },
+);
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
@@ -118,6 +116,10 @@ export function ProfileForm() {
   const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('upload');
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [isValidatingAudio, setIsValidatingAudio] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const isCreating = !editingProfileId;
 
   const form = useForm<ProfileFormValues>({
@@ -126,6 +128,8 @@ export function ProfileForm() {
       name: '',
       description: '',
       language: 'en',
+      sampleFile: undefined,
+      referenceText: '',
     },
   });
 
@@ -303,6 +307,54 @@ export function ProfileForm() {
       cancelSystemRecording();
     }
     form.resetField('sampleFile');
+    // Stop any playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+  }
+
+  function handlePlayPause() {
+    const file = form.getValues('sampleFile');
+    if (!file) return;
+
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+    } else {
+      const audio = new Audio(URL.createObjectURL(file));
+      audioRef.current = audio;
+      
+      audio.addEventListener('ended', () => {
+        setIsPlaying(false);
+        if (audioRef.current) {
+          URL.revokeObjectURL(audioRef.current.src);
+        }
+        audioRef.current = null;
+      });
+
+      audio.addEventListener('error', () => {
+        setIsPlaying(false);
+        toast({
+          title: 'Playback error',
+          description: 'Failed to play audio file',
+          variant: 'destructive',
+        });
+        if (audioRef.current) {
+          URL.revokeObjectURL(audioRef.current.src);
+        }
+        audioRef.current = null;
+      });
+
+      audio.play();
+      setIsPlaying(true);
+    }
   }
 
   async function onSubmit(data: ProfileFormValues) {
@@ -322,71 +374,87 @@ export function ProfileForm() {
           description: `"${data.name}" has been updated successfully.`,
         });
       } else {
-        // Get file and reference text directly from form state to ensure we have the values
+        // Creating: require sample file and reference text
         const sampleFile = form.getValues('sampleFile');
         const referenceText = form.getValues('referenceText');
 
+        if (!sampleFile) {
+          form.setError('sampleFile', {
+            type: 'manual',
+            message: 'Audio sample is required',
+          });
+          toast({
+            title: 'Audio sample required',
+            description: 'Please provide an audio sample to create the voice profile.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (!referenceText || referenceText.trim().length === 0) {
+          form.setError('referenceText', {
+            type: 'manual',
+            message: 'Reference text is required',
+          });
+          toast({
+            title: 'Reference text required',
+            description: 'Please provide the reference text for the audio sample.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         // Validate audio duration before creating profile
-        if (sampleFile) {
-          try {
-            const duration = await getAudioDuration(sampleFile);
-            if (duration > MAX_AUDIO_DURATION_SECONDS) {
-              form.setError('sampleFile', {
-                type: 'manual',
-                message: `Audio is too long (${formatAudioDuration(duration)}). Maximum duration is ${formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)}.`,
-              });
-              toast({
-                title: 'Invalid audio file',
-                description: `Audio duration is ${formatAudioDuration(duration)}, but maximum is ${formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)}.`,
-                variant: 'destructive',
-              });
-              return; // Prevent form submission
-            }
-          } catch (error) {
+        try {
+          const duration = await getAudioDuration(sampleFile);
+          if (duration > MAX_AUDIO_DURATION_SECONDS) {
             form.setError('sampleFile', {
               type: 'manual',
-              message: 'Failed to validate audio file. Please try a different file.',
+              message: `Audio is too long (${formatAudioDuration(duration)}). Maximum duration is ${formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)}.`,
             });
             toast({
-              title: 'Validation error',
-              description: error instanceof Error ? error.message : 'Failed to validate audio file',
+              title: 'Invalid audio file',
+              description: `Audio duration is ${formatAudioDuration(duration)}, but maximum is ${formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)}.`,
               variant: 'destructive',
             });
             return; // Prevent form submission
           }
+        } catch (error) {
+          form.setError('sampleFile', {
+            type: 'manual',
+            message: 'Failed to validate audio file. Please try a different file.',
+          });
+          toast({
+            title: 'Validation error',
+            description: error instanceof Error ? error.message : 'Failed to validate audio file',
+            variant: 'destructive',
+          });
+          return; // Prevent form submission
         }
 
-        // Creating: create profile, then optionally add sample
+        // Creating: create profile, then add sample
         const profile = await createProfile.mutateAsync({
           name: data.name,
           description: data.description,
           language: data.language,
         });
 
-        // If sample file and reference text provided, add it
-        if (sampleFile && referenceText && referenceText.trim().length > 0) {
-          try {
-            await addSample.mutateAsync({
-              profileId: profile.id,
-              file: sampleFile,
-              referenceText: referenceText,
-            });
-            toast({
-              title: 'Profile created',
-              description: `"${data.name}" has been created with a sample.`,
-            });
-          } catch (sampleError) {
-            // Profile was created but sample failed - still show success for profile
-            toast({
-              title: 'Profile created',
-              description: `"${data.name}" has been created, but failed to add sample: ${sampleError instanceof Error ? sampleError.message : 'Unknown error'}`,
-              variant: 'destructive',
-            });
-          }
-        } else {
+        try {
+          await addSample.mutateAsync({
+            profileId: profile.id,
+            file: sampleFile,
+            referenceText: referenceText,
+          });
           toast({
             title: 'Profile created',
-            description: `"${data.name}" has been created successfully. You can add samples later.`,
+            description: `"${data.name}" has been created with a sample.`,
+          });
+        } catch (sampleError) {
+          // Profile was created but sample failed - still show error
+          toast({
+            title: 'Failed to add sample',
+            description: `Profile "${data.name}" was created, but failed to add sample: ${sampleError instanceof Error ? sampleError.message : 'Unknown error'}`,
+            variant: 'destructive',
           });
         }
       }
@@ -415,6 +483,13 @@ export function ProfileForm() {
       if (isSystemRecording) {
         cancelSystemRecording();
       }
+      // Stop and cleanup audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        URL.revokeObjectURL(audioRef.current.src);
+        audioRef.current = null;
+      }
+      setIsPlaying(false);
     }
   }
 
@@ -426,7 +501,7 @@ export function ProfileForm() {
           <DialogDescription>
             {editingProfileId
               ? 'Update your voice profile details.'
-              : 'Create a new voice profile. You can add a sample now or later.'}
+              : 'Create a new voice profile with an audio sample to clone the voice.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -493,10 +568,9 @@ export function ProfileForm() {
               {isCreating && (
                 <div className="space-y-4 border-l pl-6">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Add Sample (Optional)</h3>
+                    <h3 className="text-sm font-medium mb-2">Add Sample</h3>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Add an audio sample to get started immediately. You can add more samples
-                      later.
+                      Provide an audio sample to clone the voice. You can add more samples later.
                     </p>
                   </div>
 
@@ -516,16 +590,16 @@ export function ProfileForm() {
                   >
                     <TabsList className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}>
                       <TabsTrigger value="upload" className="flex items-center gap-2">
-                        <Upload className="h-4 w-4" />
+                        <Upload className="h-4 w-4 shrink-0" />
                         Upload
                       </TabsTrigger>
                       <TabsTrigger value="record" className="flex items-center gap-2">
-                        <Mic className="h-4 w-4" />
+                        <Mic className="h-4 w-4 shrink-0" />
                         Record
                       </TabsTrigger>
                       {isTauri() && isSystemAudioSupported && (
                         <TabsTrigger value="system" className="flex items-center gap-2">
-                          <Monitor className="h-4 w-4" />
+                          <Monitor className="h-4 w-4 shrink-0" />
                           System Audio
                         </TabsTrigger>
                       )}
@@ -535,16 +609,16 @@ export function ProfileForm() {
                       <FormField
                         control={form.control}
                         name="sampleFile"
-                        render={({ field: { onChange, name, ref } }) => (
+                        render={({ field: { onChange, name } }) => (
                           <FormItem>
                             <FormLabel>Audio File</FormLabel>
                             <FormControl>
                               <div className="flex flex-col gap-2">
-                                <Input
+                                <input
                                   type="file"
                                   accept="audio/*"
                                   name={name}
-                                  ref={ref}
+                                  ref={fileInputRef}
                                   onChange={(e) => {
                                     const file = e.target.files?.[0];
                                     if (file) {
@@ -553,50 +627,103 @@ export function ProfileForm() {
                                       onChange(undefined);
                                     }
                                   }}
+                                  className="hidden"
                                 />
-                                {selectedFile && (
-                                  <>
-                                    {isValidatingAudio && (
-                                      <p className="text-sm text-muted-foreground">
-                                        Validating audio...
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    setIsDragging(true);
+                                  }}
+                                  onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    setIsDragging(false);
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    setIsDragging(false);
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (file && file.type.startsWith('audio/')) {
+                                      onChange(file);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      fileInputRef.current?.click();
+                                    }
+                                  }}
+                                  className={`flex flex-col items-center justify-center gap-4 p-4 border-2 rounded-lg transition-colors min-h-[180px] ${
+                                    selectedFile
+                                      ? 'border-primary bg-primary/5'
+                                      : isDragging
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-dashed border-muted-foreground/25 hover:border-muted-foreground/50'
+                                  }`}
+                                >
+                                  {!selectedFile ? (
+                                    <>
+                                      <Button
+                                        type="button"
+                                        size="lg"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex items-center gap-2"
+                                      >
+                                        <Upload className="h-5 w-5" />
+                                        Choose File
+                                      </Button>
+                                      <p className="text-sm text-muted-foreground text-center">
+                                        Click to choose a file or drag and drop. Maximum duration: 30 seconds.
                                       </p>
-                                    )}
-                                    {!isValidatingAudio && audioDuration !== null && (
-                                      <div className="flex items-center gap-2 text-sm">
-                                        <span className="text-muted-foreground">Duration:</span>
-                                        <span
-                                          className={
-                                            audioDuration > MAX_AUDIO_DURATION_SECONDS
-                                              ? 'text-destructive font-medium'
-                                              : 'text-foreground'
-                                          }
-                                        >
-                                          {formatAudioDuration(audioDuration)}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                          / {formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)} max
-                                        </span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2">
+                                        <Upload className="h-5 w-5 text-primary" />
+                                        <span className="font-medium">File uploaded</span>
                                       </div>
-                                    )}
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={handleTranscribe}
-                                      disabled={transcribe.isPending || isValidatingAudio || (audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS)}
-                                      className="flex items-center gap-2 w-full"
-                                    >
-                                      <Mic className="h-4 w-4" />
-                                      {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
-                                    </Button>
-                                  </>
-                                )}
+                                      <p className="text-sm text-muted-foreground text-center">
+                                        File: {selectedFile.name}
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="outline"
+                                          onClick={handlePlayPause}
+                                          disabled={isValidatingAudio}
+                                        >
+                                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={handleTranscribe}
+                                          disabled={transcribe.isPending || isValidatingAudio || (audioDuration !== null && audioDuration > MAX_AUDIO_DURATION_SECONDS)}
+                                          className="flex items-center gap-2"
+                                        >
+                                          <Mic className="h-4 w-4" />
+                                          {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => {
+                                            onChange(undefined);
+                                            if (fileInputRef.current) {
+                                              fileInputRef.current.value = '';
+                                            }
+                                          }}
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </FormControl>
-                            <FormDescription>
-                              Supported formats: WAV, MP3, M4A. Maximum duration:{' '}
-                              {formatAudioDuration(MAX_AUDIO_DURATION_SECONDS)}. Click "Transcribe"
-                              to automatically extract text from the audio.
-                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -613,7 +740,7 @@ export function ProfileForm() {
                             <FormControl>
                               <div className="space-y-4">
                                 {!isRecording && !selectedFile && (
-                                  <div className="flex flex-col items-center gap-4 p-4 border-2 border-dashed rounded-lg">
+                                  <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
                                     <Button
                                       type="button"
                                       onClick={startRecording}
@@ -630,7 +757,7 @@ export function ProfileForm() {
                                 )}
 
                                 {isRecording && (
-                                  <div className="flex flex-col items-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5">
+                                  <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
                                     <div className="flex items-center gap-4">
                                       <div className="flex items-center gap-2">
                                         <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
@@ -649,14 +776,13 @@ export function ProfileForm() {
                                       Stop Recording
                                     </Button>
                                     <p className="text-sm text-muted-foreground text-center">
-                                      Recording in progress... ({formatAudioDuration(30 - duration)}{' '}
-                                      remaining)
+                                      {formatAudioDuration(30 - duration)} remaining
                                     </p>
                                   </div>
                                 )}
 
                                 {selectedFile && !isRecording && (
-                                  <div className="flex flex-col items-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5">
+                                  <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
                                     <div className="flex items-center gap-2">
                                       <Mic className="h-5 w-5 text-primary" />
                                       <span className="font-medium">Recording complete</span>
@@ -665,6 +791,14 @@ export function ProfileForm() {
                                       File: {selectedFile.name}
                                     </p>
                                     <div className="flex gap-2">
+                                      <Button
+                                        type="button"
+                                        size="icon"
+                                        variant="outline"
+                                        onClick={handlePlayPause}
+                                      >
+                                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                      </Button>
                                       <Button
                                         type="button"
                                         variant="outline"
@@ -688,10 +822,6 @@ export function ProfileForm() {
                                 )}
                               </div>
                             </FormControl>
-                            <FormDescription>
-                              Record audio directly from your microphone. Maximum duration is 30
-                              seconds.
-                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -709,7 +839,7 @@ export function ProfileForm() {
                               <FormControl>
                                 <div className="space-y-4">
                                   {!isSystemRecording && !selectedFile && (
-                                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-dashed rounded-lg">
+                                    <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
                                       <Button
                                         type="button"
                                         onClick={startSystemRecording}
@@ -726,7 +856,7 @@ export function ProfileForm() {
                                   )}
 
                                   {isSystemRecording && (
-                                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5">
+                                    <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
                                       <div className="flex items-center gap-4">
                                         <div className="flex items-center gap-2">
                                           <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
@@ -745,14 +875,13 @@ export function ProfileForm() {
                                         Stop Capture
                                       </Button>
                                       <p className="text-sm text-muted-foreground text-center">
-                                        Capturing system audio... ({formatAudioDuration(30 - systemDuration)}{' '}
-                                        remaining)
+                                        {formatAudioDuration(30 - systemDuration)} remaining
                                       </p>
                                     </div>
                                   )}
 
                                   {selectedFile && !isSystemRecording && (
-                                    <div className="flex flex-col items-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5">
+                                    <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
                                       <div className="flex items-center gap-2">
                                         <Monitor className="h-5 w-5 text-primary" />
                                         <span className="font-medium">Capture complete</span>
@@ -761,6 +890,14 @@ export function ProfileForm() {
                                         File: {selectedFile.name}
                                       </p>
                                       <div className="flex gap-2">
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="outline"
+                                          onClick={handlePlayPause}
+                                        >
+                                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                        </Button>
                                         <Button
                                           type="button"
                                           variant="outline"
@@ -784,10 +921,6 @@ export function ProfileForm() {
                                   )}
                                 </div>
                               </FormControl>
-                              <FormDescription>
-                                Capture audio from your system (speakers, applications). Maximum duration is 30
-                                seconds.
-                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -809,10 +942,6 @@ export function ProfileForm() {
                             {...field}
                           />
                         </FormControl>
-                        <FormDescription>
-                          This should match exactly what is spoken in the audio file. Required if
-                          you add a sample.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
