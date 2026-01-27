@@ -15,7 +15,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
-import { isMacOS, isTauri, setupWindowCloseHandler, startServer } from '@/lib/tauri';
+import { isMacOS, isTauri, setupWindowCloseHandler, startServer, setKeepServerRunning } from '@/lib/tauri';
+import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -50,6 +51,16 @@ function App() {
 
   // Monitor active downloads/generations and show toasts for them
   const activeDownloads = useRestoreActiveTasks();
+
+  // Sync stored setting to Rust on startup
+  useEffect(() => {
+    if (isTauri()) {
+      const keepRunning = useServerStore.getState().keepServerRunningOnClose;
+      setKeepServerRunning(keepRunning).catch((error) => {
+        console.error('Failed to sync initial setting to Rust:', error);
+      });
+    }
+  }, []);
 
   // Setup window close handler and auto-start server when running in Tauri (production only)
   useEffect(() => {

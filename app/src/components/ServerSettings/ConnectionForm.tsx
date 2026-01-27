@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { useServerStore } from '@/stores/serverStore';
+import { setKeepServerRunning } from '@/lib/tauri';
 
 const connectionSchema = z.object({
   serverUrl: z.string().url('Please enter a valid URL'),
@@ -88,6 +89,9 @@ export function ConnectionForm() {
               checked={keepServerRunningOnClose}
               onCheckedChange={(checked: boolean) => {
                 setKeepServerRunningOnClose(checked);
+                setKeepServerRunning(checked).catch((error) => {
+                  console.error('Failed to sync setting to Rust:', error);
+                });
                 toast({
                   title: 'Setting updated',
                   description: checked

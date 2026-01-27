@@ -55,6 +55,21 @@ export async function stopServer(): Promise<void> {
 }
 
 /**
+ * Set whether the server should keep running when the app closes (Tauri only)
+ */
+export async function setKeepServerRunning(keepRunning: boolean): Promise<void> {
+  if (!isTauri()) {
+    return;
+  }
+
+  try {
+    await invoke('set_keep_server_running', { keepRunning });
+  } catch (error) {
+    console.error('Failed to set keep server running setting:', error);
+  }
+}
+
+/**
  * Setup window close handler to check setting and stop server if needed
  */
 export async function setupWindowCloseHandler(): Promise<void> {

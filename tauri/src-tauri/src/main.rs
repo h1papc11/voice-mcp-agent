@@ -4,12 +4,14 @@
 mod audio_capture;
 
 use std::sync::Mutex;
-use tauri::{command, State, Manager, WindowEvent, Emitter, Listener};
+use tauri::{command, State, Manager, WindowEvent, Emitter, Listener, RunEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::mpsc;
 
 struct ServerState {
     child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
+    server_pid: Mutex<Option<u32>>,
+    keep_running_on_close: Mutex<bool>,
 }
 
 #[command]
@@ -18,9 +20,64 @@ async fn start_server(
     state: State<'_, ServerState>,
     remote: Option<bool>,
 ) -> Result<String, String> {
-    // Check if server is already running
+    // Check if server is already running (managed by this app instance)
     if state.child.lock().unwrap().is_some() {
         return Ok("Server already running on http://localhost:8000".to_string());
+    }
+
+    // If keep_running_on_close is false, kill any orphaned server from previous session
+    let keep_running = *state.keep_running_on_close.lock().unwrap();
+    if !keep_running {
+        #[cfg(unix)]
+        {
+            use std::process::Command;
+            // Find any process listening on port 8000
+            if let Ok(output) = Command::new("lsof")
+                .args(["-ti", ":8000"])
+                .output()
+            {
+                let pids = String::from_utf8_lossy(&output.stdout);
+                for pid_str in pids.lines() {
+                    if let Ok(pid) = pid_str.trim().parse::<i32>() {
+                        println!("Found orphaned server on port 8000 (PID: {}), killing it...", pid);
+                        // Kill the process group
+                        let _ = Command::new("kill")
+                            .args(["-9", "--", &format!("-{}", pid)])
+                            .output();
+                        let _ = Command::new("kill")
+                            .args(["-9", &pid.to_string()])
+                            .output();
+                    }
+                }
+            }
+        }
+        
+        #[cfg(windows)]
+        {
+            use std::process::Command;
+            // On Windows, find and kill process on port 8000
+            if let Ok(output) = Command::new("netstat")
+                .args(["-ano"])
+                .output()
+            {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                for line in output_str.lines() {
+                    if line.contains(":8000") && line.contains("LISTENING") {
+                        if let Some(pid_str) = line.split_whitespace().last() {
+                            if let Ok(pid) = pid_str.parse::<u32>() {
+                                println!("Found orphaned server on port 8000 (PID: {}), killing it...", pid);
+                                let _ = Command::new("taskkill")
+                                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                                    .output();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Brief wait for port to be released
+        std::thread::sleep(std::time::Duration::from_millis(200));
     }
 
     // Get app data directory
@@ -77,7 +134,9 @@ async fn start_server(
     println!("Server process spawned, waiting for ready signal...");
     println!("=================================================================");
 
-    // Store child process
+    // Store child process and its PID for process group killing
+    let pid = child.pid();
+    *state.server_pid.lock().unwrap() = Some(pid);
     *state.child.lock().unwrap() = Some(child);
 
     // Wait for server to be ready by listening for startup log
@@ -161,10 +220,48 @@ async fn start_server(
 
 #[command]
 async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
-    if let Some(child) = state.child.lock().unwrap().take() {
-        child.kill().map_err(|e| format!("Failed to kill: {}", e))?;
+    let pid = state.server_pid.lock().unwrap().take();
+    let _child = state.child.lock().unwrap().take();
+    
+    if let Some(pid) = pid {
+        println!("stop_server: Killing server process group with PID: {}", pid);
+        
+        #[cfg(unix)]
+        {
+            use std::process::Command;
+            // Kill process group with SIGTERM first
+            let _ = Command::new("kill")
+                .args(["-TERM", "--", &format!("-{}", pid)])
+                .output();
+            
+            // Brief wait then force kill
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            
+            let _ = Command::new("kill")
+                .args(["-9", "--", &format!("-{}", pid)])
+                .output();
+            let _ = Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .output();
+        }
+        
+        #[cfg(windows)]
+        {
+            use std::process::Command;
+            let _ = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+        
+        println!("stop_server: Process group kill completed");
     }
+    
     Ok(())
+}
+
+#[command]
+fn set_keep_server_running(state: State<'_, ServerState>, keep_running: bool) {
+    *state.keep_running_on_close.lock().unwrap() = keep_running;
 }
 
 #[command]
@@ -195,6 +292,8 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .manage(ServerState {
             child: Mutex::new(None),
+            server_pid: Mutex::new(None),
+            keep_running_on_close: Mutex::new(false),
         })
         .manage(audio_capture::AudioCaptureState::new())
         .setup(|app| {
@@ -216,6 +315,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_server,
             stop_server,
+            set_keep_server_running,
             start_system_audio_capture,
             stop_system_audio_capture,
             is_system_audio_supported
@@ -264,8 +364,92 @@ pub fn run() {
                 });
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            match &event {
+                RunEvent::Exit => {
+                    println!("=================================================================");
+                    println!("RunEvent::Exit received - checking server cleanup");
+                    let state = app.state::<ServerState>();
+                    let keep_running = *state.keep_running_on_close.lock().unwrap();
+                    println!("keep_running_on_close = {}", keep_running);
+                    
+                    if !keep_running {
+                        // Get the stored PID for process group killing
+                        let pid = state.server_pid.lock().unwrap().take();
+                        // Also take the child to clean up
+                        let _child = state.child.lock().unwrap().take();
+                        
+                        if let Some(pid) = pid {
+                            println!("Killing server process group with PID: {}", pid);
+                            
+                            // Kill the entire process group on Unix systems
+                            // Using negative PID sends signal to all processes in the group
+                            #[cfg(unix)]
+                            {
+                                use std::process::Command;
+                                // First try SIGTERM to the process group
+                                let pgid_kill = Command::new("kill")
+                                    .args(["-TERM", "--", &format!("-{}", pid)])
+                                    .output();
+                                
+                                match pgid_kill {
+                                    Ok(output) => {
+                                        if output.status.success() {
+                                            println!("SIGTERM sent to process group -{}", pid);
+                                        } else {
+                                            // Process group kill failed, try direct kill
+                                            println!("Process group kill failed, trying direct kill");
+                                            let _ = Command::new("kill")
+                                                .args(["-TERM", &pid.to_string()])
+                                                .output();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Failed to execute kill command: {}", e);
+                                    }
+                                }
+                                
+                                // Give it a moment, then force kill if needed
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                
+                                // Force kill with SIGKILL
+                                let _ = Command::new("kill")
+                                    .args(["-9", "--", &format!("-{}", pid)])
+                                    .output();
+                                let _ = Command::new("kill")
+                                    .args(["-9", &pid.to_string()])
+                                    .output();
+                                
+                                println!("Server process group kill completed");
+                            }
+                            
+                            #[cfg(windows)]
+                            {
+                                // On Windows, use taskkill with /T to kill child processes
+                                use std::process::Command;
+                                let _ = Command::new("taskkill")
+                                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                                    .output();
+                                println!("Server process tree kill completed");
+                            }
+                        } else {
+                            println!("No server PID found (already stopped or never started)");
+                        }
+                    } else {
+                        println!("Keeping server running per user setting");
+                    }
+                    println!("=================================================================");
+                }
+                RunEvent::ExitRequested { api, .. } => {
+                    println!("RunEvent::ExitRequested received");
+                    // Don't prevent exit, just log it
+                    let _ = api;
+                }
+                _ => {}
+            }
+        });
 }
 
 fn main() {
