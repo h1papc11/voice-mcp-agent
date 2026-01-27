@@ -321,11 +321,35 @@ Currently, testing is primarily manual. When adding tests:
 
 Releases are managed by maintainers:
 
-1. Version bump in `tauri.conf.json` and `Cargo.toml`
-2. Update CHANGELOG.md
-3. Create git tag: `git tag v0.2.0`
-4. Push tag: `git push --tags`
-5. GitHub Actions builds and releases
+1. **Bump version using bumpversion:**
+   ```bash
+   # Install bumpversion (if not already installed)
+   pip install bumpversion
+   
+   # Bump patch version (0.1.0 -> 0.1.1)
+   bumpversion patch
+   
+   # Or bump minor version (0.1.0 -> 0.2.0)
+   bumpversion minor
+   
+   # Or bump major version (0.1.0 -> 1.0.0)
+   bumpversion major
+   ```
+   
+   This automatically:
+   - Updates version numbers in all files (`tauri.conf.json`, `Cargo.toml`, all `package.json` files, `backend/main.py`)
+   - Creates a git commit with the version bump
+   - Creates a git tag (e.g., `v0.1.1`, `v0.2.0`)
+
+2. **Update CHANGELOG.md** with release notes
+
+3. **Push commits and tags:**
+   ```bash
+   git push
+   git push --tags
+   ```
+
+4. **GitHub Actions builds and releases** automatically when tags are pushed
 
 ## Troubleshooting
 
