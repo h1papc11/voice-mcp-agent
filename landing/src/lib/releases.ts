@@ -74,10 +74,8 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
     const releaseInfo: ReleaseInfo = {
       version,
       downloadLinks: {
-        macArm:
-          downloadLinks.macArm || `${baseUrl}/voicebox_aarch64.app.tar.gz`,
-        macIntel:
-          downloadLinks.macIntel || `${baseUrl}/voicebox_x64.app.tar.gz`,
+        macArm: downloadLinks.macArm || `${baseUrl}/voicebox_aarch64.app.tar.gz`,
+        macIntel: downloadLinks.macIntel || `${baseUrl}/voicebox_x64.app.tar.gz`,
         windows:
           downloadLinks.windows || `${baseUrl}/voicebox_${version.replace('v', '')}_x64_en-US.msi`,
         linux: downloadLinks.linux || `${baseUrl}/voicebox_x86_64-unknown-linux-gnu.AppImage`,

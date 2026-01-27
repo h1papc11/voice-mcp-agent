@@ -8,6 +8,9 @@ use tauri::{command, State, Manager, WindowEvent, Emitter, Listener, RunEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::mpsc;
 
+const LEGACY_PORT: u16 = 8000;
+const SERVER_PORT: u16 = 17493;
+
 struct ServerState {
     child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
     server_pid: Mutex<Option<u32>>,
@@ -22,63 +25,84 @@ async fn start_server(
 ) -> Result<String, String> {
     // Check if server is already running (managed by this app instance)
     if state.child.lock().unwrap().is_some() {
-        return Ok("Server already running on http://localhost:8000".to_string());
+        return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
     }
 
-    // If keep_running_on_close is false, kill any orphaned server from previous session
-    let keep_running = *state.keep_running_on_close.lock().unwrap();
-    if !keep_running {
-        #[cfg(unix)]
+    // Kill any orphaned voicebox-server from previous session on legacy port 8000
+    // This handles upgrades from older versions that used a fixed port
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+        // Find processes listening on legacy port 8000 with their command names
+        if let Ok(output) = Command::new("lsof")
+            .args(["-i", &format!(":{}", LEGACY_PORT), "-sTCP:LISTEN"])
+            .output()
         {
-            use std::process::Command;
-            // Find any process listening on port 8000
-            if let Ok(output) = Command::new("lsof")
-                .args(["-ti", ":8000"])
-                .output()
-            {
-                let pids = String::from_utf8_lossy(&output.stdout);
-                for pid_str in pids.lines() {
-                    if let Ok(pid) = pid_str.trim().parse::<i32>() {
-                        println!("Found orphaned server on port 8000 (PID: {}), killing it...", pid);
-                        // Kill the process group
-                        let _ = Command::new("kill")
-                            .args(["-9", "--", &format!("-{}", pid)])
-                            .output();
-                        let _ = Command::new("kill")
-                            .args(["-9", &pid.to_string()])
-                            .output();
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines().skip(1) { // Skip header line
+                // lsof output format: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let command = parts[0];
+                    let pid_str = parts[1];
+                    
+                    // Only kill if it's a voicebox-server process
+                    if command.contains("voicebox") {
+                        if let Ok(pid) = pid_str.parse::<i32>() {
+                            println!("Found orphaned voicebox-server on legacy port {} (PID: {}, CMD: {}), killing it...", LEGACY_PORT, pid, command);
+                            // Kill the process group
+                            let _ = Command::new("kill")
+                                .args(["-9", "--", &format!("-{}", pid)])
+                                .output();
+                            let _ = Command::new("kill")
+                                .args(["-9", &pid.to_string()])
+                                .output();
+                        }
+                    } else {
+                        println!("Legacy port {} is in use by non-voicebox process: {} (PID: {}), not killing", LEGACY_PORT, command, pid_str);
                     }
                 }
             }
         }
-        
-        #[cfg(windows)]
+    }
+    
+    #[cfg(windows)]
+    {
+        use std::process::Command;
+        // On Windows, find PIDs on legacy port 8000, then check their names
+        if let Ok(output) = Command::new("netstat")
+            .args(["-ano"])
+            .output()
         {
-            use std::process::Command;
-            // On Windows, find and kill process on port 8000
-            if let Ok(output) = Command::new("netstat")
-                .args(["-ano"])
-                .output()
-            {
-                let output_str = String::from_utf8_lossy(&output.stdout);
-                for line in output_str.lines() {
-                    if line.contains(":8000") && line.contains("LISTENING") {
-                        if let Some(pid_str) = line.split_whitespace().last() {
-                            if let Ok(pid) = pid_str.parse::<u32>() {
-                                println!("Found orphaned server on port 8000 (PID: {}), killing it...", pid);
-                                let _ = Command::new("taskkill")
-                                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                                    .output();
+            let output_str = String::from_utf8_lossy(&output.stdout);
+            for line in output_str.lines() {
+                if line.contains(&format!(":{}", LEGACY_PORT)) && line.contains("LISTENING") {
+                    if let Some(pid_str) = line.split_whitespace().last() {
+                        if let Ok(pid) = pid_str.parse::<u32>() {
+                            // Get process name for this PID
+                            if let Ok(tasklist_output) = Command::new("tasklist")
+                                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+                                .output()
+                            {
+                                let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
+                                if tasklist_str.to_lowercase().contains("voicebox") {
+                                    println!("Found orphaned voicebox-server on legacy port {} (PID: {}), killing it...", LEGACY_PORT, pid);
+                                    let _ = Command::new("taskkill")
+                                        .args(["/PID", &pid.to_string(), "/T", "/F"])
+                                        .output();
+                                } else {
+                                    println!("Legacy port {} is in use by non-voicebox process (PID: {}), not killing", LEGACY_PORT, pid);
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        
-        // Brief wait for port to be released
-        std::thread::sleep(std::time::Duration::from_millis(200));
     }
+    
+    // Brief wait for port to be released
+    std::thread::sleep(std::time::Duration::from_millis(200));
 
     // Get app data directory
     let data_dir = app
@@ -106,12 +130,14 @@ async fn start_server(
 
     println!("Sidecar command created successfully");
 
-    // Pass data directory to Python server
+    // Pass data directory and port to Python server
     sidecar = sidecar.args([
         "--data-dir",
         data_dir
             .to_str()
             .ok_or_else(|| "Invalid data dir path".to_string())?,
+        "--port",
+        &SERVER_PORT.to_string(),
     ]);
 
     if remote.unwrap_or(false) {
@@ -134,9 +160,9 @@ async fn start_server(
     println!("Server process spawned, waiting for ready signal...");
     println!("=================================================================");
 
-    // Store child process and its PID for process group killing
-    let pid = child.pid();
-    *state.server_pid.lock().unwrap() = Some(pid);
+    // Store child process and PID
+    let process_pid = child.pid();
+    *state.server_pid.lock().unwrap() = Some(process_pid);
     *state.child.lock().unwrap() = Some(child);
 
     // Wait for server to be ready by listening for startup log
@@ -215,7 +241,7 @@ async fn start_server(
         }
     });
 
-    Ok("Server started on http://localhost:8000".to_string())
+    Ok(format!("http://127.0.0.1:{}", SERVER_PORT))
 }
 
 #[command]

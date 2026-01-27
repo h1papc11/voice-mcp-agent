@@ -94,8 +94,10 @@ function App() {
     console.log('Production mode: Starting bundled server...');
 
     startServer(false)
-      .then(() => {
-        console.log('Server is ready');
+      .then((serverUrl) => {
+        console.log('Server is ready at:', serverUrl);
+        // Update the server URL in the store with the dynamically assigned port
+        useServerStore.getState().setServerUrl(serverUrl);
         setServerReady(true);
         // Mark that we started the server (so we know to stop it on close)
         // @ts-expect-error - adding property to window

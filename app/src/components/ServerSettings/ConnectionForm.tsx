@@ -70,7 +70,7 @@ export function ConnectionForm() {
                 <FormItem>
                   <FormLabel>Server URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="http://localhost:8000" {...field} />
+                    <Input placeholder="http://127.0.0.1:17493" {...field} />
                   </FormControl>
                   <FormDescription>Enter the URL of your voicebox backend server</FormDescription>
                   <FormMessage />
