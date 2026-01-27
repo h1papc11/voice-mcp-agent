@@ -1,6 +1,6 @@
 {
   "name": "@voicebox/landing",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Landing page for voicebox.sh",
   "scripts": {
     "dev": "bun --bun next dev --turbo",
