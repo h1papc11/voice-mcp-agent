@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { check, type Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { check, type Update } from '@tauri-apps/plugin-updater';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface UpdateStatus {
   checking: boolean;
@@ -92,23 +92,22 @@ export function useAutoUpdater(checkOnMount = false) {
           case 'Started':
             totalBytes = event.data.contentLength || 0;
             downloadedBytes = 0;
-            setStatus((prev) => ({ 
-              ...prev, 
+            setStatus((prev) => ({
+              ...prev,
               downloading: true,
               totalBytes,
               downloadedBytes: 0,
-              downloadProgress: 0
+              downloadProgress: 0,
             }));
             break;
           case 'Progress': {
             downloadedBytes += event.data.chunkLength;
-            const progress = totalBytes > 0 
-              ? Math.round((downloadedBytes / totalBytes) * 100)
-              : undefined;
+            const progress =
+              totalBytes > 0 ? Math.round((downloadedBytes / totalBytes) * 100) : undefined;
             setStatus((prev) => ({
               ...prev,
               downloadedBytes,
-              downloadProgress: progress
+              downloadProgress: progress,
             }));
             break;
           }
@@ -117,7 +116,7 @@ export function useAutoUpdater(checkOnMount = false) {
               ...prev,
               downloading: false,
               readyToInstall: true,
-              downloadProgress: 100
+              downloadProgress: 100,
             }));
             break;
         }
