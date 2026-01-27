@@ -4,7 +4,7 @@ import { isTauri } from '@/lib/tauri';
 
 interface UseSystemAudioCaptureOptions {
   maxDurationSeconds?: number;
-  onRecordingComplete?: (blob: Blob) => void;
+  onRecordingComplete?: (blob: Blob, duration?: number) => void;
 }
 
 /**
@@ -110,7 +110,11 @@ export function useSystemAudioCapture({
       }
 
       const blob = new Blob([bytes], { type: 'audio/wav' });
-      onRecordingComplete?.(blob);
+      // Pass the actual recorded duration
+      const recordedDuration = startTimeRef.current 
+        ? (Date.now() - startTimeRef.current) / 1000 
+        : undefined;
+      onRecordingComplete?.(blob, recordedDuration);
     } catch (err) {
       const errorMessage =
         err instanceof Error

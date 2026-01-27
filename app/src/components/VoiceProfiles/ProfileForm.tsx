@@ -46,14 +46,26 @@ import { formatAudioDuration } from '@/lib/utils/audio';
 import { isTauri } from '@/lib/tauri';
 
 // Helper function to get audio duration from File
-async function getAudioDuration(file: File): Promise<number> {
+async function getAudioDuration(file: File & { recordedDuration?: number }): Promise<number> {
+  // If the file has a recordedDuration property (from our recording hooks),
+  // use that instead of trying to read metadata. This fixes issues on Windows
+  // where WebM files from MediaRecorder don't have proper duration metadata.
+  if (file.recordedDuration !== undefined && Number.isFinite(file.recordedDuration)) {
+    return file.recordedDuration;
+  }
+  
   return new Promise((resolve, reject) => {
     const audio = new Audio();
     const url = URL.createObjectURL(file);
     
     audio.addEventListener('loadedmetadata', () => {
       URL.revokeObjectURL(url);
-      resolve(audio.duration);
+      // Check if duration is valid (not Infinity or NaN)
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        resolve(audio.duration);
+      } else {
+        reject(new Error('Audio file has invalid duration metadata'));
+      }
     });
     
     audio.addEventListener('error', () => {
@@ -123,7 +135,7 @@ export function ProfileForm() {
   useEffect(() => {
     if (selectedFile && selectedFile instanceof File) {
       setIsValidatingAudio(true);
-      getAudioDuration(selectedFile)
+      getAudioDuration(selectedFile as File & { recordedDuration?: number })
         .then((duration) => {
           setAudioDuration(duration);
           if (duration > MAX_AUDIO_DURATION_SECONDS) {
@@ -138,10 +150,18 @@ export function ProfileForm() {
         .catch((error) => {
           console.error('Failed to get audio duration:', error);
           setAudioDuration(null);
-          form.setError('sampleFile', {
-            type: 'manual',
-            message: 'Failed to validate audio file. Please try a different file.',
-          });
+          // For recordings, we auto-stop at max duration, so we can skip validation errors
+          const isRecordedFile = selectedFile.name.startsWith('recording-') || 
+                                 selectedFile.name.startsWith('system-audio-');
+          if (!isRecordedFile) {
+            form.setError('sampleFile', {
+              type: 'manual',
+              message: 'Failed to validate audio file. Please try a different file.',
+            });
+          } else {
+            // Clear any existing errors for recorded files
+            form.clearErrors('sampleFile');
+          }
         })
         .finally(() => {
           setIsValidatingAudio(false);
@@ -161,10 +181,14 @@ export function ProfileForm() {
     cancelRecording,
   } = useAudioRecording({
     maxDurationSeconds: 30,
-    onRecordingComplete: (blob) => {
+    onRecordingComplete: (blob, recordedDuration) => {
       const file = new File([blob], `recording-${Date.now()}.webm`, {
         type: blob.type || 'audio/webm',
-      });
+      }) as File & { recordedDuration?: number };
+      // Store the actual recorded duration to bypass metadata reading issues on Windows
+      if (recordedDuration !== undefined) {
+        file.recordedDuration = recordedDuration;
+      }
       form.setValue('sampleFile', file, { shouldValidate: true });
       toast({
         title: 'Recording complete',
@@ -183,10 +207,14 @@ export function ProfileForm() {
     cancelRecording: cancelSystemRecording,
   } = useSystemAudioCapture({
     maxDurationSeconds: 30,
-    onRecordingComplete: (blob) => {
+    onRecordingComplete: (blob, recordedDuration) => {
       const file = new File([blob], `system-audio-${Date.now()}.wav`, {
         type: blob.type || 'audio/wav',
-      });
+      }) as File & { recordedDuration?: number };
+      // Store the actual recorded duration to bypass metadata reading issues on Windows
+      if (recordedDuration !== undefined) {
+        file.recordedDuration = recordedDuration;
+      }
       form.setValue('sampleFile', file, { shouldValidate: true });
       toast({
         title: 'System audio captured',

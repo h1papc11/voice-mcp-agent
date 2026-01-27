@@ -3,7 +3,7 @@ import { isTauri } from '@/lib/tauri';
 
 interface UseAudioRecordingOptions {
   maxDurationSeconds?: number;
-  onRecordingComplete?: (blob: Blob) => void;
+  onRecordingComplete?: (blob: Blob, duration?: number) => void;
 }
 
 export function useAudioRecording({
@@ -87,7 +87,11 @@ export function useAudioRecording({
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        onRecordingComplete?.(blob);
+        // Pass the actual recorded duration
+        const recordedDuration = startTimeRef.current 
+          ? (Date.now() - startTimeRef.current) / 1000 
+          : undefined;
+        onRecordingComplete?.(blob, recordedDuration);
 
         // Stop all tracks
         streamRef.current?.getTracks().forEach((track) => {

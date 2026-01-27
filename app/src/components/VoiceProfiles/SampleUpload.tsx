@@ -72,11 +72,15 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
     cancelRecording,
   } = useAudioRecording({
     maxDurationSeconds: 30,
-    onRecordingComplete: (blob) => {
+    onRecordingComplete: (blob, recordedDuration) => {
       // Convert blob to File object
       const file = new File([blob], `recording-${Date.now()}.webm`, {
         type: blob.type || 'audio/webm',
-      });
+      }) as File & { recordedDuration?: number };
+      // Store the actual recorded duration to bypass metadata reading issues on Windows
+      if (recordedDuration !== undefined) {
+        file.recordedDuration = recordedDuration;
+      }
       form.setValue('file', file, { shouldValidate: true });
       toast({
         title: 'Recording complete',
@@ -95,11 +99,15 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
     cancelRecording: cancelSystemRecording,
   } = useSystemAudioCapture({
     maxDurationSeconds: 30,
-    onRecordingComplete: (blob) => {
+    onRecordingComplete: (blob, recordedDuration) => {
       // Convert blob to File object
       const file = new File([blob], `system-audio-${Date.now()}.wav`, {
         type: blob.type || 'audio/wav',
-      });
+      }) as File & { recordedDuration?: number };
+      // Store the actual recorded duration to bypass metadata reading issues on Windows
+      if (recordedDuration !== undefined) {
+        file.recordedDuration = recordedDuration;
+      }
       form.setValue('file', file, { shouldValidate: true });
       toast({
         title: 'System audio captured',
