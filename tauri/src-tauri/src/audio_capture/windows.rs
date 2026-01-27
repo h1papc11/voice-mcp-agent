@@ -5,8 +5,8 @@ use std::io::Cursor;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
 use wasapi::*;
+use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
 
 pub async fn start_capture(
     state: &AudioCaptureState,
@@ -37,6 +37,20 @@ pub async fn start_capture(
     // Spawn capture task on a dedicated thread (WASAPI COM objects are not Send)
     // All WASAPI objects must be created and used on the same thread
     thread::spawn(move || {
+        // Initialize COM for this thread
+        unsafe {
+            let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+            if hr.is_err() {
+                eprintln!("Failed to initialize COM: {:?}", hr);
+                return;
+            }
+        }
+
+        // Ensure COM is uninitialized when thread exits
+        let _com_guard = scopeguard::guard((), |_| unsafe {
+            CoUninitialize();
+        });
+
         // Initialize WASAPI on this thread
         let device = match DeviceEnumerator::new()
             .and_then(|enumerator| enumerator.get_default_device(&Direction::Render))
@@ -76,10 +90,21 @@ pub async fn start_capture(
         *sample_rate_arc.lock().unwrap() = mix_format.get_samplespersec();
         *channels_arc.lock().unwrap() = mix_format.get_nchannels();
 
+        // Get device period
+        let (_def_period, min_period) = match audio_client.get_device_period() {
+            Ok(periods) => periods,
+            Err(e) => {
+                eprintln!("Failed to get device period: {}", e);
+                return;
+            }
+        };
+
         // Initialize audio client for loopback with StreamMode
+        // For loopback mode: get Render device, initialize with Capture direction
+        // This triggers AUDCLNT_STREAMFLAGS_LOOPBACK in the wasapi crate
         let stream_mode = StreamMode::EventsShared {
-            autoconvert: false,
-            buffer_duration_hns: 0, // 0 = use default buffer size
+            autoconvert: true,  // Enable automatic format conversion
+            buffer_duration_hns: min_period, // Use minimum period
         };
 
         if let Err(e) = audio_client.initialize_client(&mix_format, &Direction::Capture, &stream_mode) {
@@ -88,6 +113,15 @@ pub async fn start_capture(
             *error_arc.lock().unwrap() = Some(error_msg);
             return;
         }
+
+        // Set up event handle for EventsShared mode
+        let h_event = match audio_client.set_get_eventhandle() {
+            Ok(event) => event,
+            Err(e) => {
+                eprintln!("Failed to set event handle: {}", e);
+                return;
+            }
+        };
 
         let capture_client = match audio_client.get_audiocaptureclient() {
             Ok(client) => client,
@@ -158,8 +192,10 @@ pub async fn start_capture(
                 }
             }
 
-            // Sleep briefly to avoid busy-waiting
-            thread::sleep(Duration::from_millis(10));
+            // Wait for event signal (with timeout to allow checking stop flag)
+            if h_event.wait_for_event(100).is_err() {
+                // Timeout is expected - just continue to check stop flag
+            }
         }
 
         // Stop the stream when done

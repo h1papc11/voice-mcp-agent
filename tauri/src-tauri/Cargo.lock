@@ -4490,6 +4490,7 @@ dependencies = [
  "coreaudio-sys",
  "hound",
  "objc",
+ "scopeguard",
  "screencapturekit",
  "serde",
  "serde_json",
