@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Mic, Monitor, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useState, useEffect, useRef } from 'react';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,16 +19,18 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
-import { useTranscription } from '@/lib/hooks/useTranscription';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
+import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
+import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
-import { Mic, Square, Upload, Monitor, Play, Pause } from 'lucide-react';
-import { formatAudioDuration } from '@/lib/utils/audio';
+import { useTranscription } from '@/lib/hooks/useTranscription';
 import { isTauri } from '@/lib/tauri';
+import { AudioSampleUpload } from './AudioSampleUpload';
+import { AudioSampleRecording } from './AudioSampleRecording';
+import { AudioSampleSystem } from './AudioSampleSystem';
 
 const sampleSchema = z.object({
   file: z.instanceof(File, { message: 'Please select an audio file' }),
@@ -51,10 +54,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
   const { data: profile } = useProfile(profileId);
   const { toast } = useToast();
   const [mode, setMode] = useState<'upload' | 'record' | 'system'>('upload');
-  const [isDragging, setIsDragging] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
 
   const form = useForm<SampleFormValues>({
     resolver: zodResolver(sampleSchema),
@@ -156,11 +156,6 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
       const result = await transcribe.mutateAsync({ file, language });
 
       form.setValue('referenceText', result.text, { shouldValidate: true });
-
-      toast({
-        title: 'Transcription complete',
-        description: 'Audio has been transcribed successfully.',
-      });
     } catch (error) {
       toast({
         title: 'Transcription failed',
@@ -203,13 +198,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
       if (isSystemRecording) {
         cancelSystemRecording();
       }
-      // Stop and cleanup audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        URL.revokeObjectURL(audioRef.current.src);
-        audioRef.current = null;
-      }
-      setIsPlaying(false);
+      cleanupAudio();
     }
     onOpenChange(newOpen);
   }
@@ -220,56 +209,13 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
     } else if (mode === 'system') {
       cancelSystemRecording();
     }
-    // Reset file field by clearing the input
     form.resetField('file');
-    // Stop any playing audio
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    setIsPlaying(false);
+    cleanupAudio();
   }
 
   function handlePlayPause() {
     const file = form.getValues('file');
-    if (!file) return;
-
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-        setIsPlaying(false);
-      } else {
-        audioRef.current.play();
-        setIsPlaying(true);
-      }
-    } else {
-      const audio = new Audio(URL.createObjectURL(file));
-      audioRef.current = audio;
-      
-      audio.addEventListener('ended', () => {
-        setIsPlaying(false);
-        if (audioRef.current) {
-          URL.revokeObjectURL(audioRef.current.src);
-        }
-        audioRef.current = null;
-      });
-
-      audio.addEventListener('error', () => {
-        setIsPlaying(false);
-        toast({
-          title: 'Playback error',
-          description: 'Failed to play audio file',
-          variant: 'destructive',
-        });
-        if (audioRef.current) {
-          URL.revokeObjectURL(audioRef.current.src);
-        }
-        audioRef.current = null;
-      });
-
-      audio.play();
-      setIsPlaying(true);
-    }
+    playPause(file);
   }
 
   return (
@@ -284,10 +230,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <Tabs
-              value={mode}
-              onValueChange={(v) => setMode(v as 'upload' | 'record' | 'system')}
-            >
+            <Tabs value={mode} onValueChange={(v) => setMode(v as 'upload' | 'record' | 'system')}>
               <TabsList
                 className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
               >
@@ -312,119 +255,15 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                   control={form.control}
                   name="file"
                   render={({ field: { onChange, name } }) => (
-                    <FormItem>
-                      <FormLabel>Audio File</FormLabel>
-                      <FormControl>
-                        <div className="flex flex-col gap-2">
-                          <input
-                            type="file"
-                            accept="audio/*"
-                            name={name}
-                            ref={fileInputRef}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                onChange(file);
-                              }
-                            }}
-                            className="hidden"
-                          />
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onDragOver={(e) => {
-                              e.preventDefault();
-                              setIsDragging(true);
-                            }}
-                            onDragLeave={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                            }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                              const file = e.dataTransfer.files?.[0];
-                              if (file && file.type.startsWith('audio/')) {
-                                onChange(file);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                fileInputRef.current?.click();
-                              }
-                            }}
-                            className={`flex flex-col items-center justify-center gap-4 p-4 border-2 rounded-lg transition-colors min-h-[180px] ${
-                              selectedFile
-                                ? 'border-primary bg-primary/5'
-                                : isDragging
-                                  ? 'border-primary bg-primary/5'
-                                  : 'border-dashed border-muted-foreground/25 hover:border-muted-foreground/50'
-                            }`}
-                          >
-                            {!selectedFile ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="lg"
-                                  onClick={() => fileInputRef.current?.click()}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Upload className="h-5 w-5" />
-                                  Choose File
-                                </Button>
-                                <p className="text-sm text-muted-foreground text-center">
-                                  Click to choose a file or drag and drop. Maximum duration: 30 seconds.
-                                </p>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-center gap-2">
-                                  <Upload className="h-5 w-5 text-primary" />
-                                  <span className="font-medium">File uploaded</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground text-center">
-                                  File: {selectedFile.name}
-                                </p>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    onClick={handlePlayPause}
-                                  >
-                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleTranscribe}
-                                    disabled={transcribe.isPending}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <Mic className="h-4 w-4" />
-                                    {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      onChange(undefined);
-                                      if (fileInputRef.current) {
-                                        fileInputRef.current.value = '';
-                                      }
-                                    }}
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <AudioSampleUpload
+                      file={selectedFile}
+                      onFileChange={onChange}
+                      onTranscribe={handleTranscribe}
+                      onPlayPause={handlePlayPause}
+                      isPlaying={isPlaying}
+                      isTranscribing={transcribe.isPending}
+                      fieldName={name}
+                    />
                   )}
                 />
               </TabsContent>
@@ -434,95 +273,18 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                   control={form.control}
                   name="file"
                   render={() => (
-                    <FormItem>
-                      <FormLabel>Record Audio</FormLabel>
-                      <FormControl>
-                        <div className="space-y-4">
-                          {!isRecording && !selectedFile && (
-                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
-                              <Button
-                                type="button"
-                                onClick={startRecording}
-                                size="lg"
-                                className="flex items-center gap-2"
-                              >
-                                <Mic className="h-5 w-5" />
-                                Start Recording
-                              </Button>
-                              <p className="text-sm text-muted-foreground text-center">
-                                Click to start recording. Maximum duration: 30 seconds.
-                              </p>
-                            </div>
-                          )}
-
-                          {isRecording && (
-                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
-                              <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                                  <span className="text-lg font-mono font-semibold">
-                                    {formatAudioDuration(duration)}
-                                  </span>
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                onClick={stopRecording}
-                                variant="destructive"
-                                className="flex items-center gap-2"
-                              >
-                                <Square className="h-4 w-4" />
-                                Stop Recording
-                              </Button>
-                              <p className="text-sm text-muted-foreground text-center">
-                                {formatAudioDuration(30 - duration)} remaining
-                              </p>
-                            </div>
-                          )}
-
-                          {selectedFile && !isRecording && (
-                            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
-                              <div className="flex items-center gap-2">
-                                <Mic className="h-5 w-5 text-primary" />
-                                <span className="font-medium">Recording complete</span>
-                              </div>
-                              <p className="text-sm text-muted-foreground">
-                                File: {selectedFile.name}
-                              </p>
-                              <div className="flex gap-2">
-                                <Button
-                                  type="button"
-                                  size="icon"
-                                  variant="outline"
-                                  onClick={handlePlayPause}
-                                >
-                                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleTranscribe}
-                                  disabled={transcribe.isPending}
-                                  className="flex items-center gap-2"
-                                >
-                                  <Mic className="h-4 w-4" />
-                                  {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleCancelRecording}
-                                  className="flex items-center gap-2"
-                                >
-                                  Record Again
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                    <AudioSampleRecording
+                      file={selectedFile}
+                      isRecording={isRecording}
+                      duration={duration}
+                      onStart={startRecording}
+                      onStop={stopRecording}
+                      onCancel={handleCancelRecording}
+                      onTranscribe={handleTranscribe}
+                      onPlayPause={handlePlayPause}
+                      isPlaying={isPlaying}
+                      isTranscribing={transcribe.isPending}
+                    />
                   )}
                 />
               </TabsContent>
@@ -533,95 +295,18 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                     control={form.control}
                     name="file"
                     render={() => (
-                      <FormItem>
-                        <FormLabel>Capture System Audio</FormLabel>
-                        <FormControl>
-                          <div className="space-y-4">
-                            {!isSystemRecording && !selectedFile && (
-                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
-                                <Button
-                                  type="button"
-                                  onClick={startSystemRecording}
-                                  size="lg"
-                                  className="flex items-center gap-2"
-                                >
-                                  <Monitor className="h-5 w-5" />
-                                  Start Capture
-                                </Button>
-                                <p className="text-sm text-muted-foreground text-center">
-                                  Capture audio from your system. Maximum duration: 30 seconds.
-                                </p>
-                              </div>
-                            )}
-
-                            {isSystemRecording && (
-                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
-                                    <span className="text-lg font-mono font-semibold">
-                                      {formatAudioDuration(systemDuration)}
-                                    </span>
-                                  </div>
-                                </div>
-                                <Button
-                                  type="button"
-                                  onClick={stopSystemRecording}
-                                  variant="destructive"
-                                  className="flex items-center gap-2"
-                                >
-                                  <Square className="h-4 w-4" />
-                                  Stop Capture
-                                </Button>
-                                <p className="text-sm text-muted-foreground text-center">
-                                  {formatAudioDuration(30 - systemDuration)} remaining
-                                </p>
-                              </div>
-                            )}
-
-                            {selectedFile && !isSystemRecording && mode === 'system' && (
-                              <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
-                                <div className="flex items-center gap-2">
-                                  <Monitor className="h-5 w-5 text-primary" />
-                                  <span className="font-medium">Capture complete</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                  File: {selectedFile.name}
-                                </p>
-                                <div className="flex gap-2">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    onClick={handlePlayPause}
-                                  >
-                                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleTranscribe}
-                                    disabled={transcribe.isPending}
-                                    className="flex items-center gap-2"
-                                  >
-                                    <Mic className="h-4 w-4" />
-                                    {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={handleCancelRecording}
-                                    className="flex items-center gap-2"
-                                  >
-                                    Capture Again
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                      <AudioSampleSystem
+                        file={selectedFile}
+                        isRecording={isSystemRecording}
+                        duration={systemDuration}
+                        onStart={startSystemRecording}
+                        onStop={stopSystemRecording}
+                        onCancel={handleCancelRecording}
+                        onTranscribe={handleTranscribe}
+                        onPlayPause={handlePlayPause}
+                        isPlaying={isPlaying}
+                        isTranscribing={transcribe.isPending}
+                      />
                     )}
                   />
                 </TabsContent>
