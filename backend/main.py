@@ -47,7 +47,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "voicebox API", "version": "0.1.2"}
+    return {"message": "voicebox API", "version": "0.1.3"}
 
 
 @app.get("/health", response_model=models.HealthResponse)
