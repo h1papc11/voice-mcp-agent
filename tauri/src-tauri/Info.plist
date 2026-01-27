@@ -8,5 +8,7 @@
 	<string>voicebox</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>voicebox needs microphone access to record voice samples for voice cloning.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>Voicebox needs screen capture access to record system audio for voice samples.</string>
 </dict>
 </plist>

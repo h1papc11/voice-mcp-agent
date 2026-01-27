@@ -14,7 +14,7 @@ import { UpdateNotification } from '@/components/UpdateNotification';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
-import { useRestoreActiveTasks, MODEL_DISPLAY_NAMES } from '@/lib/hooks/useRestoreActiveTasks';
+import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
 import { isMacOS, isTauri, setupWindowCloseHandler, startServer } from '@/lib/tauri';
 
 // Track if server is starting to prevent duplicate starts

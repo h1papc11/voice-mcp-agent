@@ -26,8 +26,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
-import { Mic, Square, Upload } from 'lucide-react';
+import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
+import { Mic, Square, Upload, Monitor } from 'lucide-react';
 import { formatAudioDuration } from '@/lib/utils/audio';
+import { isTauri } from '@/lib/tauri';
 
 const sampleSchema = z.object({
   file: z.instanceof(File, { message: 'Please select an audio file' }),
@@ -50,7 +52,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
   const transcribe = useTranscription();
   const { data: profile } = useProfile(profileId);
   const { toast } = useToast();
-  const [mode, setMode] = useState<'upload' | 'record'>('upload');
+  const [mode, setMode] = useState<'upload' | 'record' | 'system'>('upload');
 
   const form = useForm<SampleFormValues>({
     resolver: zodResolver(sampleSchema),
@@ -83,6 +85,29 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
     },
   });
 
+  const {
+    isRecording: isSystemRecording,
+    duration: systemDuration,
+    error: systemRecordingError,
+    isSupported: isSystemAudioSupported,
+    startRecording: startSystemRecording,
+    stopRecording: stopSystemRecording,
+    cancelRecording: cancelSystemRecording,
+  } = useSystemAudioCapture({
+    maxDurationSeconds: 30,
+    onRecordingComplete: (blob) => {
+      // Convert blob to File object
+      const file = new File([blob], `system-audio-${Date.now()}.wav`, {
+        type: blob.type || 'audio/wav',
+      });
+      form.setValue('file', file, { shouldValidate: true });
+      toast({
+        title: 'System audio captured',
+        description: 'Audio has been captured successfully.',
+      });
+    },
+  });
+
   // Show recording errors
   useEffect(() => {
     if (recordingError) {
@@ -93,6 +118,17 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
       });
     }
   }, [recordingError, toast]);
+
+  // Show system audio recording errors
+  useEffect(() => {
+    if (systemRecordingError) {
+      toast({
+        title: 'System audio capture error',
+        description: systemRecordingError,
+        variant: 'destructive',
+      });
+    }
+  }, [systemRecordingError, toast]);
 
   async function handleTranscribe() {
     const file = form.getValues('file');
@@ -154,12 +190,19 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
       if (isRecording) {
         cancelRecording();
       }
+      if (isSystemRecording) {
+        cancelSystemRecording();
+      }
     }
     onOpenChange(newOpen);
   }
 
   function handleCancelRecording() {
-    cancelRecording();
+    if (mode === 'record') {
+      cancelRecording();
+    } else if (mode === 'system') {
+      cancelSystemRecording();
+    }
     // Reset file field by clearing the input
     form.resetField('file');
   }
@@ -176,8 +219,13 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as 'upload' | 'record')}>
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs
+              value={mode}
+              onValueChange={(v) => setMode(v as 'upload' | 'record' | 'system')}
+            >
+              <TabsList
+                className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+              >
                 <TabsTrigger value="upload" className="flex items-center gap-2">
                   <Upload className="h-4 w-4" />
                   Upload
@@ -186,6 +234,12 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                   <Mic className="h-4 w-4" />
                   Record
                 </TabsTrigger>
+                {isTauri() && isSystemAudioSupported && (
+                  <TabsTrigger value="system" className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4" />
+                    System Audio
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="upload" className="space-y-4">
@@ -325,6 +379,103 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                   )}
                 />
               </TabsContent>
+
+              {isTauri() && isSystemAudioSupported && (
+                <TabsContent value="system" className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="file"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel>Capture System Audio</FormLabel>
+                        <FormControl>
+                          <div className="space-y-4">
+                            {!isSystemRecording && !selectedFile && (
+                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg">
+                                <Button
+                                  type="button"
+                                  onClick={startSystemRecording}
+                                  size="lg"
+                                  className="flex items-center gap-2"
+                                >
+                                  <Monitor className="h-5 w-5" />
+                                  Start Capture
+                                </Button>
+                                <p className="text-sm text-muted-foreground text-center">
+                                  Capture audio from your system. Maximum duration: 30 seconds.
+                                </p>
+                              </div>
+                            )}
+
+                            {isSystemRecording && (
+                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-destructive rounded-lg bg-destructive/5">
+                                <div className="flex items-center gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
+                                    <span className="text-lg font-mono font-semibold">
+                                      {formatAudioDuration(systemDuration)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  onClick={stopSystemRecording}
+                                  variant="destructive"
+                                  className="flex items-center gap-2"
+                                >
+                                  <Square className="h-4 w-4" />
+                                  Stop Capture
+                                </Button>
+                                <p className="text-sm text-muted-foreground text-center">
+                                  Capturing system audio... ({formatAudioDuration(30 - systemDuration)}{' '}
+                                  remaining)
+                                </p>
+                              </div>
+                            )}
+
+                            {selectedFile && !isSystemRecording && mode === 'system' && (
+                              <div className="flex flex-col items-center gap-4 p-6 border-2 border-primary rounded-lg bg-primary/5">
+                                <div className="flex items-center gap-2">
+                                  <Monitor className="h-5 w-5 text-primary" />
+                                  <span className="font-medium">Capture complete</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  File: {selectedFile.name}
+                                </p>
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleTranscribe}
+                                    disabled={transcribe.isPending}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <Mic className="h-4 w-4" />
+                                    {transcribe.isPending ? 'Transcribing...' : 'Transcribe'}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={handleCancelRecording}
+                                    className="flex items-center gap-2"
+                                  >
+                                    Capture Again
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Capture audio from your system (applications, browser tabs, etc.). Works
+                          natively without browser dialogs.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </TabsContent>
+              )}
             </Tabs>
 
             <FormField

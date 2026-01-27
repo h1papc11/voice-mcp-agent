@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod audio_capture;
+
 use std::sync::Mutex;
 use tauri::{command, State, Manager, WindowEvent, Emitter, Listener};
 use tauri_plugin_shell::ShellExt;
@@ -165,6 +167,26 @@ async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
     Ok(())
 }
 
+#[command]
+async fn start_system_audio_capture(
+    state: State<'_, audio_capture::AudioCaptureState>,
+    max_duration_secs: u32,
+) -> Result<(), String> {
+    audio_capture::start_capture(&state, max_duration_secs).await
+}
+
+#[command]
+async fn stop_system_audio_capture(
+    state: State<'_, audio_capture::AudioCaptureState>,
+) -> Result<String, String> {
+    audio_capture::stop_capture(&state).await
+}
+
+#[command]
+fn is_system_audio_supported() -> bool {
+    audio_capture::is_supported()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -174,6 +196,7 @@ pub fn run() {
         .manage(ServerState {
             child: Mutex::new(None),
         })
+        .manage(audio_capture::AudioCaptureState::new())
         .setup(|app| {
             #[cfg(desktop)]
             app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
@@ -190,7 +213,13 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![start_server, stop_server])
+        .invoke_handler(tauri::generate_handler![
+            start_server,
+            stop_server,
+            start_system_audio_capture,
+            stop_system_audio_capture,
+            is_system_audio_supported
+        ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 // Prevent automatic close
