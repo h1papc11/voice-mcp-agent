@@ -30,6 +30,8 @@ target/
 *.swo
 *~
 
+tauri/src-tauri/gen/Assets.car
+
 # OS
 .DS_Store
 Thumbs.db

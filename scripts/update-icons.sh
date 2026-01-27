@@ -95,6 +95,25 @@ for size in 30 44 71 89 107 142 150 284 310; do
 done
 sips -s format png -z 50 50 "$SOURCE_ICON" --out "$ICONS_DIR/StoreLogo.png" 2>/dev/null
 
+# Windows icon.ico (multi-size ICO file)
+echo "Generating Windows icon.ico..."
+if command -v convert &> /dev/null; then
+  # Create temporary PNG files at different sizes for ICO
+  # Windows typically uses: 16x16, 32x32, 48x48, 256x256
+  sips -s format png -z 16 16 "$SOURCE_ICON" --out /tmp/icon-16.png 2>/dev/null
+  sips -s format png -z 32 32 "$SOURCE_ICON" --out /tmp/icon-32.png 2>/dev/null
+  sips -s format png -z 48 48 "$SOURCE_ICON" --out /tmp/icon-48.png 2>/dev/null
+  sips -s format png -z 256 256 "$SOURCE_ICON" --out /tmp/icon-256.png 2>/dev/null
+  # Combine into proper multi-size ICO file
+  convert /tmp/icon-16.png /tmp/icon-32.png /tmp/icon-48.png /tmp/icon-256.png "$ICONS_DIR/icon.ico" 2>/dev/null
+  rm -f /tmp/icon-16.png /tmp/icon-32.png /tmp/icon-48.png /tmp/icon-256.png 2>/dev/null
+  echo "  ✓ Generated Windows icon.ico"
+else
+  # Fallback: use sips to create a basic ICO (single size)
+  echo "  ⚠ ImageMagick not found - generating basic icon.ico (single size)"
+  sips -s format ico -z 256 256 "$SOURCE_ICON" --out "$ICONS_DIR/icon.ico" 2>/dev/null || echo "  ⚠ Failed to generate icon.ico (sips may not support ICO format)"
+fi
+
 # iOS Icons
 echo "Generating iOS icons..."
 mkdir -p "$ICONS_DIR/ios"
@@ -188,6 +207,7 @@ echo "Updated:"
 echo "  ✓ Liquid Glass icon bundle with all appearance variants"
 echo "  ✓ macOS/Desktop fallback icons"
 echo "  ✓ Windows Square logos"
+echo "  ✓ Windows icon.ico (multi-size)"
 echo "  ✓ iOS AppIcons (18 sizes)"
 echo "  ✓ Android mipmap icons (5 densities)"
 echo "  ✓ Landing page logo"
