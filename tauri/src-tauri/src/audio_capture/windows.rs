@@ -19,6 +19,7 @@ pub async fn start_capture(
     let sample_rate_arc = state.sample_rate.clone();
     let channels_arc = state.channels.clone();
     let stop_tx = state.stop_tx.clone();
+    let error_arc = state.error.clone();
 
     // Use AtomicBool for stop signal (works with non-Send types)
     let stop_flag = Arc::new(AtomicBool::new(false));
@@ -42,7 +43,9 @@ pub async fn start_capture(
         {
             Ok(d) => d,
             Err(e) => {
-                eprintln!("Failed to get audio device: {}", e);
+                let error_msg = format!("Failed to get audio device: {}", e);
+                eprintln!("{}", error_msg);
+                *error_arc.lock().unwrap() = Some(error_msg);
                 return;
             }
         };
@@ -50,7 +53,9 @@ pub async fn start_capture(
         let mut audio_client = match device.get_iaudioclient() {
             Ok(client) => client,
             Err(e) => {
-                eprintln!("Failed to get audio client: {}", e);
+                let error_msg = format!("Failed to get audio client: {}", e);
+                eprintln!("{}", error_msg);
+                *error_arc.lock().unwrap() = Some(error_msg);
                 return;
             }
         };
@@ -58,7 +63,9 @@ pub async fn start_capture(
         let mix_format = match audio_client.get_mixformat() {
             Ok(format) => format,
             Err(e) => {
-                eprintln!("Failed to get mix format: {}", e);
+                let error_msg = format!("Failed to get mix format: {}", e);
+                eprintln!("{}", error_msg);
+                *error_arc.lock().unwrap() = Some(error_msg);
                 return;
             }
         };
@@ -76,20 +83,26 @@ pub async fn start_capture(
         };
 
         if let Err(e) = audio_client.initialize_client(&mix_format, &Direction::Capture, &stream_mode) {
-            eprintln!("Failed to initialize audio client: {}", e);
+            let error_msg = format!("Failed to initialize audio client: {}", e);
+            eprintln!("{}", error_msg);
+            *error_arc.lock().unwrap() = Some(error_msg);
             return;
         }
 
         let capture_client = match audio_client.get_audiocaptureclient() {
             Ok(client) => client,
             Err(e) => {
-                eprintln!("Failed to get capture client: {}", e);
+                let error_msg = format!("Failed to get capture client: {}", e);
+                eprintln!("{}", error_msg);
+                *error_arc.lock().unwrap() = Some(error_msg);
                 return;
             }
         };
 
         if let Err(e) = audio_client.start_stream() {
-            eprintln!("Failed to start stream: {}", e);
+            let error_msg = format!("Failed to start stream: {}", e);
+            eprintln!("{}", error_msg);
+            *error_arc.lock().unwrap() = Some(error_msg);
             return;
         }
 
@@ -176,13 +189,18 @@ pub async fn stop_capture(state: &AudioCaptureState) -> Result<String, String> {
     // Wait a bit for capture to stop
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
+    // Check if there was an error during capture
+    if let Some(error) = state.error.lock().unwrap().as_ref() {
+        return Err(error.clone());
+    }
+
     // Get samples
     let samples = state.samples.lock().unwrap().clone();
     let sample_rate = *state.sample_rate.lock().unwrap();
     let channels = *state.channels.lock().unwrap();
 
     if samples.is_empty() {
-        return Err("No audio samples captured".to_string());
+        return Err("No audio samples captured. Make sure audio is playing on your system during recording.".to_string());
     }
 
     // Convert to WAV

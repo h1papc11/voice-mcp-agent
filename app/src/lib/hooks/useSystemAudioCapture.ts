@@ -41,7 +41,6 @@ export function useSystemAudioCapture({
   }, []);
 
   const startRecording = useCallback(async () => {
-    console.log('[useSystemAudioCapture] startRecording called');
     if (!isTauri()) {
       const errorMsg = 'System audio capture is only available in the desktop app.';
       setError(errorMsg);
@@ -55,16 +54,13 @@ export function useSystemAudioCapture({
     }
 
     try {
-      console.log('[useSystemAudioCapture] Starting capture...');
       setError(null);
       setDuration(0);
 
       // Start native capture
-      console.log('[useSystemAudioCapture] Calling invoke...');
       await invoke('start_system_audio_capture', {
         maxDurationSecs: maxDurationSeconds,
       });
-      console.log('[useSystemAudioCapture] Invoke completed, starting timer');
 
       setIsRecording(true);
       isRecordingRef.current = true;
@@ -78,14 +74,11 @@ export function useSystemAudioCapture({
 
           // Auto-stop at max duration
           if (elapsed >= maxDurationSeconds && stopRecordingRef.current) {
-            console.log('[useSystemAudioCapture] Max duration reached, auto-stopping');
             void stopRecordingRef.current();
           }
         }
       }, 100);
-      console.log('[useSystemAudioCapture] Timer started');
     } catch (err) {
-      console.error('[useSystemAudioCapture] Error starting recording:', err);
       const errorMessage =
         err instanceof Error
           ? err.message
@@ -157,17 +150,15 @@ export function useSystemAudioCapture({
   // Cleanup on unmount only
   useEffect(() => {
     return () => {
-      console.log('[useSystemAudioCapture] Component unmounting, cleaning up');
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
         timerRef.current = null;
       }
       // Cancel recording on unmount if still recording
       if (isRecordingRef.current && isTauri()) {
-        console.log('[useSystemAudioCapture] Canceling recording on unmount');
         // Call stop directly without the callback to avoid stale closure
         invoke('stop_system_audio_capture').catch((err) => {
-          console.error('[useSystemAudioCapture] Error stopping on unmount:', err);
+          console.error('Error stopping audio capture on unmount:', err);
         });
       }
     };
