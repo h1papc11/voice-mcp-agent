@@ -58,10 +58,14 @@ async def health():
     import os
     
     tts_model = tts.get_tts_model()
-    gpu_available = torch.cuda.is_available()
-    
+
+    # Check for GPU availability (CUDA or MPS)
+    has_cuda = torch.cuda.is_available()
+    has_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    gpu_available = has_cuda or has_mps
+
     vram_used = None
-    if gpu_available:
+    if has_cuda:
         vram_used = torch.cuda.memory_allocated() / 1024 / 1024  # MB
     
     # Check if model is loaded - use the same logic as model status endpoint
@@ -1053,13 +1057,22 @@ async def get_active_tasks():
 # STARTUP & SHUTDOWN
 # ============================================
 
+def _get_gpu_status() -> str:
+    """Get GPU availability status."""
+    if torch.cuda.is_available():
+        return f"CUDA ({torch.cuda.get_device_name(0)})"
+    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+        return "MPS (Apple Silicon)"
+    return "None (CPU only)"
+
+
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup."""
     print("voicebox API starting up...")
     database.init_db()
     print(f"Database initialized at {database._db_path}")
-    print(f"GPU available: {torch.cuda.is_available()}")
+    print(f"GPU available: {_get_gpu_status()}")
 
 
 @app.on_event("shutdown")

@@ -12,7 +12,7 @@
     "dev": "cd tauri && bun run tauri dev",
     "dev:web": "cd web && bun run dev",
     "dev:landing": "cd landing && bun run dev",
-    "dev:server": "uvicorn backend.main:app --reload --port 17493",
+    "dev:server": "uvicorn backend.main:app --reload --port 8000",
     "build": "cd tauri && bun run tauri build",
     "build:web": "cd web && bun run build",
     "build:landing": "cd landing && bun run build",
