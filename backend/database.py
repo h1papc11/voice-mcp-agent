@@ -2,7 +2,7 @@
 SQLite database ORM using SQLAlchemy.
 """
 
-from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, ForeignKey
+from sqlalchemy import create_engine, Column, String, Integer, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
@@ -62,6 +62,33 @@ class Project(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class AudioChannel(Base):
+    """Audio channel (bus) database model."""
+    __tablename__ = "audio_channels"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ChannelDeviceMapping(Base):
+    """Mapping between channels and OS audio devices."""
+    __tablename__ = "channel_device_mappings"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    channel_id = Column(String, ForeignKey("audio_channels.id"), nullable=False)
+    device_id = Column(String, nullable=False)  # OS device identifier
+
+
+class ProfileChannelMapping(Base):
+    """Mapping between voice profiles and audio channels (many-to-many)."""
+    __tablename__ = "profile_channel_mappings"
+    
+    profile_id = Column(String, ForeignKey("profiles.id"), primary_key=True)
+    channel_id = Column(String, ForeignKey("audio_channels.id"), primary_key=True)
+
+
 # Database setup will be initialized in init_db()
 engine = None
 SessionLocal = None
@@ -82,6 +109,31 @@ def init_db():
 
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
+    
+    # Create default channel if it doesn't exist
+    db = SessionLocal()
+    try:
+        default_channel = db.query(AudioChannel).filter(AudioChannel.is_default == True).first()
+        if not default_channel:
+            default_channel = AudioChannel(
+                id=str(uuid.uuid4()),
+                name="Default",
+                is_default=True
+            )
+            db.add(default_channel)
+            
+            # Assign all existing profiles to default channel
+            profiles = db.query(VoiceProfile).all()
+            for profile in profiles:
+                mapping = ProfileChannelMapping(
+                    profile_id=profile.id,
+                    channel_id=default_channel.id
+                )
+                db.add(mapping)
+            
+            db.commit()
+    finally:
+        db.close()
 
 
 def get_db():

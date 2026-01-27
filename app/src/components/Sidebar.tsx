@@ -1,4 +1,4 @@
-import { Loader2, Settings, Volume2 } from 'lucide-react';
+import { Loader2, Settings, Volume2, Mic, Speaker, Server } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
 import { useGenerationStore } from '@/stores/generationStore';
@@ -11,8 +11,10 @@ interface SidebarProps {
 }
 
 const tabs = [
-  { id: 'main', icon: Volume2, label: 'Main' },
-  { id: 'settings', icon: Settings, label: 'Settings' },
+  { id: 'main', icon: Volume2, label: 'Generate' },
+  { id: 'voices', icon: Mic, label: 'Voices' },
+  { id: 'audio', icon: Speaker, label: 'Audio' },
+  { id: 'server', icon: Server, label: 'Server' },
 ];
 
 export function Sidebar({ activeTab, onTabChange, isMacOS }: SidebarProps) {

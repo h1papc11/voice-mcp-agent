@@ -3,15 +3,14 @@ import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
 import { GenerationForm } from '@/components/Generation/GenerationForm';
 import { HistoryTable } from '@/components/History/HistoryTable';
-import { ConnectionForm } from '@/components/ServerSettings/ConnectionForm';
-import { ModelManagement } from '@/components/ServerSettings/ModelManagement';
-import { ServerStatus } from '@/components/ServerSettings/ServerStatus';
-import { UpdateStatus } from '@/components/ServerSettings/UpdateStatus';
 import ShinyText from '@/components/ShinyText';
 import { Sidebar } from '@/components/Sidebar';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { Toaster } from '@/components/ui/toaster';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
+import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
+import { AudioTab } from '@/components/AudioTab/AudioTab';
+import { ServerTab } from '@/components/ServerTab/ServerTab';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
 import {
@@ -174,27 +173,7 @@ function App() {
 
         <main className="flex-1 ml-20 overflow-hidden flex flex-col">
           <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
-            {activeTab === 'settings' ? (
-              <div className="space-y-4 overflow-y-auto flex flex-col">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <ConnectionForm />
-                  <ServerStatus />
-                </div>
-                {isTauri() && <UpdateStatus />}
-                <ModelManagement />
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  Created by{' '}
-                  <a
-                    href="https://github.com/jamiepine"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline"
-                  >
-                    Jamie Pine
-                  </a>
-                </div>
-              </div>
-            ) : (
+            {activeTab === 'main' && (
               // Main view: Profiles top left, Generator bottom left, History right
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0 overflow-hidden">
                 {/* Left Column */}
@@ -216,12 +195,15 @@ function App() {
                 </div>
               </div>
             )}
+            {activeTab === 'voices' && <VoicesTab />}
+            {activeTab === 'audio' && <AudioTab />}
+            {activeTab === 'server' && <ServerTab />}
           </div>
         </main>
       </div>
 
-      {/* Audio Player - always visible except on settings */}
-      {activeTab !== 'settings' && <AudioPlayer />}
+      {/* Audio Player - always visible except on server tab */}
+      {activeTab !== 'server' && <AudioPlayer />}
 
       {/* Show download toasts for any active downloads (from anywhere) */}
       {activeDownloads.map((download) => {

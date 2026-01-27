@@ -3,6 +3,7 @@ import { create } from 'zustand';
 interface PlayerState {
   audioUrl: string | null;
   audioId: string | null;
+  profileId: string | null;
   title: string | null;
   isPlaying: boolean;
   currentTime: number;
@@ -11,7 +12,7 @@ interface PlayerState {
   isLooping: boolean;
   shouldRestart: boolean;
 
-  setAudio: (url: string, id: string, title?: string) => void;
+  setAudio: (url: string, id: string, profileId: string | null, title?: string) => void;
   setIsPlaying: (playing: boolean) => void;
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -25,6 +26,7 @@ interface PlayerState {
 export const usePlayerStore = create<PlayerState>((set) => ({
   audioUrl: null,
   audioId: null,
+  profileId: null,
   title: null,
   isPlaying: false,
   currentTime: 0,
@@ -33,10 +35,11 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   isLooping: false,
   shouldRestart: false,
 
-  setAudio: (url, id, title) =>
+  setAudio: (url, id, profileId, title) =>
     set({
       audioUrl: url,
       audioId: id,
+      profileId: profileId || null,
       title: title || null,
       currentTime: 0,
       isPlaying: false,
@@ -53,6 +56,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
     set({
       audioUrl: null,
       audioId: null,
+      profileId: null,
       title: null,
       isPlaying: false,
       currentTime: 0,

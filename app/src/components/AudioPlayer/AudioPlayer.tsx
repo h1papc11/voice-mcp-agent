@@ -1,15 +1,20 @@
 import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { isTauri } from '@/lib/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 export function AudioPlayer() {
   const {
     audioUrl,
     audioId,
+    profileId,
     title,
     isPlaying,
     currentTime,
@@ -24,6 +29,36 @@ export function AudioPlayer() {
     toggleLoop,
     clearRestartFlag,
   } = usePlayerStore();
+
+  // Check if profile has assigned channels (for native audio routing)
+  const { data: profileChannels } = useQuery({
+    queryKey: ['profile-channels', profileId],
+    queryFn: () => {
+      if (!profileId) return { channel_ids: [] };
+      return apiClient.getProfileChannels(profileId);
+    },
+    enabled: !!profileId && isTauri(),
+  });
+
+  const { data: channels } = useQuery({
+    queryKey: ['channels'],
+    queryFn: () => apiClient.listChannels(),
+    enabled: !!profileChannels && profileChannels.channel_ids.length > 0,
+  });
+
+  // Determine if we should use native playback
+  const useNativePlayback = useMemo(() => {
+    if (!isTauri() || !profileChannels || !channels) return false;
+    
+    const assignedChannels = channels.filter((ch) =>
+      profileChannels.channel_ids.includes(ch.id),
+    );
+    
+    // Use native playback if any assigned channel has non-default devices
+    return assignedChannels.some(
+      (ch) => ch.device_ids.length > 0 && !ch.is_default,
+    );
+  }, [profileChannels, channels, isTauri()]);
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -395,7 +430,44 @@ export function AudioPlayer() {
 
   // Handle loop - WaveSurfer handles this via the 'finish' event
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
+    // If using native playback, handle differently
+    if (useNativePlayback && audioUrl && profileChannels && channels) {
+      if (isPlaying) {
+        // For native playback, we'd need to track and stop streams
+        // For now, just toggle the state
+        setIsPlaying(false);
+        return;
+      }
+
+      try {
+        // Collect all device IDs from assigned channels
+        const assignedChannels = channels.filter((ch) =>
+          profileChannels.channel_ids.includes(ch.id),
+        );
+        const deviceIds = assignedChannels.flatMap((ch) => ch.device_ids);
+
+        if (deviceIds.length > 0) {
+          // Fetch audio data
+          const response = await fetch(audioUrl);
+          const audioData = new Uint8Array(await response.arrayBuffer());
+
+          // Play via native audio
+          await invoke('play_audio_to_devices', {
+            audio_data: Array.from(audioData),
+            device_ids: deviceIds,
+          });
+
+          setIsPlaying(true);
+          return;
+        }
+      } catch (error) {
+        console.error('Native playback failed, falling back to WaveSurfer:', error);
+        // Fall through to WaveSurfer playback
+      }
+    }
+
+    // Standard WaveSurfer playback
     if (!wavesurferRef.current) {
       console.error('WaveSurfer not initialized');
       return;

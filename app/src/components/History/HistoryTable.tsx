@@ -69,14 +69,14 @@ export function HistoryTable() {
     return () => scrollEl.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handlePlay = (audioId: string, text: string) => {
+  const handlePlay = (audioId: string, text: string, profileId: string) => {
     // If clicking the same audio, restart it from the beginning
     if (currentAudioId === audioId) {
       restartCurrentAudio();
     } else {
       // Otherwise, load the new audio
       const audioUrl = apiClient.getAudioUrl(audioId);
-      setAudio(audioUrl, audioId, text.substring(0, 50));
+      setAudio(audioUrl, audioId, profileId, text.substring(0, 50));
     }
   };
 
@@ -195,7 +195,7 @@ export function HistoryTable() {
                     if (target.closest('textarea') || window.getSelection()?.toString()) {
                       return;
                     }
-                    handlePlay(gen.id, gen.text);
+                    handlePlay(gen.id, gen.text, gen.profile_id);
                   }}
                 >
                   {/* Waveform icon */}
@@ -242,7 +242,7 @@ export function HistoryTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text)}>
+                        <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}>
                           <Play className="mr-2 h-4 w-4" />
                           Play
                         </DropdownMenuItem>

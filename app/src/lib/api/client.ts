@@ -279,6 +279,88 @@ class ApiClient {
   async getActiveTasks(): Promise<ActiveTasksResponse> {
     return this.request<ActiveTasksResponse>('/tasks/active');
   }
+
+  // Audio Channels
+  async listChannels(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      is_default: boolean;
+      device_ids: string[];
+      created_at: string;
+    }>
+  > {
+    return this.request('/channels');
+  }
+
+  async createChannel(data: {
+    name: string;
+    device_ids: string[];
+  }): Promise<{
+    id: string;
+    name: string;
+    is_default: boolean;
+    device_ids: string[];
+    created_at: string;
+  }> {
+    return this.request('/channels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateChannel(
+    channelId: string,
+    data: {
+      name?: string;
+      device_ids?: string[];
+    },
+  ): Promise<{
+    id: string;
+    name: string;
+    is_default: boolean;
+    device_ids: string[];
+    created_at: string;
+  }> {
+    return this.request(`/channels/${channelId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteChannel(channelId: string): Promise<{ message: string }> {
+    return this.request(`/channels/${channelId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getChannelVoices(channelId: string): Promise<{ profile_ids: string[] }> {
+    return this.request(`/channels/${channelId}/voices`);
+  }
+
+  async setChannelVoices(
+    channelId: string,
+    profileIds: string[],
+  ): Promise<{ message: string }> {
+    return this.request(`/channels/${channelId}/voices`, {
+      method: 'PUT',
+      body: JSON.stringify({ profile_ids: profileIds }),
+    });
+  }
+
+  async getProfileChannels(profileId: string): Promise<{ channel_ids: string[] }> {
+    return this.request(`/profiles/${profileId}/channels`);
+  }
+
+  async setProfileChannels(
+    profileId: string,
+    channelIds: string[],
+  ): Promise<{ message: string }> {
+    return this.request(`/profiles/${profileId}/channels`, {
+      method: 'PUT',
+      body: JSON.stringify({ channel_ids: channelIds }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
