@@ -1,5 +1,5 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { RefreshCw, Download, AlertCircle } from 'lucide-react';
+import { AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,8 +92,8 @@ export function UpdateStatus() {
           </div>
         )}
 
-        {status.readyToInstall && (
-          <div className="space-y-3 p-4 border rounded-lg bg-green-500/10 border-green-500/20">
+        {!status.readyToInstall && (
+          <div className="space-y-3 p-4 border rounded-lg bg-accent/30 border-accent/50">
             <div className="flex items-center gap-2">
               <div>
                 <div className="font-semibold">Update Ready to Install</div>
