@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { apiClient } from '@/lib/api/client';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import {
   useDeleteGeneration,
   useExportGeneration,
@@ -27,7 +28,6 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { formatDate, formatDuration } from '@/lib/utils/format';
 import { usePlayerStore } from '@/stores/playerStore';
-import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 
 // OLD TABLE-BASED COMPONENT - REMOVED (can be found in git history)
 // This is the new alternate history view with fixed height rows

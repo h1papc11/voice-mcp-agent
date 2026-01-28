@@ -11,6 +11,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { Toaster } from '@/components/ui/toaster';
 import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
+import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
 import {
@@ -20,9 +21,8 @@ import {
   setupWindowCloseHandler,
   startServer,
 } from '@/lib/tauri';
-import { useServerStore } from '@/stores/serverStore';
-import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
+import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -140,7 +140,12 @@ function App() {
   // Show loading screen while server is starting in Tauri
   if (isTauri() && !serverReady) {
     return (
-      <div className={cn('min-h-screen bg-background flex items-center justify-center', TOP_SAFE_AREA_PADDING)}>
+      <div
+        className={cn(
+          'min-h-screen bg-background flex items-center justify-center',
+          TOP_SAFE_AREA_PADDING,
+        )}
+      >
         <TitleBarDragRegion />
         <div className="text-center space-y-6">
           <div className="flex justify-center relative">

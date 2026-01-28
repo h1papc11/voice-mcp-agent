@@ -1,13 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Download, Loader2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { apiClient } from '@/lib/api/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, CheckCircle2, Trash2 } from 'lucide-react';
-import { ModelProgress } from './ModelProgress';
-import { useToast } from '@/components/ui/use-toast';
-import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +11,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api/client';
+import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
+import { ModelProgress } from './ModelProgress';
 
 export function ModelManagement() {
   const { toast } = useToast();
@@ -197,8 +197,8 @@ export function ModelManagement() {
               {modelToDelete?.sizeMb && (
                 <>
                   {' '}
-                  This will free up {formatSize(modelToDelete.sizeMb)} of disk space. The model
-                  will need to be re-downloaded if you want to use it again.
+                  This will free up {formatSize(modelToDelete.sizeMb)} of disk space. The model will
+                  need to be re-downloaded if you want to use it again.
                 </>
               )}
             </AlertDialogDescription>
@@ -244,13 +244,7 @@ interface ModelItemProps {
   formatSize: (sizeMb?: number) => string;
 }
 
-function ModelItem({
-  model,
-  onDownload,
-  onDelete,
-  isDownloading,
-  formatSize,
-}: ModelItemProps) {
+function ModelItem({ model, onDownload, onDelete, isDownloading, formatSize }: ModelItemProps) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div className="flex-1">

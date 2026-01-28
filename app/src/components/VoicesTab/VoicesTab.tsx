@@ -17,15 +17,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { ProfileForm } from '@/components/VoiceProfiles/ProfileForm';
 import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileResponse } from '@/lib/api/types';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { useHistory } from '@/lib/hooks/useHistory';
 import { useDeleteProfile, useProfileSamples, useProfiles } from '@/lib/hooks/useProfiles';
-import { useUIStore } from '@/stores/uiStore';
-import { ProfileForm } from '@/components/VoiceProfiles/ProfileForm';
-import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useUIStore } from '@/stores/uiStore';
 
 export function VoicesTab() {
   const { data: profiles, isLoading } = useProfiles();
