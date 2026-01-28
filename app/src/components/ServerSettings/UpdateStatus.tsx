@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { getVersion } from '@tauri-apps/api/app';
 import { RefreshCw, Download, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useAutoUpdater } from '@/hooks/useAutoUpdater';
-import { getVersion } from '@tauri-apps/api/app';
 
 export function UpdateStatus() {
   const { status, checkForUpdates, downloadAndInstall, restartAndInstall } = useAutoUpdater(false);
@@ -77,17 +77,18 @@ export function UpdateStatus() {
                 Downloading update...
               </div>
               {status.downloadProgress !== undefined && (
-                <span className="text-muted-foreground">
-                  {status.downloadProgress}%
-                </span>
+                <span className="text-muted-foreground">{status.downloadProgress}%</span>
               )}
             </div>
             <Progress value={status.downloadProgress} />
-            {status.downloadedBytes !== undefined && status.totalBytes !== undefined && status.totalBytes > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {(status.downloadedBytes / 1024 / 1024).toFixed(1)} MB / {(status.totalBytes / 1024 / 1024).toFixed(1)} MB
-              </div>
-            )}
+            {status.downloadedBytes !== undefined &&
+              status.totalBytes !== undefined &&
+              status.totalBytes > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {(status.downloadedBytes / 1024 / 1024).toFixed(1)} MB /{' '}
+                  {(status.totalBytes / 1024 / 1024).toFixed(1)} MB
+                </div>
+              )}
           </div>
         )}
 
@@ -96,11 +97,14 @@ export function UpdateStatus() {
             <div className="flex items-center gap-2">
               <div>
                 <div className="font-semibold">Update Ready to Install</div>
-                <div className="text-sm text-muted-foreground">Version {status.version} has been downloaded</div>
+                <div className="text-sm text-muted-foreground">
+                  Version {status.version} has been downloaded
+                </div>
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              The app needs to restart to complete the installation. You can do this now or later at your convenience.
+              The app needs to restart to complete the installation. You can do this now or later at
+              your convenience.
             </div>
             <Button onClick={restartAndInstall} className="w-full" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />

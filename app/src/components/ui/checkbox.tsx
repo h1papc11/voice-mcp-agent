@@ -1,33 +1,41 @@
 import * as React from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
-export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface CheckboxProps {
+  checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+  id?: string;
 }
 
-const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, onCheckedChange, ...props }, ref) => {
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (onCheckedChange) {
-        onCheckedChange(e.target.checked);
-      }
-      // Call original onChange if provided
-      if (props.onChange) {
-        props.onChange(e);
-      }
-    };
-
+const Checkbox = React.forwardRef<HTMLButtonElement, CheckboxProps>(
+  ({ checked = false, onCheckedChange, disabled = false, className, id, ...props }, ref) => {
     return (
-      <input
-        type="checkbox"
+      <button
+        type="button"
+        ref={ref}
+        id={id}
+        role="checkbox"
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => {
+          if (!disabled && onCheckedChange) {
+            onCheckedChange(!checked);
+          }
+        }}
         className={cn(
-          'h-4 w-4 rounded border-gray-300 text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors',
+          checked ? 'bg-accent border-accent' : 'border-muted-foreground/30',
+          disabled && 'opacity-50 cursor-not-allowed',
+          !disabled && 'cursor-pointer',
           className,
         )}
-        ref={ref}
-        onChange={handleChange}
         {...props}
-      />
+      >
+        {checked && <Check className="h-3 w-3 text-accent-foreground" />}
+      </button>
     );
   },
 );
