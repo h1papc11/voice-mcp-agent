@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Edit, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { Edit, MoreHorizontal, Plus, Trash2, Mic } from 'lucide-react';
+import { useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,6 +22,10 @@ import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useHistory } from '@/lib/hooks/useHistory';
 import { useDeleteProfile, useProfileSamples, useProfiles } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
+import { ProfileForm } from '@/components/VoiceProfiles/ProfileForm';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
+import { cn } from '@/lib/utils/cn';
+import { usePlayerStore } from '@/stores/playerStore';
 
 export function VoicesTab() {
   const { data: profiles, isLoading } = useProfiles();
@@ -30,6 +34,9 @@ export function VoicesTab() {
   const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
   const setEditingProfileId = useUIStore((state) => state.setEditingProfileId);
   const deleteProfile = useDeleteProfile();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const audioUrl = usePlayerStore((state) => state.audioUrl);
+  const isPlayerVisible = !!audioUrl;
 
   // Get generation counts per profile
   const generationCounts = useMemo(() => {
@@ -96,16 +103,29 @@ export function VoicesTab() {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Voices</h1>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Voice
-        </Button>
+    <div className="h-full flex flex-col relative overflow-hidden">
+      {/* Scroll Mask - Always visible, behind content */}
+      <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-background to-transparent z-10 pointer-events-none" />
+
+      {/* Fixed Header */}
+      <div className="absolute top-0 left-0 right-0 z-20">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Voices</h1>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Voice
+          </Button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-auto">
+      {/* Scrollable Content */}
+      <div
+        ref={scrollRef}
+        className={cn(
+          'flex-1 overflow-y-auto pt-16 relative z-0',
+          isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
+        )}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -133,6 +153,8 @@ export function VoicesTab() {
           </TableBody>
         </Table>
       </div>
+
+      <ProfileForm />
     </div>
   );
 }
@@ -159,19 +181,24 @@ function VoiceRow({
   const { data: samples } = useProfileSamples(profile.id);
 
   return (
-    <TableRow>
+    <TableRow className="cursor-pointer" onClick={onEdit}>
       <TableCell>
-        <div>
-          <div className="font-medium">{profile.name}</div>
-          {profile.description && (
-            <div className="text-sm text-muted-foreground">{profile.description}</div>
-          )}
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Mic className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div>
+            <div className="font-medium">{profile.name}</div>
+            {profile.description && (
+              <div className="text-sm text-muted-foreground">{profile.description}</div>
+            )}
+          </div>
         </div>
       </TableCell>
-      <TableCell>{profile.language}</TableCell>
-      <TableCell>{generationCount}</TableCell>
-      <TableCell>{samples?.length || 0}</TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>{profile.language}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>{generationCount}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>{samples?.length || 0}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <MultiSelect
           options={channels.map((ch) => ({
             value: ch.id,
@@ -183,7 +210,7 @@ function VoiceRow({
           className="min-w-[200px]"
         />
       </TableCell>
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">

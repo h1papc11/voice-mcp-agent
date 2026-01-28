@@ -1,7 +1,6 @@
-import { Edit, Plus, Trash2, Speaker } from 'lucide-react';
+import { Edit, Plus, Trash2, Speaker, CheckCircle2, Check } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -19,10 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import { isTauri } from '@/lib/tauri';
 import { invoke } from '@tauri-apps/api/core';
+import { usePlayerStore } from '@/stores/playerStore';
+import { cn } from '@/lib/utils/cn';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 
 interface AudioDevice {
   id: string;
@@ -33,7 +36,10 @@ interface AudioDevice {
 export function AudioTab() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<string | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const audioUrl = usePlayerStore((state) => state.audioUrl);
+  const isPlayerVisible = !!audioUrl;
 
   const { data: channels, isLoading: channelsLoading } = useQuery({
     queryKey: ['channels'],
@@ -120,98 +126,219 @@ export function AudioTab() {
     );
   }
 
+  const allChannels = channels || [];
+  const allDevices = devices || [];
+  const selectedChannel = selectedChannelId
+    ? allChannels.find((c) => c.id === selectedChannelId)
+    : null;
+
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Audio Channels</h1>
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <h2 className="text-2xl font-bold">Audio Channels</h2>
         <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Channel
         </Button>
       </div>
 
-      <div className="flex-1 overflow-auto space-y-4">
-        {channels?.map((channel) => (
-          <Card key={channel.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Speaker className="h-5 w-5" />
-                  {channel.name}
-                  {channel.is_default && (
-                    <span className="text-xs text-muted-foreground">(Default)</span>
-                  )}
-                </CardTitle>
-                {!channel.is_default && (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingChannel(channel.id)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Delete this channel?')) {
-                          deleteChannel.mutate(channel.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <Label className="text-sm font-medium">Output Devices:</Label>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {channel.device_ids.length > 0 ? (
-                      <ul className="list-disc list-inside">
-                        {channel.device_ids.map((deviceId) => {
-                          const device = devices?.find((d) => d.id === deviceId);
-                          return (
-                            <li key={deviceId}>{device?.name || deviceId || 'Default Speakers'}</li>
-                          );
-                        })}
-                      </ul>
-                    ) : (
-                      <span>Default Speakers</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Assigned Voices:</Label>
-                  <ChannelVoicesList channelId={channel.id} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mt-8 pt-6 border-t">
-        <h2 className="text-lg font-semibold mb-4">Available Devices</h2>
-        <div className="space-y-2">
-          {devices && devices.length > 0 ? (
-            devices.map((device) => (
-              <div key={device.id} className="text-sm">
-                <span className="font-medium">{device.name}</span>
-                {device.is_default && (
-                  <span className="text-muted-foreground ml-2">(default)</span>
-                )}
-              </div>
-            ))
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0">
+        {/* Left Column - Channels */}
+        <div className={cn('flex flex-col min-h-0 overflow-y-auto', isPlayerVisible && BOTTOM_SAFE_AREA_PADDING)}>
+          {allChannels.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted rounded-md">
+              <Speaker className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-4">
+                No audio channels yet. Create your first channel to route voices to specific devices.
+              </p>
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Channel
+              </Button>
+            </div>
           ) : (
-            <div className="text-sm text-muted-foreground">
-              {isTauri()
-                ? 'No audio devices found'
-                : 'Audio device selection requires Tauri'}
+            <div className="space-y-3 p-2">
+              {allChannels.map((channel) => {
+                const isSelected = selectedChannelId === channel.id;
+                return (
+                  <button
+                    key={channel.id}
+                    type="button"
+                    className={cn(
+                      'group border rounded-lg p-4 transition-colors cursor-pointer text-left w-full',
+                      isSelected && 'ring-2 ring-primary bg-primary/5 border-primary',
+                    )}
+                    onClick={() => setSelectedChannelId(isSelected ? null : channel.id)}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <Speaker className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-semibold text-base truncate">{channel.name}</h3>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2.5 ml-10">
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                              Output Devices
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {channel.device_ids.length > 0 ? (
+                                channel.device_ids.map((deviceId) => {
+                                  const device = allDevices.find((d) => d.id === deviceId);
+                                  return (
+                                    <Badge
+                                      key={deviceId}
+                                      variant="outline"
+                                      className="text-xs font-normal"
+                                    >
+                                      {device?.name || deviceId}
+                                    </Badge>
+                                  );
+                                })
+                              ) : (
+                                (() => {
+                                  const defaultDevice = allDevices.find((d) => d.is_default);
+                                  return defaultDevice ? (
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                      {defaultDevice.name}
+                                    </Badge>
+                                  ) : null;
+                                })()
+                              )}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                              Assigned Voices
+                            </div>
+                            <ChannelVoicesList channelId={channel.id} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {!channel.is_default && (
+                        <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingChannel(channel.id);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('Delete this channel?')) {
+                                deleteChannel.mutate(channel.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column - Available Devices */}
+        <div className={cn('flex flex-col min-h-0 overflow-y-auto', isPlayerVisible && BOTTOM_SAFE_AREA_PADDING)}>
+          <div className="shrink-0 mb-4">
+            <h3 className="text-lg font-semibold">Available Devices</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {selectedChannelId
+                ? selectedChannel?.is_default
+                  ? 'Default channel uses system default device'
+                  : 'Click devices to add or remove them from the selected channel'
+                : 'Select a channel to assign devices'}
+            </p>
+          </div>
+          {allDevices.length > 0 ? (
+            <div className="space-y-2">
+              {allDevices.map((device) => {
+                const isConnected =
+                  selectedChannelId &&
+                  selectedChannel &&
+                  (selectedChannel.device_ids.length === 0
+                    ? device.is_default
+                    : selectedChannel.device_ids.includes(device.id));
+                const canToggle = selectedChannelId && selectedChannel && !selectedChannel.is_default;
+                
+                const handleDeviceClick = () => {
+                  if (!canToggle || !selectedChannel) return;
+                  
+                  const currentDeviceIds = selectedChannel.device_ids;
+                  const newDeviceIds = isConnected
+                    ? currentDeviceIds.filter((id) => id !== device.id)
+                    : [...currentDeviceIds, device.id];
+                  
+                  updateChannel.mutate({
+                    channelId: selectedChannelId,
+                    data: { device_ids: newDeviceIds },
+                  });
+                };
+                
+                return (
+                  <button
+                    key={device.id}
+                    type="button"
+                    onClick={handleDeviceClick}
+                    disabled={!canToggle}
+                    className={cn(
+                      'flex items-center gap-2 text-sm p-3 rounded-lg border transition-colors text-left w-full',
+                      isConnected
+                        ? 'bg-primary/10 border-primary ring-1 ring-primary/20'
+                        : 'hover:bg-muted/50',
+                      !canToggle && 'cursor-default opacity-60',
+                      canToggle && 'cursor-pointer',
+                    )}
+                  >
+                    {canToggle ? (
+                      <div
+                        className={cn(
+                          'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0',
+                          isConnected
+                            ? 'bg-accent border-accent'
+                            : 'border-muted-foreground/30',
+                        )}
+                      >
+                        {isConnected && <Check className="h-3 w-3 text-accent-foreground" />}
+                      </div>
+                    ) : device.is_default ? (
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    ) : null}
+                    <span className={cn('truncate flex-1', device.is_default && 'font-medium')}>
+                      {device.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted rounded-md">
+              <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-center">
+                {isTauri()
+                  ? 'No audio devices found'
+                  : 'Audio device selection requires Tauri'}
+              </p>
             </div>
           )}
         </div>
@@ -228,28 +355,31 @@ export function AudioTab() {
       />
 
       {/* Edit Channel Dialog */}
-      {editingChannel && (
-        <EditChannelDialog
-          open={!!editingChannel}
-          onOpenChange={(open) => !open && setEditingChannel(null)}
-          channel={channels?.find((c) => c.id === editingChannel)!}
-          devices={devices || []}
-          profiles={profiles || []}
-          channelVoices={channelVoices?.profile_ids || []}
-          onUpdate={(name, deviceIds) => {
-            updateChannel.mutate({
-              channelId: editingChannel,
-              data: { name, device_ids: deviceIds },
-            });
-          }}
-          onSetVoices={(profileIds) => {
-            setChannelVoices.mutate({
-              channelId: editingChannel,
-              profileIds,
-            });
-          }}
-        />
-      )}
+      {editingChannel && (() => {
+        const channel = channels?.find((c) => c.id === editingChannel);
+        return channel ? (
+          <EditChannelDialog
+            open={!!editingChannel}
+            onOpenChange={(open) => !open && setEditingChannel(null)}
+            channel={channel}
+            devices={devices || []}
+            profiles={profiles || []}
+            channelVoices={channelVoices?.profile_ids || []}
+            onUpdate={(name, deviceIds) => {
+              updateChannel.mutate({
+                channelId: editingChannel,
+                data: { name, device_ids: deviceIds },
+              });
+            }}
+            onSetVoices={(profileIds) => {
+              setChannelVoices.mutate({
+                channelId: editingChannel,
+                profileIds,
+              });
+            }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }
@@ -271,11 +401,15 @@ function ChannelVoicesList({ channelId }: { channelId: string }) {
       .filter(Boolean) || [];
 
   return (
-    <div className="mt-1 text-sm text-muted-foreground">
+    <div className="flex flex-wrap gap-1.5">
       {voiceNames.length > 0 ? (
-        <span>{voiceNames.join(', ')}</span>
+        voiceNames.map((name) => (
+          <Badge key={name} variant="outline" className="text-xs font-normal">
+            {name}
+          </Badge>
+        ))
       ) : (
-        <span>No voices assigned</span>
+        <span className="text-sm text-muted-foreground">No voices assigned</span>
       )}
     </div>
   );

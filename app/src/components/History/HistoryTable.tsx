@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { formatDate, formatDuration } from '@/lib/utils/format';
 import { usePlayerStore } from '@/stores/playerStore';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 
 // OLD TABLE-BASED COMPONENT - REMOVED (can be found in git history)
 // This is the new alternate history view with fixed height rows
@@ -177,7 +178,7 @@ export function HistoryTable() {
             ref={scrollRef}
             className={cn(
               'flex-1 min-h-0 overflow-y-auto space-y-2 pb-4',
-              isPlayerVisible && 'pb-32',
+              isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
             )}
           >
             {history.map((gen) => {

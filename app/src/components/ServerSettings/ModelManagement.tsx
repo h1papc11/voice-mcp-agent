@@ -277,14 +277,13 @@ function ModelItem({
         {model.downloaded ? (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-accent" />
               <span>Ready</span>
             </div>
             <Button
               size="sm"
               onClick={onDelete}
               variant="outline"
-              className="text-destructive hover:text-destructive"
               disabled={model.loaded}
               title={model.loaded ? 'Unload model before deleting' : 'Delete model'}
             >

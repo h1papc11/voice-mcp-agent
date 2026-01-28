@@ -21,6 +21,8 @@ import {
   startServer,
 } from '@/lib/tauri';
 import { useServerStore } from '@/stores/serverStore';
+import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
+import { cn } from '@/lib/utils/cn';
 
 // Track if server is starting to prevent duplicate starts
 let serverStarting = false;
@@ -138,7 +140,7 @@ function App() {
   // Show loading screen while server is starting in Tauri
   if (isTauri() && !serverReady) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center pt-12">
+      <div className={cn('min-h-screen bg-background flex items-center justify-center', TOP_SAFE_AREA_PADDING)}>
         <TitleBarDragRegion />
         <div className="text-center space-y-6">
           <div className="flex justify-center relative">

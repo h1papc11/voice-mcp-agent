@@ -1,4 +1,4 @@
-import { Loader2, Volume2, Mic, Speaker, Server, Box } from 'lucide-react';
+import { Box, Loader2, Mic, Server, Speaker, Volume2 } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
 import { useGenerationStore } from '@/stores/generationStore';
