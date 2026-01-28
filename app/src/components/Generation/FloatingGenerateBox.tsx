@@ -134,7 +134,7 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
       });
 
       const audioUrl = apiClient.getAudioUrl(result.id);
-      setAudio(audioUrl, result.id, data.text.substring(0, 50));
+      setAudio(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
 
       form.reset();
       setIsExpanded(false);

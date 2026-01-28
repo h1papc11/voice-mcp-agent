@@ -48,17 +48,32 @@ export function AudioPlayer() {
 
   // Determine if we should use native playback
   const useNativePlayback = useMemo(() => {
-    if (!isTauri() || !profileChannels || !channels) return false;
+    console.log('useNativePlayback memo:', {
+      isTauri: isTauri(),
+      profileId,
+      profileChannels,
+      channels,
+    });
+    
+    if (!isTauri() || !profileChannels || !channels) {
+      console.log('useNativePlayback: false - missing requirements');
+      return false;
+    }
     
     const assignedChannels = channels.filter((ch) =>
       profileChannels.channel_ids.includes(ch.id),
     );
     
+    console.log('Assigned channels:', assignedChannels);
+    
     // Use native playback if any assigned channel has non-default devices
-    return assignedChannels.some(
+    const shouldUseNative = assignedChannels.some(
       (ch) => ch.device_ids.length > 0 && !ch.is_default,
     );
-  }, [profileChannels, channels, isTauri()]);
+    
+    console.log('useNativePlayback result:', shouldUseNative);
+    return shouldUseNative;
+  }, [profileChannels, channels, profileId]);
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
@@ -157,7 +172,7 @@ export function AudioPlayer() {
       });
 
       // Update store when duration is loaded
-      wavesurfer.on('ready', () => {
+      wavesurfer.on('ready', async () => {
         const dur = wavesurfer.getDuration();
         setDuration(dur);
         loadingRef.current = false;
@@ -178,7 +193,95 @@ export function AudioPlayer() {
           console.log('Audio element volume:', mediaElement.volume, 'muted:', mediaElement.muted);
         }
 
-        // Auto-play when ready
+        // Auto-play when ready - check if we should use native playback
+        // Get current values from the store and queries at runtime (not captured closure values)
+        const currentAudioUrl = usePlayerStore.getState().audioUrl;
+        const currentProfileId = usePlayerStore.getState().profileId;
+        
+        console.log('Auto-play check - capturing runtime values...');
+        
+        // Fetch profile channels at runtime (not using captured value)
+        let runtimeProfileChannels = null;
+        let runtimeChannels = null;
+        
+        if (isTauri() && currentProfileId) {
+          try {
+            runtimeProfileChannels = await apiClient.getProfileChannels(currentProfileId);
+            console.log('Runtime profileChannels:', runtimeProfileChannels);
+            
+            if (runtimeProfileChannels && runtimeProfileChannels.channel_ids.length > 0) {
+              runtimeChannels = await apiClient.listChannels();
+              console.log('Runtime channels:', runtimeChannels);
+            }
+          } catch (error) {
+            console.error('Failed to fetch runtime channel data:', error);
+          }
+        }
+        
+        console.log('Auto-play check:', {
+          isTauri: isTauri(),
+          currentAudioUrl,
+          currentProfileId,
+          hasProfileChannels: !!runtimeProfileChannels,
+          hasChannels: !!runtimeChannels,
+        });
+        
+        if (isTauri() && currentAudioUrl && currentProfileId && runtimeProfileChannels && runtimeChannels) {
+          console.log('Attempting native audio playback...');
+          try {
+            // Collect all device IDs from assigned channels
+            const assignedChannels = runtimeChannels.filter((ch: any) =>
+              runtimeProfileChannels.channel_ids.includes(ch.id),
+            );
+            console.log('Assigned channels for playback:', assignedChannels);
+            
+            // Check if any assigned channel has non-default devices
+            const shouldUseNative = assignedChannels.some(
+              (ch: any) => ch.device_ids.length > 0 && !ch.is_default,
+            );
+            console.log('Should use native playback:', shouldUseNative);
+            
+            if (!shouldUseNative) {
+              console.log('No custom devices assigned, falling back to WaveSurfer');
+            } else {
+              const deviceIds = assignedChannels.flatMap((ch: any) => ch.device_ids);
+              console.log('Device IDs to play to:', deviceIds);
+
+              if (deviceIds.length > 0) {
+              console.log('Fetching audio data from:', currentAudioUrl);
+              // Fetch audio data
+              const response = await fetch(currentAudioUrl);
+              const audioData = new Uint8Array(await response.arrayBuffer());
+              console.log('Audio data size:', audioData.length);
+
+              // Play via native audio
+              console.log('Invoking play_audio_to_devices...');
+              try {
+                const result = await invoke('play_audio_to_devices', {
+                  audioData: Array.from(audioData),
+                  deviceIds: deviceIds,
+                });
+                console.log('play_audio_to_devices completed successfully, result:', result);
+                setIsPlaying(true);
+                console.log('Auto-playing via native audio routing - SUCCESS');
+                return;
+              } catch (invokeError) {
+                console.error('play_audio_to_devices invoke failed:', invokeError);
+                throw invokeError;
+              }
+              } else {
+                console.log('No device IDs found, falling back to WaveSurfer');
+              }
+            }
+          } catch (error) {
+            console.error('Native playback failed during auto-play, falling back to WaveSurfer:', error);
+            // Fall through to WaveSurfer playback
+          }
+        } else {
+          console.log('Not using native playback, using WaveSurfer');
+        }
+
+        // Standard WaveSurfer auto-play
         // Use a small delay to ensure audio element is fully ready
         setTimeout(() => {
           wavesurfer.play().catch((error) => {
@@ -454,8 +557,8 @@ export function AudioPlayer() {
 
           // Play via native audio
           await invoke('play_audio_to_devices', {
-            audio_data: Array.from(audioData),
-            device_ids: deviceIds,
+            audioData: Array.from(audioData),
+            deviceIds: deviceIds,
           });
 
           setIsPlaying(true);

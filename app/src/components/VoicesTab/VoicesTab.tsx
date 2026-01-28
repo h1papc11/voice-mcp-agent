@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Table,
   TableBody,
@@ -17,6 +18,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { apiClient } from '@/lib/api/client';
+import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useHistory } from '@/lib/hooks/useHistory';
 import { useDeleteProfile, useProfileSamples, useProfiles } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
@@ -136,12 +138,7 @@ export function VoicesTab() {
 }
 
 interface VoiceRowProps {
-  profile: {
-    id: string;
-    name: string;
-    description: string | null;
-    language: string;
-  };
+  profile: VoiceProfileResponse;
   generationCount: number;
   channelIds: string[];
   channels: Array<{ id: string; name: string; is_default: boolean }>;
@@ -175,22 +172,16 @@ function VoiceRow({
       <TableCell>{generationCount}</TableCell>
       <TableCell>{samples?.length || 0}</TableCell>
       <TableCell>
-        <select
-          multiple
+        <MultiSelect
+          options={channels.map((ch) => ({
+            value: ch.id,
+            label: `${ch.name}${ch.is_default ? ' (Default)' : ''}`,
+          }))}
           value={channelIds}
-          onChange={(e) => {
-            const selected = Array.from(e.target.selectedOptions, (opt) => opt.value);
-            onChannelChange(selected);
-          }}
-          className="w-full min-w-[200px] border rounded px-2 py-1 text-sm"
-          size={Math.min(channels.length + 1, 5)}
-        >
-          {channels.map((ch) => (
-            <option key={ch.id} value={ch.id}>
-              {ch.name} {ch.is_default && '(Default)'}
-            </option>
-          ))}
-        </select>
+          onChange={onChannelChange}
+          placeholder="Select channels..."
+          className="min-w-[200px]"
+        />
       </TableCell>
       <TableCell>
         <DropdownMenu>

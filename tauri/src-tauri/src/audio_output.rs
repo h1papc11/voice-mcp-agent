@@ -58,10 +58,16 @@ impl AudioOutputState {
         audio_data: Vec<u8>,
         device_ids: Vec<String>,
     ) -> Result<(), String> {
+        eprintln!("play_audio_to_devices called with {} bytes, {} device IDs", audio_data.len(), device_ids.len());
+        eprintln!("Requested device IDs: {:?}", device_ids);
+        
         // Decode audio file (assuming WAV format)
+        eprintln!("Decoding audio data...");
         let (samples, sample_rate, channels) = self.decode_wav(&audio_data)?;
+        eprintln!("Audio decoded: {} samples, {}Hz, {} channels", samples.len(), sample_rate, channels);
 
         // Find devices by ID
+        eprintln!("Enumerating output devices...");
         let devices: Vec<Device> = self
             .host
             .output_devices()
@@ -69,7 +75,9 @@ impl AudioOutputState {
             .filter_map(|device| {
                 let name = device.name().ok()?;
                 let id = format!("device_{}", name.replace(' ', "_").to_lowercase());
+                eprintln!("Found device: {} (id: {})", name, id);
                 if device_ids.contains(&id) {
+                    eprintln!("  -> Matched! Will play to this device");
                     Some(device)
                 } else {
                     None
@@ -78,15 +86,21 @@ impl AudioOutputState {
             .collect();
 
         if devices.is_empty() {
+            eprintln!("ERROR: No matching devices found");
             return Err("No matching devices found".to_string());
         }
 
+        eprintln!("Playing to {} device(s)", devices.len());
         // Play to each device
-        for device in devices {
-            self.play_to_device(&device, samples.clone(), sample_rate, channels)
-                .map_err(|e| format!("Failed to play to device: {}", e))?;
+        for (i, device) in devices.iter().enumerate() {
+            let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
+            eprintln!("Playing to device {}/{}: {}", i + 1, devices.len(), device_name);
+            self.play_to_device(device, samples.clone(), sample_rate, channels)
+                .map_err(|e| format!("Failed to play to device {}: {}", device_name, e))?;
+            eprintln!("Successfully started playback on device: {}", device_name);
         }
 
+        eprintln!("play_audio_to_devices completed successfully");
         Ok(())
     }
 
@@ -94,83 +108,120 @@ impl AudioOutputState {
         use symphonia::core::formats::FormatOptions;
         use symphonia::core::io::MediaSourceStream;
         use symphonia::core::meta::MetadataOptions;
-        use symphonia::core::probe::Probe;
 
+        eprintln!("decode_wav: Creating MediaSourceStream from {} bytes", data.len());
         let mss = MediaSourceStream::new(
-            Box::new(std::io::Cursor::new(data)),
+            Box::new(std::io::Cursor::new(data.to_vec())),
             Default::default(),
         );
 
-        let mut probe = Probe::default();
-        let mut format = probe
+        eprintln!("decode_wav: Probing audio format...");
+        let mut format = symphonia::default::get_probe()
             .format(
                 &Default::default(),
                 mss,
                 &FormatOptions::default(),
                 &MetadataOptions::default(),
             )
-            .map_err(|e| format!("Failed to probe audio: {}", e))?
+            .map_err(|e| {
+                eprintln!("decode_wav: Failed to probe audio: {}", e);
+                format!("Failed to probe audio: {}", e)
+            })?
             .format;
+        
+        eprintln!("decode_wav: Audio format probed successfully");
 
+        eprintln!("decode_wav: Finding audio track...");
         let track = format
             .tracks()
             .iter()
             .find(|t| t.codec_params.codec != symphonia::core::codecs::CODEC_TYPE_NULL)
-            .ok_or("No audio track found")?;
+            .ok_or_else(|| {
+                eprintln!("decode_wav: No audio track found");
+                "No audio track found".to_string()
+            })?;
 
         let sample_rate = track
             .codec_params
             .sample_rate
-            .ok_or("No sample rate found")?;
+            .ok_or_else(|| {
+                eprintln!("decode_wav: No sample rate found in track");
+                "No sample rate found".to_string()
+            })?;
 
         let channels = track
             .codec_params
             .channels
-            .ok_or("No channels found")?
+            .ok_or_else(|| {
+                eprintln!("decode_wav: No channels found in track");
+                "No channels found".to_string()
+            })?
             .count() as u16;
 
+        eprintln!("decode_wav: Track info - sample_rate: {}, channels: {}", sample_rate, channels);
+
+        eprintln!("decode_wav: Creating decoder...");
         let mut decoder = symphonia::default::get_codecs()
             .make(&track.codec_params, &Default::default())
-            .map_err(|e| format!("Failed to create decoder: {}", e))?;
+            .map_err(|e| {
+                eprintln!("decode_wav: Failed to create decoder: {}", e);
+                format!("Failed to create decoder: {}", e)
+            })?;
+        
+        eprintln!("decode_wav: Decoder created successfully");
 
         let mut samples = Vec::new();
+        let mut packet_count = 0;
+        eprintln!("decode_wav: Starting packet decoding loop...");
         loop {
             let packet = match format.next_packet() {
                 Ok(packet) => packet,
-                Err(_) => break, // End of stream
+                Err(e) => {
+                    eprintln!("decode_wav: End of stream or error: {:?}", e);
+                    break;
+                }
             };
 
+            packet_count += 1;
             let decoded = decoder
                 .decode(&packet)
-                .map_err(|e| format!("Decode error: {}", e))?;
+                .map_err(|e| {
+                    eprintln!("decode_wav: Decode error on packet {}: {}", packet_count, e);
+                    format!("Decode error: {}", e)
+                })?;
 
-            // Convert to f32 samples
+            // Convert to f32 samples by matching on the buffer type
+            use symphonia::core::audio::{AudioBufferRef, Signal};
+            use symphonia::core::conv::FromSample;
+
             let spec = *decoded.spec();
-            let duration = decoded.capacity() as u64;
+            let num_channels = spec.channels.count();
+            let num_frames = decoded.frames();
 
-            // Handle multi-channel audio
-            if spec.channels.count() == 1 {
-                // Mono
-                let plane = decoded.plane(0);
-                for i in 0..duration {
-                    if let Some(&sample) = plane.get(i as usize) {
-                        samples.push(sample as f32 / 32768.0);
-                    }
-                }
-            } else {
-                // Multi-channel - interleave
-                for i in 0..duration {
-                    for ch in 0..spec.channels.count() {
-                        if let Some(plane) = decoded.plane(ch) {
-                            if let Some(&sample) = plane.get(i as usize) {
-                                samples.push(sample as f32 / 32768.0);
-                            }
-                        }
-                    }
+            eprintln!("decode_wav: Packet {} - {} frames, {} channels", packet_count, num_frames, num_channels);
+
+            // Interleave samples from all channels
+            for frame_idx in 0..num_frames {
+                for ch in 0..num_channels {
+                    let sample_f32 = match &decoded {
+                        AudioBufferRef::U8(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::U16(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::U24(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::U32(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::S8(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::S16(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::S24(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::S32(buf) => f32::from_sample(buf.chan(ch)[frame_idx]),
+                        AudioBufferRef::F32(buf) => buf.chan(ch)[frame_idx],
+                        AudioBufferRef::F64(buf) => buf.chan(ch)[frame_idx] as f32,
+                    };
+                    samples.push(sample_f32);
                 }
             }
         }
 
+        eprintln!("decode_wav: Decoded {} packets, total {} samples", packet_count, samples.len());
+        eprintln!("decode_wav: Returning sample_rate={}, channels={}", sample_rate, channels);
         Ok((samples, sample_rate, channels))
     }
 
@@ -181,6 +232,10 @@ impl AudioOutputState {
         sample_rate: u32,
         channels: u16,
     ) -> Result<(), String> {
+        let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
+        eprintln!("play_to_device: Starting playback to device: {}", device_name);
+        eprintln!("play_to_device: Input - {} samples, {}Hz, {} channels", samples.len(), sample_rate, channels);
+        
         let config = device
             .default_output_config()
             .map_err(|e| format!("Failed to get default config: {}", e))?;
@@ -188,16 +243,29 @@ impl AudioOutputState {
         // Prepare samples for the device's format
         let device_sample_rate = config.sample_rate().0;
         let device_channels = config.channels();
+        let device_sample_format = config.sample_format();
+        
+        eprintln!("play_to_device: Device config - {}Hz, {} channels, format: {:?}", 
+                  device_sample_rate, device_channels, device_sample_format);
 
         // Resample if needed (simple linear interpolation for now)
         let resampled = if device_sample_rate != sample_rate {
-            self.resample(&samples, sample_rate, device_sample_rate)
+            eprintln!("play_to_device: Resampling from {}Hz to {}Hz", sample_rate, device_sample_rate);
+            let result = self.resample(&samples, sample_rate, device_sample_rate);
+            eprintln!("play_to_device: Resampled {} samples to {} samples", samples.len(), result.len());
+            result
         } else {
+            eprintln!("play_to_device: No resampling needed");
             samples
         };
 
         // Interleave/convert channels if needed
+        eprintln!("play_to_device: Interleaving channels from {} to {} channels", channels, device_channels);
         let interleaved = self.interleave_channels(&resampled, channels, device_channels);
+        eprintln!("play_to_device: Interleaved to {} samples", interleaved.len());
+
+        // Calculate duration before moving interleaved
+        let duration_secs = (interleaved.len() as f64 / (device_sample_rate as f64 * device_channels as f64)).ceil() as u64 + 1;
 
         // Create shared buffer for playback
         let buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(interleaved));
@@ -289,14 +357,24 @@ impl AudioOutputState {
             _ => return Err("Unsupported sample format".to_string()),
         };
 
-        stream.play().map_err(|e| format!("Failed to play stream: {}", e))?;
+        eprintln!("play_to_device: Starting stream playback...");
+        stream.play().map_err(|e| {
+            eprintln!("play_to_device: Failed to play stream: {}", e);
+            format!("Failed to play stream: {}", e)
+        })?;
+        
+        eprintln!("play_to_device: Stream started successfully");
 
         // Keep stream alive until playback completes
         // In a real implementation, we'd track this and clean up when done
+        eprintln!("play_to_device: Keeping stream alive for ~{} seconds", duration_secs.min(30));
         std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_secs(30)); // Max 30s
+            let sleep_duration = std::time::Duration::from_secs(duration_secs.min(30));
+            std::thread::sleep(sleep_duration);
+            eprintln!("play_to_device: Stream sleep completed, stream will be dropped");
         });
 
+        eprintln!("play_to_device: Function completed successfully");
         Ok(())
     }
 
