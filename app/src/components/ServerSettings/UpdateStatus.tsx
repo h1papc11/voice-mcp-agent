@@ -92,7 +92,7 @@ export function UpdateStatus() {
           </div>
         )}
 
-        {!status.readyToInstall && (
+        {status.readyToInstall && (
           <div className="space-y-3 p-4 border rounded-lg bg-accent/30 border-accent/50">
             <div className="flex items-center gap-2">
               <div>
