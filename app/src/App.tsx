@@ -1,27 +1,17 @@
 import { useEffect, useState } from 'react';
+import { RouterProvider } from '@tanstack/react-router';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
-import { AppFrame } from '@/components/AppFrame/AppFrame';
-import { AudioTab } from '@/components/AudioTab/AudioTab';
-import { MainEditor } from '@/components/MainEditor/MainEditor';
-import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
-import { ServerTab } from '@/components/ServerTab/ServerTab';
-// import { GenerationForm } from '@/components/Generation/GenerationForm';
 import ShinyText from '@/components/ShinyText';
-import { Sidebar } from '@/components/Sidebar';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
-import { Toaster } from '@/components/ui/toaster';
-import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
 import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
-import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
-import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
 import {
-  isMacOS,
   isTauri,
   setKeepServerRunning,
   setupWindowCloseHandler,
   startServer,
 } from '@/lib/tauri';
 import { cn } from '@/lib/utils/cn';
+import { router } from '@/router';
 import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
@@ -51,12 +41,8 @@ const LOADING_MESSAGES = [
 ];
 
 function App() {
-  const [activeTab, setActiveTab] = useState('main');
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-
-  // Monitor active downloads/generations and show toasts for them
-  const activeDownloads = useRestoreActiveTasks();
 
   // Sync stored setting to Rust on startup
   useEffect(() => {
@@ -172,57 +158,7 @@ function App() {
     );
   }
 
-  return (
-    <AppFrame>
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isMacOS={isMacOS()} />
-
-        <main className="flex-1 ml-20 overflow-hidden flex flex-col">
-          <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
-            {activeTab === 'main' && <MainEditor />}
-            {activeTab === 'voices' && <VoicesTab />}
-            {activeTab === 'audio' && <AudioTab />}
-            {activeTab === 'server' && <ServerTab />}
-            {activeTab === 'models' && <ModelsTab />}
-          </div>
-        </main>
-      </div>
-
-      {/* Show download toasts for any active downloads (from anywhere) */}
-      {activeDownloads.map((download) => {
-        const displayName = MODEL_DISPLAY_NAMES[download.model_name] || download.model_name;
-        return (
-          <DownloadToastRestorer
-            key={download.model_name}
-            modelName={download.model_name}
-            displayName={displayName}
-          />
-        );
-      })}
-
-      <Toaster />
-    </AppFrame>
-  );
-}
-
-/**
- * Component that restores a download toast for a specific model.
- */
-function DownloadToastRestorer({
-  modelName,
-  displayName,
-}: {
-  modelName: string;
-  displayName: string;
-}) {
-  // Use the download toast hook to restore the toast
-  useModelDownloadToast({
-    modelName,
-    displayName,
-    enabled: true,
-  });
-
-  return null;
+  return <RouterProvider router={router} />;
 }
 
 export default App;

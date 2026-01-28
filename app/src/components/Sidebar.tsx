@@ -1,3 +1,4 @@
+import { Link, useMatchRoute } from '@tanstack/react-router';
 import { Box, Loader2, Mic, Server, Speaker, Volume2 } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
@@ -5,23 +6,22 @@ import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
 
 interface SidebarProps {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
   isMacOS?: boolean;
 }
 
 const tabs = [
-  { id: 'main', icon: Volume2, label: 'Generate' },
-  { id: 'voices', icon: Mic, label: 'Voices' },
-  { id: 'audio', icon: Speaker, label: 'Audio' },
-  { id: 'models', icon: Box, label: 'Models' },
-  { id: 'server', icon: Server, label: 'Server' },
+  { id: 'main', path: '/', icon: Volume2, label: 'Generate' },
+  { id: 'voices', path: '/voices', icon: Mic, label: 'Voices' },
+  { id: 'audio', path: '/audio', icon: Speaker, label: 'Audio' },
+  { id: 'models', path: '/models', icon: Box, label: 'Models' },
+  { id: 'server', path: '/server', icon: Server, label: 'Server' },
 ];
 
-export function Sidebar({ activeTab, onTabChange, isMacOS }: SidebarProps) {
+export function Sidebar({ isMacOS }: SidebarProps) {
   const isGenerating = useGenerationStore((state) => state.isGenerating);
   const audioUrl = usePlayerStore((state) => state.audioUrl);
   const isPlayerVisible = !!audioUrl;
+  const matchRoute = useMatchRoute();
 
   return (
     <div
@@ -39,13 +39,16 @@ export function Sidebar({ activeTab, onTabChange, isMacOS }: SidebarProps) {
       <div className="flex flex-col gap-3">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
+          // For index route, use exact match; for others, use default matching
+          const isActive =
+            tab.path === '/'
+              ? matchRoute({ to: '/', exact: true })
+              : matchRoute({ to: tab.path });
 
           return (
-            <button
+            <Link
               key={tab.id}
-              type="button"
-              onClick={() => onTabChange(tab.id)}
+              to={tab.path}
               className={cn(
                 'w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200',
                 'hover:bg-muted/50',
@@ -55,7 +58,7 @@ export function Sidebar({ activeTab, onTabChange, isMacOS }: SidebarProps) {
               aria-label={tab.label}
             >
               <Icon className="h-5 w-5" />
-            </button>
+            </Link>
           );
         })}
       </div>
