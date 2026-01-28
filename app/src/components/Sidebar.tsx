@@ -1,4 +1,4 @@
-import { Loader2, Settings, Volume2, Mic, Speaker, Server } from 'lucide-react';
+import { Loader2, Volume2, Mic, Speaker, Server, Box } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
 import { useGenerationStore } from '@/stores/generationStore';
@@ -14,6 +14,7 @@ const tabs = [
   { id: 'main', icon: Volume2, label: 'Generate' },
   { id: 'voices', icon: Mic, label: 'Voices' },
   { id: 'audio', icon: Speaker, label: 'Audio' },
+  { id: 'models', icon: Box, label: 'Models' },
   { id: 'server', icon: Server, label: 'Server' },
 ];
 

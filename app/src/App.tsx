@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
-import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
+import { AppFrame } from '@/components/AppFrame/AppFrame';
+import { AudioTab } from '@/components/AudioTab/AudioTab';
+import { MainEditor } from '@/components/MainEditor/MainEditor';
+import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
+import { ServerTab } from '@/components/ServerTab/ServerTab';
 // import { GenerationForm } from '@/components/Generation/GenerationForm';
-import { FloatingGenerateBox } from '@/components/Generation/FloatingGenerateBox';
-import { HistoryTable } from '@/components/History/HistoryTable';
 import ShinyText from '@/components/ShinyText';
 import { Sidebar } from '@/components/Sidebar';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { Toaster } from '@/components/ui/toaster';
-import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
 import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
-import { AudioTab } from '@/components/AudioTab/AudioTab';
-import { ServerTab } from '@/components/ServerTab/ServerTab';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
 import {
@@ -21,7 +20,6 @@ import {
   setupWindowCloseHandler,
   startServer,
 } from '@/lib/tauri';
-import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
 
 // Track if server is starting to prevent duplicate starts
@@ -54,7 +52,6 @@ function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-  const audioUrl = usePlayerStore((state) => state.audioUrl);
 
   // Monitor active downloads/generations and show toasts for them
   const activeDownloads = useRestoreActiveTasks();
@@ -169,47 +166,20 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden pt-12">
-      <TitleBarDragRegion />
+    <AppFrame>
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isMacOS={isMacOS()} />
 
         <main className="flex-1 ml-20 overflow-hidden flex flex-col">
           <div className="container mx-auto px-8 max-w-[1800px] h-full overflow-hidden flex flex-col">
-            {activeTab === 'main' && (
-              // Main view: Profiles top left, Generator bottom left, History right
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full min-h-0 overflow-hidden relative">
-                {/* Left Column */}
-                <div className="flex flex-col gap-6 min-h-0 overflow-y-auto pb-32">
-                  {/* Profiles - Top Left */}
-                  <div className="shrink-0 flex flex-col">
-                    <ProfileList />
-                  </div>
-
-                  {/* Generator - Bottom Left */}
-                  {/* <div className="shrink-0">
-                    <GenerationForm />
-                  </div> */}
-                </div>
-
-                {/* Right Column - History */}
-                <div className="flex flex-col min-h-0 overflow-hidden">
-                  <HistoryTable />
-                </div>
-
-                {/* Floating Generate Box */}
-                <FloatingGenerateBox isPlayerOpen={!!audioUrl} />
-              </div>
-            )}
+            {activeTab === 'main' && <MainEditor />}
             {activeTab === 'voices' && <VoicesTab />}
             {activeTab === 'audio' && <AudioTab />}
             {activeTab === 'server' && <ServerTab />}
+            {activeTab === 'models' && <ModelsTab />}
           </div>
         </main>
       </div>
-
-      {/* Audio Player - always visible except on server tab */}
-      {activeTab !== 'server' && <AudioPlayer />}
 
       {/* Show download toasts for any active downloads (from anywhere) */}
       {activeDownloads.map((download) => {
@@ -224,7 +194,7 @@ function App() {
       })}
 
       <Toaster />
-    </div>
+    </AppFrame>
   );
 }
 

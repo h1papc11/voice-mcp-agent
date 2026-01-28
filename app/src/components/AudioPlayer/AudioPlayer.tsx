@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
-import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
+import { Pause, Play, Repeat, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ export function AudioPlayer() {
     setVolume,
     toggleLoop,
     clearRestartFlag,
+    reset,
   } = usePlayerStore();
 
   // Check if profile has assigned channels (for native audio routing)
@@ -234,7 +235,7 @@ export function AudioPlayer() {
           runtimeChannels
         ) {
           console.log('Attempting native audio playback...');
-          
+
           // Stop any existing native playback first
           if (isUsingNativePlaybackRef.current) {
             try {
@@ -244,7 +245,7 @@ export function AudioPlayer() {
               console.error('Failed to stop existing playback:', error);
             }
           }
-          
+
           try {
             // Collect all device IDs from assigned channels
             const assignedChannels = runtimeChannels.filter((ch: any) =>
@@ -267,7 +268,12 @@ export function AudioPlayer() {
                 const currentVolume = usePlayerStore.getState().volume;
                 mediaElement.volume = currentVolume;
                 mediaElement.muted = false;
-                console.log('WaveSurfer unmuted for normal playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+                console.log(
+                  'WaveSurfer unmuted for normal playback - volume:',
+                  mediaElement.volume,
+                  'muted:',
+                  mediaElement.muted,
+                );
               }
             } else {
               const deviceIds = assignedChannels.flatMap((ch: any) => ch.device_ids);
@@ -288,24 +294,29 @@ export function AudioPlayer() {
                     deviceIds: deviceIds,
                   });
                   console.log('play_audio_to_devices completed successfully, result:', result);
-                  
+
                   // Mark that we're using native playback
                   isUsingNativePlaybackRef.current = true;
-                  
+
                   // Mute WaveSurfer's audio element to prevent UI audio output
                   // Keep WaveSurfer running for visualization
                   const mediaElement = wavesurfer.getMediaElement();
                   if (mediaElement) {
                     mediaElement.volume = 0;
                     mediaElement.muted = true;
-                    console.log('WaveSurfer muted for native playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+                    console.log(
+                      'WaveSurfer muted for native playback - volume:',
+                      mediaElement.volume,
+                      'muted:',
+                      mediaElement.muted,
+                    );
                   }
-                  
+
                   // Start WaveSurfer playback for visualization (muted)
                   wavesurfer.play().catch((error) => {
                     console.error('Failed to start WaveSurfer visualization:', error);
                   });
-                  
+
                   setIsPlaying(true);
                   console.log('Auto-playing via native audio routing - SUCCESS');
                   return;
@@ -329,7 +340,12 @@ export function AudioPlayer() {
               const currentVolume = usePlayerStore.getState().volume;
               mediaElement.volume = currentVolume;
               mediaElement.muted = false;
-              console.log('WaveSurfer unmuted after native playback failure - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+              console.log(
+                'WaveSurfer unmuted after native playback failure - volume:',
+                mediaElement.volume,
+                'muted:',
+                mediaElement.muted,
+              );
             }
             // Fall through to WaveSurfer playback
           }
@@ -342,7 +358,12 @@ export function AudioPlayer() {
             const currentVolume = usePlayerStore.getState().volume;
             mediaElement.volume = currentVolume;
             mediaElement.muted = false;
-            console.log('WaveSurfer unmuted for normal playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+            console.log(
+              'WaveSurfer unmuted for normal playback - volume:',
+              mediaElement.volume,
+              'muted:',
+              mediaElement.muted,
+            );
           }
         }
 
@@ -373,7 +394,12 @@ export function AudioPlayer() {
             const currentVolume = usePlayerStore.getState().volume;
             mediaElement.volume = currentVolume;
             mediaElement.muted = false;
-            console.log('Playing (normal mode) - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+            console.log(
+              'Playing (normal mode) - volume:',
+              mediaElement.volume,
+              'muted:',
+              mediaElement.muted,
+            );
           }
         }
       });
@@ -497,7 +523,7 @@ export function AudioPlayer() {
         }
       })();
     }
-    
+
     // Reset native playback flag when loading new audio
     // Also unmute WaveSurfer if it was muted
     if (isUsingNativePlaybackRef.current) {
@@ -667,17 +693,17 @@ export function AudioPlayer() {
         wavesurferRef.current.pause();
         return;
       }
-      
+
       // Play: trigger native playback
       try {
         // Stop any existing native playback first
         try {
           await invoke('stop_audio_playback');
-        } catch (error) {
+        } catch (_error) {
           // Ignore errors when stopping (might not be playing)
           console.log('No existing playback to stop');
         }
-        
+
         // Collect all device IDs from assigned channels
         const assignedChannels = channels.filter((ch) =>
           profileChannels.channel_ids.includes(ch.id),
@@ -697,21 +723,21 @@ export function AudioPlayer() {
 
           // Mark that we're using native playback
           isUsingNativePlaybackRef.current = true;
-          
+
           // Mute WaveSurfer and start it for visualization
           const mediaElement = wavesurferRef.current.getMediaElement();
           if (mediaElement) {
             mediaElement.volume = 0;
             mediaElement.muted = true;
           }
-          
+
           // Start WaveSurfer for visualization (muted)
           wavesurferRef.current.play().catch((error) => {
             console.error('Failed to start WaveSurfer visualization:', error);
             setIsPlaying(false);
             setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
           });
-          
+
           return;
         }
       } catch (error) {
@@ -733,7 +759,7 @@ export function AudioPlayer() {
           mediaElement.volume = volume;
         }
       }
-      
+
       wavesurferRef.current.play().catch((error) => {
         console.error('Failed to play:', error);
         setIsPlaying(false);
@@ -750,6 +776,22 @@ export function AudioPlayer() {
 
   const handleVolumeChange = (value: number[]) => {
     setVolume(value[0] / 100);
+  };
+
+  const handleClose = () => {
+    // Stop any native playback
+    if (isUsingNativePlaybackRef.current && isTauri()) {
+      invoke('stop_audio_playback').catch((error) => {
+        console.error('Failed to stop native playback:', error);
+      });
+    }
+    // Stop WaveSurfer
+    if (wavesurferRef.current) {
+      wavesurferRef.current.pause();
+      wavesurferRef.current.seekTo(0);
+    }
+    // Reset player state
+    reset();
   };
 
   // Don't render if no audio
@@ -832,6 +874,17 @@ export function AudioPlayer() {
               className="flex-1"
             />
           </div>
+
+          {/* Close Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="shrink-0"
+            title="Close player"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </div>
