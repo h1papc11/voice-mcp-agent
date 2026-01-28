@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RouterProvider } from '@tanstack/react-router';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import ShinyText from '@/components/ShinyText';
@@ -13,9 +13,6 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { router } from '@/router';
 import { useServerStore } from '@/stores/serverStore';
-
-// Track if server is starting to prevent duplicate starts
-let serverStarting = false;
 
 const LOADING_MESSAGES = [
   'Warming up tensors...',
@@ -43,6 +40,7 @@ const LOADING_MESSAGES = [
 function App() {
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const serverStartingRef = useRef(false);
 
   // Sync stored setting to Rust on startup
   useEffect(() => {
@@ -78,11 +76,11 @@ function App() {
     }
 
     // Auto-start server in production
-    if (serverStarting) {
+    if (serverStartingRef.current) {
       return;
     }
 
-    serverStarting = true;
+    serverStartingRef.current = true;
     console.log('Production mode: Starting bundled server...');
 
     startServer(false)
@@ -92,13 +90,11 @@ function App() {
         useServerStore.getState().setServerUrl(serverUrl);
         setServerReady(true);
         // Mark that we started the server (so we know to stop it on close)
-        // @ts-expect-error - adding property to window
         window.__voiceboxServerStartedByApp = true;
       })
       .catch((error) => {
         console.error('Failed to auto-start server:', error);
-        serverStarting = false;
-        // @ts-expect-error - adding property to window
+        serverStartingRef.current = false;
         window.__voiceboxServerStartedByApp = false;
       });
 
@@ -106,7 +102,7 @@ function App() {
     // Note: Window close is handled separately in Tauri Rust code
     return () => {
       // Window close event handles server shutdown based on setting
-      serverStarting = false;
+      serverStartingRef.current = false;
     };
   }, []);
 

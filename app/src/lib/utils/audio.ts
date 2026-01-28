@@ -18,6 +18,41 @@ export function formatAudioDuration(seconds: number): string {
 }
 
 /**
+ * Get audio duration from a File.
+ * If the file has a recordedDuration property (from recording hooks),
+ * use that instead of trying to read metadata. This fixes issues on Windows
+ * where WebM files from MediaRecorder don't have proper duration metadata.
+ */
+export async function getAudioDuration(
+  file: File & { recordedDuration?: number },
+): Promise<number> {
+  if (file.recordedDuration !== undefined && Number.isFinite(file.recordedDuration)) {
+    return file.recordedDuration;
+  }
+
+  return new Promise((resolve, reject) => {
+    const audio = new Audio();
+    const url = URL.createObjectURL(file);
+
+    audio.addEventListener('loadedmetadata', () => {
+      URL.revokeObjectURL(url);
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        resolve(audio.duration);
+      } else {
+        reject(new Error('Audio file has invalid duration metadata'));
+      }
+    });
+
+    audio.addEventListener('error', () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load audio file'));
+    });
+
+    audio.src = url;
+  });
+}
+
+/**
  * Convert any audio blob to WAV format using Web Audio API.
  * This ensures compatibility without requiring ffmpeg on the backend.
  */

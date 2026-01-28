@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useToast } from '@/components/ui/use-toast';
 import { ProfileList } from '@/components/VoiceProfiles/ProfileList';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { useImportProfile } from '@/lib/hooks/useProfiles';
@@ -27,6 +28,7 @@ export function MainEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const { toast } = useToast();
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -36,7 +38,11 @@ export function MainEditor() {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.name.endsWith('.voicebox.zip')) {
-        alert('Please select a valid .voicebox.zip file');
+        toast({
+          title: 'Invalid file type',
+          description: 'Please select a valid .voicebox.zip file',
+          variant: 'destructive',
+        });
         return;
       }
       setSelectedFile(file);
@@ -53,9 +59,17 @@ export function MainEditor() {
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
+          toast({
+            title: 'Profile imported',
+            description: 'Voice profile imported successfully',
+          });
         },
         onError: (error) => {
-          alert(`Failed to import profile: ${error.message}`);
+          toast({
+            title: 'Failed to import profile',
+            description: error.message,
+            variant: 'destructive',
+          });
         },
       });
     }
@@ -102,15 +116,9 @@ export function MainEditor() {
           )}
         >
           <div className="flex flex-col gap-6">
-            {/* Profiles - Top Left */}
             <div className="shrink-0 flex flex-col">
               <ProfileList />
             </div>
-
-            {/* Generator - Bottom Left */}
-            {/* <div className="shrink-0">
-              <GenerationForm />
-            </div> */}
           </div>
         </div>
       </div>

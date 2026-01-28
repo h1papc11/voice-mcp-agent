@@ -12,7 +12,7 @@ interface UseSystemAudioCaptureOptions {
  * Uses ScreenCaptureKit on macOS and WASAPI loopback on Windows.
  */
 export function useSystemAudioCapture({
-  maxDurationSeconds = 30,
+  maxDurationSeconds = 29,
   onRecordingComplete,
 }: UseSystemAudioCaptureOptions = {}) {
   const [isRecording, setIsRecording] = useState(false);

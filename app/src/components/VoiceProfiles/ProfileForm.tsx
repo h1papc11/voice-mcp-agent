@@ -42,44 +42,12 @@ import {
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { isTauri } from '@/lib/tauri';
-import { formatAudioDuration } from '@/lib/utils/audio';
+import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
 import { useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
 import { SampleList } from './SampleList';
-
-// Helper function to get audio duration from File
-async function getAudioDuration(file: File & { recordedDuration?: number }): Promise<number> {
-  // If the file has a recordedDuration property (from our recording hooks),
-  // use that instead of trying to read metadata. This fixes issues on Windows
-  // where WebM files from MediaRecorder don't have proper duration metadata.
-  if (file.recordedDuration !== undefined && Number.isFinite(file.recordedDuration)) {
-    return file.recordedDuration;
-  }
-
-  return new Promise((resolve, reject) => {
-    const audio = new Audio();
-    const url = URL.createObjectURL(file);
-
-    audio.addEventListener('loadedmetadata', () => {
-      URL.revokeObjectURL(url);
-      // Check if duration is valid (not Infinity or NaN)
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        resolve(audio.duration);
-      } else {
-        reject(new Error('Audio file has invalid duration metadata'));
-      }
-    });
-
-    audio.addEventListener('error', () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to load audio file'));
-    });
-
-    audio.src = url;
-  });
-}
 
 const MAX_AUDIO_DURATION_SECONDS = 30;
 
@@ -187,7 +155,7 @@ export function ProfileForm() {
     stopRecording,
     cancelRecording,
   } = useAudioRecording({
-    maxDurationSeconds: 30,
+    maxDurationSeconds: 29,
     onRecordingComplete: (blob, recordedDuration) => {
       const file = new File([blob], `recording-${Date.now()}.webm`, {
         type: blob.type || 'audio/webm',
@@ -213,7 +181,7 @@ export function ProfileForm() {
     stopRecording: stopSystemRecording,
     cancelRecording: cancelSystemRecording,
   } = useSystemAudioCapture({
-    maxDurationSeconds: 30,
+    maxDurationSeconds: 29,
     onRecordingComplete: (blob, recordedDuration) => {
       const file = new File([blob], `system-audio-${Date.now()}.wav`, {
         type: blob.type || 'audio/wav',

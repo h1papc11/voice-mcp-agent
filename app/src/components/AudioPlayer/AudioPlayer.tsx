@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { apiClient } from '@/lib/api/client';
 import { isTauri } from '@/lib/tauri';
 import { formatAudioDuration } from '@/lib/utils/audio';
+import { debug } from '@/lib/utils/debug';
 import { usePlayerStore } from '@/stores/playerStore';
 
 export function AudioPlayer() {
@@ -49,28 +50,17 @@ export function AudioPlayer() {
 
   // Determine if we should use native playback
   const useNativePlayback = useMemo(() => {
-    console.log('useNativePlayback memo:', {
-      isTauri: isTauri(),
-      profileId,
-      profileChannels,
-      channels,
-    });
-
     if (!isTauri() || !profileChannels || !channels) {
-      console.log('useNativePlayback: false - missing requirements');
       return false;
     }
 
     const assignedChannels = channels.filter((ch) => profileChannels.channel_ids.includes(ch.id));
-
-    console.log('Assigned channels:', assignedChannels);
 
     // Use native playback if any assigned channel has non-default devices
     const shouldUseNative = assignedChannels.some(
       (ch) => ch.device_ids.length > 0 && !ch.is_default,
     );
 
-    console.log('useNativePlayback result:', shouldUseNative);
     return shouldUseNative;
   }, [profileChannels, channels, profileId]);
 
@@ -91,11 +81,11 @@ export function AudioPlayer() {
     }
 
     if (wavesurferRef.current) {
-      console.log('WaveSurfer already initialized, skipping');
+      debug.log('WaveSurfer already initialized, skipping');
       return;
     }
 
-    console.log('Creating NEW WaveSurfer instance');
+    debug.log('Creating NEW WaveSurfer instance');
 
     // Wait for container to be properly rendered
     const initWaveSurfer = () => {
@@ -121,7 +111,7 @@ export function AudioPlayer() {
         return;
       }
 
-      console.log('Initializing WaveSurfer...', {
+      debug.log('Initializing WaveSurfer...', {
         container,
         width: rect.width,
         height: rect.height,
@@ -154,9 +144,9 @@ export function AudioPlayer() {
         });
 
         wavesurferRef.current = wavesurfer;
-        console.log('WaveSurfer created successfully');
+        debug.log('WaveSurfer created successfully');
       } catch (error) {
-        console.error('Failed to create WaveSurfer:', error);
+        debug.error('Failed to create WaveSurfer:', error);
         setError(
           `Failed to initialize waveform: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -178,8 +168,8 @@ export function AudioPlayer() {
         loadingRef.current = false;
         setIsLoading(false);
         setError(null);
-        console.log('Audio ready, duration:', dur);
-        console.log('Waveform should be visible now');
+        debug.log('Audio ready, duration:', dur);
+        debug.log('Waveform should be visible now');
 
         // Ensure volume is set
         const currentVolume = usePlayerStore.getState().volume;
@@ -191,7 +181,7 @@ export function AudioPlayer() {
         if (mediaElement && !isUsingNativePlaybackRef.current) {
           mediaElement.volume = currentVolume;
           mediaElement.muted = false;
-          console.log('Audio element volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+          debug.log('Audio element volume:', mediaElement.volume, 'muted:', mediaElement.muted);
         }
 
         // Auto-play when ready - check if we should use native playback
@@ -199,7 +189,7 @@ export function AudioPlayer() {
         const currentAudioUrl = usePlayerStore.getState().audioUrl;
         const currentProfileId = usePlayerStore.getState().profileId;
 
-        console.log('Auto-play check - capturing runtime values...');
+        debug.log('Auto-play check - capturing runtime values...');
 
         // Fetch profile channels at runtime (not using captured value)
         let runtimeProfileChannels = null;
@@ -208,18 +198,18 @@ export function AudioPlayer() {
         if (isTauri() && currentProfileId) {
           try {
             runtimeProfileChannels = await apiClient.getProfileChannels(currentProfileId);
-            console.log('Runtime profileChannels:', runtimeProfileChannels);
+            debug.log('Runtime profileChannels:', runtimeProfileChannels);
 
             if (runtimeProfileChannels && runtimeProfileChannels.channel_ids.length > 0) {
               runtimeChannels = await apiClient.listChannels();
-              console.log('Runtime channels:', runtimeChannels);
+              debug.log('Runtime channels:', runtimeChannels);
             }
           } catch (error) {
-            console.error('Failed to fetch runtime channel data:', error);
+            debug.error('Failed to fetch runtime channel data:', error);
           }
         }
 
-        console.log('Auto-play check:', {
+        debug.log('Auto-play check:', {
           isTauri: isTauri(),
           currentAudioUrl,
           currentProfileId,
@@ -234,15 +224,15 @@ export function AudioPlayer() {
           runtimeProfileChannels &&
           runtimeChannels
         ) {
-          console.log('Attempting native audio playback...');
+          debug.log('Attempting native audio playback...');
 
           // Stop any existing native playback first
           if (isUsingNativePlaybackRef.current) {
             try {
               await invoke('stop_audio_playback');
-              console.log('Stopped existing native playback before starting new one');
+              debug.log('Stopped existing native playback before starting new one');
             } catch (error) {
-              console.error('Failed to stop existing playback:', error);
+              debug.error('Failed to stop existing playback:', error);
             }
           }
 
@@ -251,16 +241,16 @@ export function AudioPlayer() {
             const assignedChannels = runtimeChannels.filter((ch: any) =>
               runtimeProfileChannels.channel_ids.includes(ch.id),
             );
-            console.log('Assigned channels for playback:', assignedChannels);
+            debug.log('Assigned channels for playback:', assignedChannels);
 
             // Check if any assigned channel has non-default devices
             const shouldUseNative = assignedChannels.some(
               (ch: any) => ch.device_ids.length > 0 && !ch.is_default,
             );
-            console.log('Should use native playback:', shouldUseNative);
+            debug.log('Should use native playback:', shouldUseNative);
 
             if (!shouldUseNative) {
-              console.log('No custom devices assigned, falling back to WaveSurfer');
+              debug.log('No custom devices assigned, falling back to WaveSurfer');
               // Reset native playback flag and unmute WaveSurfer
               isUsingNativePlaybackRef.current = false;
               const mediaElement = wavesurfer.getMediaElement();
@@ -268,7 +258,7 @@ export function AudioPlayer() {
                 const currentVolume = usePlayerStore.getState().volume;
                 mediaElement.volume = currentVolume;
                 mediaElement.muted = false;
-                console.log(
+                debug.log(
                   'WaveSurfer unmuted for normal playback - volume:',
                   mediaElement.volume,
                   'muted:',
@@ -277,23 +267,23 @@ export function AudioPlayer() {
               }
             } else {
               const deviceIds = assignedChannels.flatMap((ch: any) => ch.device_ids);
-              console.log('Device IDs to play to:', deviceIds);
+              debug.log('Device IDs to play to:', deviceIds);
 
               if (deviceIds.length > 0) {
-                console.log('Fetching audio data from:', currentAudioUrl);
+                debug.log('Fetching audio data from:', currentAudioUrl);
                 // Fetch audio data
                 const response = await fetch(currentAudioUrl);
                 const audioData = new Uint8Array(await response.arrayBuffer());
-                console.log('Audio data size:', audioData.length);
+                debug.log('Audio data size:', audioData.length);
 
                 // Play via native audio
-                console.log('Invoking play_audio_to_devices...');
+                debug.log('Invoking play_audio_to_devices...');
                 try {
                   const result = await invoke('play_audio_to_devices', {
                     audioData: Array.from(audioData),
                     deviceIds: deviceIds,
                   });
-                  console.log('play_audio_to_devices completed successfully, result:', result);
+                  debug.log('play_audio_to_devices completed successfully, result:', result);
 
                   // Mark that we're using native playback
                   isUsingNativePlaybackRef.current = true;
@@ -304,7 +294,7 @@ export function AudioPlayer() {
                   if (mediaElement) {
                     mediaElement.volume = 0;
                     mediaElement.muted = true;
-                    console.log(
+                    debug.log(
                       'WaveSurfer muted for native playback - volume:',
                       mediaElement.volume,
                       'muted:',
@@ -314,22 +304,22 @@ export function AudioPlayer() {
 
                   // Start WaveSurfer playback for visualization (muted)
                   wavesurfer.play().catch((error) => {
-                    console.error('Failed to start WaveSurfer visualization:', error);
+                    debug.error('Failed to start WaveSurfer visualization:', error);
                   });
 
                   setIsPlaying(true);
-                  console.log('Auto-playing via native audio routing - SUCCESS');
+                  debug.log('Auto-playing via native audio routing - SUCCESS');
                   return;
                 } catch (invokeError) {
-                  console.error('play_audio_to_devices invoke failed:', invokeError);
+                  debug.error('play_audio_to_devices invoke failed:', invokeError);
                   throw invokeError;
                 }
               } else {
-                console.log('No device IDs found, falling back to WaveSurfer');
+                debug.log('No device IDs found, falling back to WaveSurfer');
               }
             }
           } catch (error) {
-            console.error(
+            debug.error(
               'Native playback failed during auto-play, falling back to WaveSurfer:',
               error,
             );
@@ -340,7 +330,7 @@ export function AudioPlayer() {
               const currentVolume = usePlayerStore.getState().volume;
               mediaElement.volume = currentVolume;
               mediaElement.muted = false;
-              console.log(
+              debug.log(
                 'WaveSurfer unmuted after native playback failure - volume:',
                 mediaElement.volume,
                 'muted:',
@@ -350,7 +340,7 @@ export function AudioPlayer() {
             // Fall through to WaveSurfer playback
           }
         } else {
-          console.log('Not using native playback, using WaveSurfer');
+          debug.log('Not using native playback, using WaveSurfer');
           // Reset native playback flag and unmute WaveSurfer
           isUsingNativePlaybackRef.current = false;
           const mediaElement = wavesurfer.getMediaElement();
@@ -358,7 +348,7 @@ export function AudioPlayer() {
             const currentVolume = usePlayerStore.getState().volume;
             mediaElement.volume = currentVolume;
             mediaElement.muted = false;
-            console.log(
+            debug.log(
               'WaveSurfer unmuted for normal playback - volume:',
               mediaElement.volume,
               'muted:',
@@ -371,7 +361,7 @@ export function AudioPlayer() {
         // Use a small delay to ensure audio element is fully ready
         setTimeout(() => {
           wavesurfer.play().catch((error) => {
-            console.error('Failed to autoplay:', error);
+            debug.error('Failed to autoplay:', error);
             // Don't show error for autoplay failures (browser restrictions)
           });
         }, 100);
@@ -388,13 +378,13 @@ export function AudioPlayer() {
           if (isUsingNativePlaybackRef.current) {
             mediaElement.volume = 0;
             mediaElement.muted = true;
-            console.log('Playing (native mode) - WaveSurfer muted for visualization only');
+            debug.log('Playing (native mode) - WaveSurfer muted for visualization only');
           } else {
             // Ensure WaveSurfer is unmuted for normal playback
             const currentVolume = usePlayerStore.getState().volume;
             mediaElement.volume = currentVolume;
             mediaElement.muted = false;
-            console.log(
+            debug.log(
               'Playing (normal mode) - volume:',
               mediaElement.volume,
               'muted:',
@@ -417,7 +407,7 @@ export function AudioPlayer() {
 
       // Handle errors
       wavesurfer.on('error', (error) => {
-        console.error('WaveSurfer error:', error);
+        debug.error('WaveSurfer error:', error);
         setIsLoading(false);
         setError(`Audio error: ${error instanceof Error ? error.message : String(error)}`);
       });
@@ -432,7 +422,7 @@ export function AudioPlayer() {
 
       // Load audio immediately if audioUrl is already set
       if (audioUrl) {
-        console.log('WaveSurfer ready, loading audio:', audioUrl);
+        debug.log('WaveSurfer ready, loading audio:', audioUrl);
         loadingRef.current = true;
         setIsLoading(true);
         // Stop any current playback before loading new audio
@@ -442,11 +432,11 @@ export function AudioPlayer() {
         wavesurfer
           .load(audioUrl)
           .then(() => {
-            console.log('Audio loaded into WaveSurfer');
+            debug.log('Audio loaded into WaveSurfer');
             loadingRef.current = false;
           })
           .catch((error) => {
-            console.error('Failed to load audio into WaveSurfer:', error);
+            debug.error('Failed to load audio into WaveSurfer:', error);
             loadingRef.current = false;
             setIsLoading(false);
             setError(
@@ -471,12 +461,12 @@ export function AudioPlayer() {
     });
 
     return () => {
-      console.log('Cleaning up WaveSurfer initialization effect');
+      debug.log('Cleaning up WaveSurfer initialization effect');
       if (rafId1) cancelAnimationFrame(rafId1);
       if (rafId2) cancelAnimationFrame(rafId2);
       if (timeoutId) clearTimeout(timeoutId);
       if (wavesurferRef.current) {
-        console.log('Destroying WaveSurfer instance');
+        debug.log('Destroying WaveSurfer instance');
         try {
           const mediaElement = wavesurferRef.current.getMediaElement();
           if (mediaElement) {
@@ -485,7 +475,7 @@ export function AudioPlayer() {
           }
           wavesurferRef.current.destroy();
         } catch (error) {
-          console.error('Error destroying WaveSurfer:', error);
+          debug.error('Error destroying WaveSurfer:', error);
         }
         wavesurferRef.current = null;
       }
@@ -517,9 +507,9 @@ export function AudioPlayer() {
       (async () => {
         try {
           await invoke('stop_audio_playback');
-          console.log('Stopped native audio playback');
+          debug.log('Stopped native audio playback');
         } catch (error) {
-          console.error('Failed to stop native playback:', error);
+          debug.error('Failed to stop native playback:', error);
         }
       })();
     }
@@ -537,30 +527,30 @@ export function AudioPlayer() {
 
     // CRITICAL: Force stop any current playback and cancel any pending loads
     // This must happen BEFORE any early returns
-    console.log('Audio URL changed to:', audioUrl);
+    debug.log('Audio URL changed to:', audioUrl);
 
     // COMPLETELY stop and destroy the current audio
     try {
       // First pause if playing
       if (wavesurfer.isPlaying()) {
-        console.log('Pausing current playback');
+        debug.log('Pausing current playback');
         wavesurfer.pause();
       }
 
       // Stop the media element explicitly
       const mediaElement = wavesurfer.getMediaElement();
       if (mediaElement) {
-        console.log('Stopping media element');
+        debug.log('Stopping media element');
         mediaElement.pause();
         mediaElement.currentTime = 0;
         mediaElement.src = '';
       }
 
       // Use empty() to completely destroy the waveform and media element
-      console.log('Calling wavesurfer.empty() to destroy audio');
+      debug.log('Calling wavesurfer.empty() to destroy audio');
       wavesurfer.empty();
     } catch (error) {
-      console.error('Error stopping previous audio:', error);
+      debug.error('Error stopping previous audio:', error);
       // Continue anyway to load new audio
     }
 
@@ -575,16 +565,16 @@ export function AudioPlayer() {
     setDuration(0);
 
     // Load new audio
-    console.log('Starting new audio load for:', audioUrl);
+    debug.log('Starting new audio load for:', audioUrl);
     wavesurfer
       .load(audioUrl)
       .then(() => {
-        console.log('Audio load promise resolved');
+        debug.log('Audio load promise resolved');
         // Don't set loading to false here - wait for 'ready' event
       })
       .catch((error) => {
-        console.error('Failed to load audio:', error);
-        console.error('Audio URL:', audioUrl);
+        debug.error('Failed to load audio:', error);
+        debug.error('Audio URL:', audioUrl);
         loadingRef.current = false;
         setIsLoading(false);
         setError(`Failed to load audio: ${error instanceof Error ? error.message : String(error)}`);
@@ -599,7 +589,7 @@ export function AudioPlayer() {
     if (isPlaying && wavesurferRef.current.isPlaying() === false) {
       // Only auto-play if audio is ready
       wavesurferRef.current.play().catch((error) => {
-        console.error('Failed to play:', error);
+        debug.error('Failed to play:', error);
         setIsPlaying(false);
         setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
       });
@@ -619,11 +609,11 @@ export function AudioPlayer() {
         if (isUsingNativePlaybackRef.current) {
           mediaElement.volume = 0;
           mediaElement.muted = true;
-          console.log('Volume sync: Using native playback, keeping WaveSurfer muted');
+          debug.log('Volume sync: Using native playback, keeping WaveSurfer muted');
         } else {
           mediaElement.volume = volume;
           mediaElement.muted = volume === 0;
-          console.log('Volume synced:', volume, 'muted:', mediaElement.muted);
+          debug.log('Volume synced:', volume, 'muted:', mediaElement.muted);
         }
       }
     }
@@ -651,10 +641,10 @@ export function AudioPlayer() {
     }
 
     // Reset to beginning and play
-    console.log('Restarting current audio from beginning');
+    debug.log('Restarting current audio from beginning');
     wavesurfer.seekTo(0);
     wavesurfer.play().catch((error) => {
-      console.error('Failed to play after restart:', error);
+      debug.error('Failed to play after restart:', error);
       setIsPlaying(false);
       setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
     });
@@ -669,13 +659,13 @@ export function AudioPlayer() {
     // Standard WaveSurfer playback (works for both normal and native playback modes)
     // When using native playback, WaveSurfer is muted but still controls visualization
     if (!wavesurferRef.current) {
-      console.error('WaveSurfer not initialized');
+      debug.error('WaveSurfer not initialized');
       return;
     }
 
     // Check if audio is loaded
     if (duration === 0 && !isLoading) {
-      console.error('Audio not loaded yet');
+      debug.error('Audio not loaded yet');
       setError('Audio not loaded. Please wait...');
       return;
     }
@@ -686,9 +676,9 @@ export function AudioPlayer() {
         // Pause: stop native playback and pause WaveSurfer visualization
         try {
           await invoke('stop_audio_playback');
-          console.log('Stopped native audio playback');
+          debug.log('Stopped native audio playback');
         } catch (error) {
-          console.error('Failed to stop native playback:', error);
+          debug.error('Failed to stop native playback:', error);
         }
         wavesurferRef.current.pause();
         return;
@@ -701,7 +691,7 @@ export function AudioPlayer() {
           await invoke('stop_audio_playback');
         } catch (_error) {
           // Ignore errors when stopping (might not be playing)
-          console.log('No existing playback to stop');
+          debug.log('No existing playback to stop');
         }
 
         // Collect all device IDs from assigned channels
@@ -733,7 +723,7 @@ export function AudioPlayer() {
 
           // Start WaveSurfer for visualization (muted)
           wavesurferRef.current.play().catch((error) => {
-            console.error('Failed to start WaveSurfer visualization:', error);
+            debug.error('Failed to start WaveSurfer visualization:', error);
             setIsPlaying(false);
             setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
           });
@@ -741,7 +731,7 @@ export function AudioPlayer() {
           return;
         }
       } catch (error) {
-        console.error('Native playback failed, falling back to WaveSurfer:', error);
+        debug.error('Native playback failed, falling back to WaveSurfer:', error);
         // Fall through to WaveSurfer playback
         isUsingNativePlaybackRef.current = false;
       }
@@ -761,7 +751,7 @@ export function AudioPlayer() {
       }
 
       wavesurferRef.current.play().catch((error) => {
-        console.error('Failed to play:', error);
+        debug.error('Failed to play:', error);
         setIsPlaying(false);
         setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
       });
@@ -782,7 +772,7 @@ export function AudioPlayer() {
     // Stop any native playback
     if (isUsingNativePlaybackRef.current && isTauri()) {
       invoke('stop_audio_playback').catch((error) => {
-        console.error('Failed to stop native playback:', error);
+        debug.error('Failed to stop native playback:', error);
       });
     }
     // Stop WaveSurfer

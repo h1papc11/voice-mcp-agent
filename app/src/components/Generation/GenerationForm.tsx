@@ -1,8 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Mic } from 'lucide-react';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -23,118 +19,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
-import { apiClient } from '@/lib/api/client';
-import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
-import { useGeneration } from '@/lib/hooks/useGeneration';
-import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
+import { LANGUAGE_OPTIONS } from '@/lib/constants/languages';
+import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile } from '@/lib/hooks/useProfiles';
-import { useGenerationStore } from '@/stores/generationStore';
-import { usePlayerStore } from '@/stores/playerStore';
 import { useUIStore } from '@/stores/uiStore';
-
-const generationSchema = z.object({
-  text: z.string().min(1, 'Text is required').max(5000),
-  language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
-  seed: z.number().int().optional(),
-  modelSize: z.enum(['1.7B', '0.6B']).optional(),
-  instruct: z.string().max(500).optional(),
-});
-
-type GenerationFormValues = z.infer<typeof generationSchema>;
 
 export function GenerationForm() {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
-  const generation = useGeneration();
-  const { toast } = useToast();
-  const setAudio = usePlayerStore((state) => state.setAudio);
-  const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
-  const [downloadingModelName, setDownloadingModelName] = useState<string | null>(null);
-  const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
 
-  // Use the download toast hook to show progress when model is downloading
-  useModelDownloadToast({
-    modelName: downloadingModelName || '',
-    displayName: downloadingDisplayName || '',
-    enabled: !!downloadingModelName,
-  });
+  const { form, handleSubmit, isPending } = useGenerationForm();
 
-  const form = useForm<GenerationFormValues>({
-    resolver: zodResolver(generationSchema),
-    defaultValues: {
-      text: '',
-      language: 'en',
-      seed: undefined,
-      modelSize: '1.7B',
-      instruct: '',
-    },
-  });
-
-  async function onSubmit(data: GenerationFormValues) {
-    if (!selectedProfileId) {
-      toast({
-        title: 'No profile selected',
-        description: 'Please select a voice profile from the cards above.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-
-      // Determine model name and display name
-      const modelName = `qwen-tts-${data.modelSize}`;
-      const displayName = data.modelSize === '1.7B' ? 'Qwen TTS 1.7B' : 'Qwen TTS 0.6B';
-
-      // Check if model is downloaded before starting generation
-      try {
-        const modelStatus = await apiClient.getModelStatus();
-        const model = modelStatus.models.find((m) => m.model_name === modelName);
-
-        if (model && !model.downloaded) {
-          // Model is not downloaded, enable download toast
-          setDownloadingModelName(modelName);
-          setDownloadingDisplayName(displayName);
-        }
-      } catch (error) {
-        // If status check fails, continue anyway - generation will handle it
-        console.error('Failed to check model status:', error);
-      }
-
-      // Proceed with generation (which will trigger download if needed)
-      const result = await generation.mutateAsync({
-        profile_id: selectedProfileId,
-        text: data.text,
-        language: data.language,
-        seed: data.seed,
-        model_size: data.modelSize,
-        instruct: data.instruct || undefined,
-      });
-
-      toast({
-        title: 'Generation complete!',
-        description: `Audio generated (${result.duration.toFixed(2)}s)`,
-      });
-
-      // Autoplay the generated audio
-      const audioUrl = apiClient.getAudioUrl(result.id);
-      setAudio(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
-
-      form.reset();
-    } catch (error) {
-      toast({
-        title: 'Generation failed',
-        description: error instanceof Error ? error.message : 'Failed to generate audio',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGenerating(false);
-      // Clear download state after generation completes
-      setDownloadingModelName(null);
-      setDownloadingDisplayName(null);
-    }
+  async function onSubmit(data: Parameters<typeof handleSubmit>[0]) {
+    await handleSubmit(data, selectedProfileId);
   }
 
   return (
@@ -276,9 +173,9 @@ export function GenerationForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={generation.isPending || !selectedProfileId}
+              disabled={isPending || !selectedProfileId}
             >
-              {generation.isPending ? (
+              {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Generating...

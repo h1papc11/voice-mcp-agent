@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import {
@@ -41,6 +42,7 @@ export function HistoryTable() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const limit = 20;
+  const { toast } = useToast();
 
   const { data: historyData, isLoading } = useHistory({
     limit,
@@ -86,7 +88,11 @@ export function HistoryTable() {
       { generationId, text },
       {
         onError: (error) => {
-          alert(`Failed to download audio: ${error.message}`);
+          toast({
+            title: 'Failed to download audio',
+            description: error.message,
+            variant: 'destructive',
+          });
         },
       },
     );
@@ -97,7 +103,11 @@ export function HistoryTable() {
       { generationId, text },
       {
         onError: (error) => {
-          alert(`Failed to export generation: ${error.message}`);
+          toast({
+            title: 'Failed to export generation',
+            description: error.message,
+            variant: 'destructive',
+          });
         },
       },
     );
@@ -112,7 +122,11 @@ export function HistoryTable() {
     if (file) {
       // Validate file extension
       if (!file.name.endsWith('.voicebox.zip')) {
-        alert('Please select a valid .voicebox.zip file');
+        toast({
+          title: 'Invalid file type',
+          description: 'Please select a valid .voicebox.zip file',
+          variant: 'destructive',
+        });
         return;
       }
       setSelectedFile(file);
@@ -129,10 +143,17 @@ export function HistoryTable() {
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
-          alert(data.message || 'Generation imported successfully');
+          toast({
+            title: 'Generation imported',
+            description: data.message || 'Generation imported successfully',
+          });
         },
         onError: (error) => {
-          alert(`Failed to import generation: ${error.message}`);
+          toast({
+            title: 'Failed to import generation',
+            description: error.message,
+            variant: 'destructive',
+          });
         },
       });
     }
@@ -148,23 +169,6 @@ export function HistoryTable() {
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
-      {/* <div className="flex justify-between items-center mb-4 shrink-0">
-        <h2 className="text-2xl font-bold">History</h2>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImportClick}>
-            <Upload className="mr-2 h-4 w-4" />
-            Import Generation
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".voicebox.zip"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-        </div>
-      </div> */}
-
       {history.length === 0 ? (
         <div className="text-center py-12 px-5 border-2 border-dashed mb-5 border-muted rounded-md text-muted-foreground flex-1 flex items-center justify-center">
           No voice generations, yet...
