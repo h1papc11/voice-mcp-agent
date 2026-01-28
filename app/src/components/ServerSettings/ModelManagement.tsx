@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Download, Loader2, Trash2 } from 'lucide-react';
+import { Download, Loader2, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   AlertDialog,
@@ -271,7 +271,6 @@ function ModelItem({ model, onDownload, onDelete, isDownloading, formatSize }: M
         {model.downloaded ? (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-accent" />
               <span>Ready</span>
             </div>
             <Button

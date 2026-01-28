@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useServerStore } from '@/stores/serverStore';
 import type { ModelProgress as ModelProgressType } from '@/lib/api/types';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, XCircle } from 'lucide-react';
 
 interface ModelProgressProps {
   modelName: string;
@@ -68,8 +68,6 @@ export function ModelProgress({ modelName, displayName }: ModelProgressProps) {
 
   const getStatusIcon = () => {
     switch (progress.status) {
-      case 'complete':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-destructive" />;
       case 'downloading':

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { RefreshCw, Download, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -94,7 +94,6 @@ export function UpdateStatus() {
         {status.readyToInstall && (
           <div className="space-y-3 p-4 border rounded-lg bg-green-500/10 border-green-500/20">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
               <div>
                 <div className="font-semibold">Update Ready to Install</div>
                 <div className="text-sm text-muted-foreground">Version {status.version} has been downloaded</div>
@@ -112,7 +111,6 @@ export function UpdateStatus() {
 
         {!status.available && !status.checking && !status.error && status.checking === false && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
             You're up to date
           </div>
         )}

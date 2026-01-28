@@ -14,10 +14,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { useServerStore } from '@/stores/serverStore';
 import { setKeepServerRunning } from '@/lib/tauri';
+import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 
 const connectionSchema = z.object({
   serverUrl: z.string().url('Please enter a valid URL'),
@@ -83,36 +84,41 @@ export function ConnectionForm() {
         </Form>
 
         <div className="mt-6 pt-6 border-t">
-          <div className="flex items-start space-x-3">
-            <Checkbox
-              id="keepServerRunning"
-              checked={keepServerRunningOnClose}
-              onCheckedChange={(checked: boolean) => {
-                setKeepServerRunningOnClose(checked);
-                setKeepServerRunning(checked).catch((error) => {
-                  console.error('Failed to sync setting to Rust:', error);
-                });
-                toast({
-                  title: 'Setting updated',
-                  description: checked
-                    ? 'Server will continue running when app closes'
-                    : 'Server will stop when app closes',
-                });
-              }}
-            />
+          <button
+            type="button"
+            onClick={() => {
+              const newValue = !keepServerRunningOnClose;
+              setKeepServerRunningOnClose(newValue);
+              setKeepServerRunning(newValue).catch((error) => {
+                console.error('Failed to sync setting to Rust:', error);
+              });
+              toast({
+                title: 'Setting updated',
+                description: newValue
+                  ? 'Server will continue running when app closes'
+                  : 'Server will stop when app closes',
+              });
+            }}
+            className="flex items-start gap-3 text-left w-full"
+          >
+            <div
+              className={cn(
+                'h-4 w-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5',
+                keepServerRunningOnClose ? 'bg-accent border-accent' : 'border-muted-foreground/30',
+              )}
+            >
+              {keepServerRunningOnClose && <Check className="h-3 w-3 text-accent-foreground" />}
+            </div>
             <div className="space-y-1">
-              <label
-                htmlFor="keepServerRunning"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
+              <div className="text-sm font-medium leading-none">
                 Keep server running when app closes
-              </label>
+              </div>
               <p className="text-sm text-muted-foreground">
                 When enabled, the server will continue running in the background after closing the
                 app. Disabled by default.
               </p>
             </div>
-          </div>
+          </button>
         </div>
       </CardContent>
     </Card>
