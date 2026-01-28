@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { Loader2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useServerHealth } from '@/lib/hooks/useServer';
@@ -43,7 +43,6 @@ export function ServerStatus() {
         ) : health ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
               <span className="text-sm">Connected</span>
             </div>
             <div className="flex flex-wrap gap-2">

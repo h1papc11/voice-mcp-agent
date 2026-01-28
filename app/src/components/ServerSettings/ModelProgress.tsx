@@ -1,9 +1,9 @@
+import { Loader2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useServerStore } from '@/stores/serverStore';
+import { Progress } from '@/components/ui/progress';
 import type { ModelProgress as ModelProgressType } from '@/lib/api/types';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { useServerStore } from '@/stores/serverStore';
 
 interface ModelProgressProps {
   modelName: string;
@@ -63,13 +63,11 @@ export function ModelProgress({ modelName, displayName }: ModelProgressProps) {
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
   };
 
   const getStatusIcon = () => {
     switch (progress.status) {
-      case 'complete':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'error':
         return <XCircle className="h-4 w-4 text-destructive" />;
       case 'downloading':

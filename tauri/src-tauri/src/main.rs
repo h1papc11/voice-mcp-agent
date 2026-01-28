@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio_capture;
+mod audio_output;
 
 use std::sync::Mutex;
 use tauri::{command, State, Manager, WindowEvent, Emitter, Listener, RunEvent};
@@ -368,6 +369,29 @@ fn is_system_audio_supported() -> bool {
     audio_capture::is_supported()
 }
 
+#[command]
+fn list_audio_output_devices(
+    state: State<'_, audio_output::AudioOutputState>,
+) -> Result<Vec<audio_output::AudioOutputDevice>, String> {
+    state.list_output_devices()
+}
+
+#[command]
+async fn play_audio_to_devices(
+    state: State<'_, audio_output::AudioOutputState>,
+    audio_data: Vec<u8>,
+    device_ids: Vec<String>,
+) -> Result<(), String> {
+    state.play_audio_to_devices(audio_data, device_ids).await
+}
+
+#[command]
+fn stop_audio_playback(
+    state: State<'_, audio_output::AudioOutputState>,
+) -> Result<(), String> {
+    state.stop_all_playback()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -380,6 +404,7 @@ pub fn run() {
             keep_running_on_close: Mutex::new(false),
         })
         .manage(audio_capture::AudioCaptureState::new())
+        .manage(audio_output::AudioOutputState::new())
         .setup(|app| {
             #[cfg(desktop)]
             {
@@ -423,7 +448,10 @@ pub fn run() {
             set_keep_server_running,
             start_system_audio_capture,
             stop_system_audio_capture,
-            is_system_audio_supported
+            is_system_audio_supported,
+            list_audio_output_devices,
+            play_audio_to_devices,
+            stop_audio_playback
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {

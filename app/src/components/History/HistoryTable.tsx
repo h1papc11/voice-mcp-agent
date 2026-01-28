@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import { apiClient } from '@/lib/api/client';
+import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import {
   useDeleteGeneration,
   useExportGeneration,
@@ -33,7 +34,7 @@ import { usePlayerStore } from '@/stores/playerStore';
 
 // NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS
 export function HistoryTable() {
-  const [page, setPage] = useState(0);
+  const [page, _setPage] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -69,14 +70,14 @@ export function HistoryTable() {
     return () => scrollEl.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handlePlay = (audioId: string, text: string) => {
+  const handlePlay = (audioId: string, text: string, profileId: string) => {
     // If clicking the same audio, restart it from the beginning
     if (currentAudioId === audioId) {
       restartCurrentAudio();
     } else {
       // Otherwise, load the new audio
       const audioUrl = apiClient.getAudioUrl(audioId);
-      setAudio(audioUrl, audioId, text.substring(0, 50));
+      setAudio(audioUrl, audioId, profileId, text.substring(0, 50));
     }
   };
 
@@ -143,7 +144,7 @@ export function HistoryTable() {
 
   const history = historyData?.items || [];
   const total = historyData?.total || 0;
-  const hasMore = history.length === limit && (page + 1) * limit < total;
+  const _hasMore = history.length === limit && (page + 1) * limit < total;
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -176,8 +177,8 @@ export function HistoryTable() {
           <div
             ref={scrollRef}
             className={cn(
-              'flex-1 min-h-0 overflow-y-auto space-y-2',
-              isPlayerVisible && 'max-h-[calc(100vh-117px)]',
+              'flex-1 min-h-0 overflow-y-auto space-y-2 pb-4',
+              isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
             )}
           >
             {history.map((gen) => {
@@ -195,7 +196,7 @@ export function HistoryTable() {
                     if (target.closest('textarea') || window.getSelection()?.toString()) {
                       return;
                     }
-                    handlePlay(gen.id, gen.text);
+                    handlePlay(gen.id, gen.text, gen.profile_id);
                   }}
                 >
                   {/* Waveform icon */}
@@ -242,7 +243,9 @@ export function HistoryTable() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text)}>
+                        <DropdownMenuItem
+                          onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
+                        >
                           <Play className="mr-2 h-4 w-4" />
                           Play
                         </DropdownMenuItem>
@@ -275,24 +278,6 @@ export function HistoryTable() {
               );
             })}
           </div>
-
-          {(total > limit || page > 0) && (
-            <div className="flex justify-between items-center mt-4 shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                Page {page + 1} • {total} total
-              </div>
-              <Button variant="outline" onClick={() => setPage((p) => p + 1)} disabled={!hasMore}>
-                Next
-              </Button>
-            </div>
-          )}
         </>
       )}
 
