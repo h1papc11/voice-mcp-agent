@@ -1,14 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react';
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { formatAudioDuration } from '@/lib/utils/audio';
-import { usePlayerStore } from '@/stores/playerStore';
-import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import { isTauri } from '@/lib/tauri';
-import { invoke } from '@tauri-apps/api/core';
+import { formatAudioDuration } from '@/lib/utils/audio';
+import { usePlayerStore } from '@/stores/playerStore';
 
 export function AudioPlayer() {
   const {
@@ -54,23 +54,21 @@ export function AudioPlayer() {
       profileChannels,
       channels,
     });
-    
+
     if (!isTauri() || !profileChannels || !channels) {
       console.log('useNativePlayback: false - missing requirements');
       return false;
     }
-    
-    const assignedChannels = channels.filter((ch) =>
-      profileChannels.channel_ids.includes(ch.id),
-    );
-    
+
+    const assignedChannels = channels.filter((ch) => profileChannels.channel_ids.includes(ch.id));
+
     console.log('Assigned channels:', assignedChannels);
-    
+
     // Use native playback if any assigned channel has non-default devices
     const shouldUseNative = assignedChannels.some(
       (ch) => ch.device_ids.length > 0 && !ch.is_default,
     );
-    
+
     console.log('useNativePlayback result:', shouldUseNative);
     return shouldUseNative;
   }, [profileChannels, channels, profileId]);
@@ -80,6 +78,7 @@ export function AudioPlayer() {
   const loadingRef = useRef(false);
   const previousAudioIdRef = useRef<string | null>(null);
   const hasInitializedRef = useRef(false);
+  const isUsingNativePlaybackRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -186,8 +185,9 @@ export function AudioPlayer() {
         wavesurfer.setVolume(currentVolume);
 
         // Get the underlying audio element and ensure it's not muted
+        // (unless we're using native playback, which will be set later)
         const mediaElement = wavesurfer.getMediaElement();
-        if (mediaElement) {
+        if (mediaElement && !isUsingNativePlaybackRef.current) {
           mediaElement.volume = currentVolume;
           mediaElement.muted = false;
           console.log('Audio element volume:', mediaElement.volume, 'muted:', mediaElement.muted);
@@ -197,18 +197,18 @@ export function AudioPlayer() {
         // Get current values from the store and queries at runtime (not captured closure values)
         const currentAudioUrl = usePlayerStore.getState().audioUrl;
         const currentProfileId = usePlayerStore.getState().profileId;
-        
+
         console.log('Auto-play check - capturing runtime values...');
-        
+
         // Fetch profile channels at runtime (not using captured value)
         let runtimeProfileChannels = null;
         let runtimeChannels = null;
-        
+
         if (isTauri() && currentProfileId) {
           try {
             runtimeProfileChannels = await apiClient.getProfileChannels(currentProfileId);
             console.log('Runtime profileChannels:', runtimeProfileChannels);
-            
+
             if (runtimeProfileChannels && runtimeProfileChannels.channel_ids.length > 0) {
               runtimeChannels = await apiClient.listChannels();
               console.log('Runtime channels:', runtimeChannels);
@@ -217,7 +217,7 @@ export function AudioPlayer() {
             console.error('Failed to fetch runtime channel data:', error);
           }
         }
-        
+
         console.log('Auto-play check:', {
           isTauri: isTauri(),
           currentAudioUrl,
@@ -225,60 +225,125 @@ export function AudioPlayer() {
           hasProfileChannels: !!runtimeProfileChannels,
           hasChannels: !!runtimeChannels,
         });
-        
-        if (isTauri() && currentAudioUrl && currentProfileId && runtimeProfileChannels && runtimeChannels) {
+
+        if (
+          isTauri() &&
+          currentAudioUrl &&
+          currentProfileId &&
+          runtimeProfileChannels &&
+          runtimeChannels
+        ) {
           console.log('Attempting native audio playback...');
+          
+          // Stop any existing native playback first
+          if (isUsingNativePlaybackRef.current) {
+            try {
+              await invoke('stop_audio_playback');
+              console.log('Stopped existing native playback before starting new one');
+            } catch (error) {
+              console.error('Failed to stop existing playback:', error);
+            }
+          }
+          
           try {
             // Collect all device IDs from assigned channels
             const assignedChannels = runtimeChannels.filter((ch: any) =>
               runtimeProfileChannels.channel_ids.includes(ch.id),
             );
             console.log('Assigned channels for playback:', assignedChannels);
-            
+
             // Check if any assigned channel has non-default devices
             const shouldUseNative = assignedChannels.some(
               (ch: any) => ch.device_ids.length > 0 && !ch.is_default,
             );
             console.log('Should use native playback:', shouldUseNative);
-            
+
             if (!shouldUseNative) {
               console.log('No custom devices assigned, falling back to WaveSurfer');
+              // Reset native playback flag and unmute WaveSurfer
+              isUsingNativePlaybackRef.current = false;
+              const mediaElement = wavesurfer.getMediaElement();
+              if (mediaElement) {
+                const currentVolume = usePlayerStore.getState().volume;
+                mediaElement.volume = currentVolume;
+                mediaElement.muted = false;
+                console.log('WaveSurfer unmuted for normal playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+              }
             } else {
               const deviceIds = assignedChannels.flatMap((ch: any) => ch.device_ids);
               console.log('Device IDs to play to:', deviceIds);
 
               if (deviceIds.length > 0) {
-              console.log('Fetching audio data from:', currentAudioUrl);
-              // Fetch audio data
-              const response = await fetch(currentAudioUrl);
-              const audioData = new Uint8Array(await response.arrayBuffer());
-              console.log('Audio data size:', audioData.length);
+                console.log('Fetching audio data from:', currentAudioUrl);
+                // Fetch audio data
+                const response = await fetch(currentAudioUrl);
+                const audioData = new Uint8Array(await response.arrayBuffer());
+                console.log('Audio data size:', audioData.length);
 
-              // Play via native audio
-              console.log('Invoking play_audio_to_devices...');
-              try {
-                const result = await invoke('play_audio_to_devices', {
-                  audioData: Array.from(audioData),
-                  deviceIds: deviceIds,
-                });
-                console.log('play_audio_to_devices completed successfully, result:', result);
-                setIsPlaying(true);
-                console.log('Auto-playing via native audio routing - SUCCESS');
-                return;
-              } catch (invokeError) {
-                console.error('play_audio_to_devices invoke failed:', invokeError);
-                throw invokeError;
-              }
+                // Play via native audio
+                console.log('Invoking play_audio_to_devices...');
+                try {
+                  const result = await invoke('play_audio_to_devices', {
+                    audioData: Array.from(audioData),
+                    deviceIds: deviceIds,
+                  });
+                  console.log('play_audio_to_devices completed successfully, result:', result);
+                  
+                  // Mark that we're using native playback
+                  isUsingNativePlaybackRef.current = true;
+                  
+                  // Mute WaveSurfer's audio element to prevent UI audio output
+                  // Keep WaveSurfer running for visualization
+                  const mediaElement = wavesurfer.getMediaElement();
+                  if (mediaElement) {
+                    mediaElement.volume = 0;
+                    mediaElement.muted = true;
+                    console.log('WaveSurfer muted for native playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+                  }
+                  
+                  // Start WaveSurfer playback for visualization (muted)
+                  wavesurfer.play().catch((error) => {
+                    console.error('Failed to start WaveSurfer visualization:', error);
+                  });
+                  
+                  setIsPlaying(true);
+                  console.log('Auto-playing via native audio routing - SUCCESS');
+                  return;
+                } catch (invokeError) {
+                  console.error('play_audio_to_devices invoke failed:', invokeError);
+                  throw invokeError;
+                }
               } else {
                 console.log('No device IDs found, falling back to WaveSurfer');
               }
             }
           } catch (error) {
-            console.error('Native playback failed during auto-play, falling back to WaveSurfer:', error);
+            console.error(
+              'Native playback failed during auto-play, falling back to WaveSurfer:',
+              error,
+            );
+            // Reset native playback flag and unmute WaveSurfer
+            isUsingNativePlaybackRef.current = false;
+            const mediaElement = wavesurfer.getMediaElement();
+            if (mediaElement) {
+              const currentVolume = usePlayerStore.getState().volume;
+              mediaElement.volume = currentVolume;
+              mediaElement.muted = false;
+              console.log('WaveSurfer unmuted after native playback failure - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+            }
             // Fall through to WaveSurfer playback
           }
         } else {
           console.log('Not using native playback, using WaveSurfer');
+          // Reset native playback flag and unmute WaveSurfer
+          isUsingNativePlaybackRef.current = false;
+          const mediaElement = wavesurfer.getMediaElement();
+          if (mediaElement) {
+            const currentVolume = usePlayerStore.getState().volume;
+            mediaElement.volume = currentVolume;
+            mediaElement.muted = false;
+            console.log('WaveSurfer unmuted for normal playback - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+          }
         }
 
         // Standard WaveSurfer auto-play
@@ -294,13 +359,22 @@ export function AudioPlayer() {
       // Handle play/pause
       wavesurfer.on('play', () => {
         setIsPlaying(true);
-        // Ensure audio element is not muted when playing
+        // Ensure audio element volume is set correctly
         const mediaElement = wavesurfer.getMediaElement();
         if (mediaElement) {
-          mediaElement.muted = false;
-          const currentVolume = usePlayerStore.getState().volume;
-          mediaElement.volume = currentVolume;
-          console.log('Playing - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+          // Double-check: if using native playback, keep WaveSurfer muted
+          // Otherwise, ensure it's unmuted
+          if (isUsingNativePlaybackRef.current) {
+            mediaElement.volume = 0;
+            mediaElement.muted = true;
+            console.log('Playing (native mode) - WaveSurfer muted for visualization only');
+          } else {
+            // Ensure WaveSurfer is unmuted for normal playback
+            const currentVolume = usePlayerStore.getState().volume;
+            mediaElement.volume = currentVolume;
+            mediaElement.muted = false;
+            console.log('Playing (normal mode) - volume:', mediaElement.volume, 'muted:', mediaElement.muted);
+          }
         }
       });
       wavesurfer.on('pause', () => setIsPlaying(false));
@@ -406,9 +480,34 @@ export function AudioPlayer() {
         setDuration(0);
         setCurrentTime(0);
         setError(null);
+        // Reset native playback flag
+        isUsingNativePlaybackRef.current = false;
       }
       return;
     }
+
+    // Stop native playback if it was active
+    if (isUsingNativePlaybackRef.current && isTauri()) {
+      (async () => {
+        try {
+          await invoke('stop_audio_playback');
+          console.log('Stopped native audio playback');
+        } catch (error) {
+          console.error('Failed to stop native playback:', error);
+        }
+      })();
+    }
+    
+    // Reset native playback flag when loading new audio
+    // Also unmute WaveSurfer if it was muted
+    if (isUsingNativePlaybackRef.current) {
+      const mediaElement = wavesurfer.getMediaElement();
+      if (mediaElement) {
+        mediaElement.muted = false;
+        mediaElement.volume = usePlayerStore.getState().volume;
+      }
+    }
+    isUsingNativePlaybackRef.current = false;
 
     // CRITICAL: Force stop any current playback and cancel any pending loads
     // This must happen BEFORE any early returns
@@ -490,9 +589,16 @@ export function AudioPlayer() {
       // Also ensure the underlying audio element volume is set
       const mediaElement = wavesurferRef.current.getMediaElement();
       if (mediaElement) {
-        mediaElement.volume = volume;
-        mediaElement.muted = volume === 0;
-        console.log('Volume synced:', volume, 'muted:', mediaElement.muted);
+        // If using native playback, keep WaveSurfer muted regardless of volume setting
+        if (isUsingNativePlaybackRef.current) {
+          mediaElement.volume = 0;
+          mediaElement.muted = true;
+          console.log('Volume sync: Using native playback, keeping WaveSurfer muted');
+        } else {
+          mediaElement.volume = volume;
+          mediaElement.muted = volume === 0;
+          console.log('Volume synced:', volume, 'muted:', mediaElement.muted);
+        }
       }
     }
   }, [volume]);
@@ -526,7 +632,7 @@ export function AudioPlayer() {
       setIsPlaying(false);
       setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
     });
-    
+
     // Clear the restart flag
     clearRestartFlag();
   }, [shouldRestart, duration, setIsPlaying, clearRestartFlag]);
@@ -534,16 +640,44 @@ export function AudioPlayer() {
   // Handle loop - WaveSurfer handles this via the 'finish' event
 
   const handlePlayPause = async () => {
-    // If using native playback, handle differently
+    // Standard WaveSurfer playback (works for both normal and native playback modes)
+    // When using native playback, WaveSurfer is muted but still controls visualization
+    if (!wavesurferRef.current) {
+      console.error('WaveSurfer not initialized');
+      return;
+    }
+
+    // Check if audio is loaded
+    if (duration === 0 && !isLoading) {
+      console.error('Audio not loaded yet');
+      setError('Audio not loaded. Please wait...');
+      return;
+    }
+
+    // If using native playback
     if (useNativePlayback && audioUrl && profileChannels && channels) {
       if (isPlaying) {
-        // For native playback, we'd need to track and stop streams
-        // For now, just toggle the state
-        setIsPlaying(false);
+        // Pause: stop native playback and pause WaveSurfer visualization
+        try {
+          await invoke('stop_audio_playback');
+          console.log('Stopped native audio playback');
+        } catch (error) {
+          console.error('Failed to stop native playback:', error);
+        }
+        wavesurferRef.current.pause();
         return;
       }
-
+      
+      // Play: trigger native playback
       try {
+        // Stop any existing native playback first
+        try {
+          await invoke('stop_audio_playback');
+        } catch (error) {
+          // Ignore errors when stopping (might not be playing)
+          console.log('No existing playback to stop');
+        }
+        
         // Collect all device IDs from assigned channels
         const assignedChannels = channels.filter((ch) =>
           profileChannels.channel_ids.includes(ch.id),
@@ -561,31 +695,45 @@ export function AudioPlayer() {
             deviceIds: deviceIds,
           });
 
-          setIsPlaying(true);
+          // Mark that we're using native playback
+          isUsingNativePlaybackRef.current = true;
+          
+          // Mute WaveSurfer and start it for visualization
+          const mediaElement = wavesurferRef.current.getMediaElement();
+          if (mediaElement) {
+            mediaElement.volume = 0;
+            mediaElement.muted = true;
+          }
+          
+          // Start WaveSurfer for visualization (muted)
+          wavesurferRef.current.play().catch((error) => {
+            console.error('Failed to start WaveSurfer visualization:', error);
+            setIsPlaying(false);
+            setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
+          });
+          
           return;
         }
       } catch (error) {
         console.error('Native playback failed, falling back to WaveSurfer:', error);
         // Fall through to WaveSurfer playback
+        isUsingNativePlaybackRef.current = false;
       }
     }
 
-    // Standard WaveSurfer playback
-    if (!wavesurferRef.current) {
-      console.error('WaveSurfer not initialized');
-      return;
-    }
-
-    // Check if audio is loaded
-    if (duration === 0 && !isLoading) {
-      console.error('Audio not loaded yet');
-      setError('Audio not loaded. Please wait...');
-      return;
-    }
-
+    // Standard WaveSurfer playback (or fallback from native playback failure)
     if (wavesurferRef.current.isPlaying()) {
       wavesurferRef.current.pause();
     } else {
+      // Ensure WaveSurfer is not muted if not using native playback
+      if (!isUsingNativePlaybackRef.current) {
+        const mediaElement = wavesurferRef.current.getMediaElement();
+        if (mediaElement) {
+          mediaElement.muted = false;
+          mediaElement.volume = volume;
+        }
+      }
+      
       wavesurferRef.current.play().catch((error) => {
         console.error('Failed to play:', error);
         setIsPlaying(false);

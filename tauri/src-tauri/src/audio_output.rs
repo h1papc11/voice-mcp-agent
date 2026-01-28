@@ -1,7 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, SampleFormat, StreamConfig};
+use cpal::{Device, Host, SampleFormat, Stream, StreamConfig};
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct AudioOutputDevice {
@@ -12,13 +12,22 @@ pub struct AudioOutputDevice {
 
 pub struct AudioOutputState {
     host: Host,
+    stop_flag: Arc<AtomicBool>,
 }
 
 impl AudioOutputState {
     pub fn new() -> Self {
         Self {
             host: cpal::default_host(),
+            stop_flag: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    pub fn stop_all_playback(&self) -> Result<(), String> {
+        eprintln!("stop_all_playback: Setting stop flag");
+        self.stop_flag.store(true, Ordering::Relaxed);
+        eprintln!("stop_all_playback: Stop flag set - active streams will output silence");
+        Ok(())
     }
 
     pub fn list_output_devices(&self) -> Result<Vec<AudioOutputDevice>, String> {
@@ -91,11 +100,18 @@ impl AudioOutputState {
         }
 
         eprintln!("Playing to {} device(s)", devices.len());
+        
+        // Stop any existing playback first
+        self.stop_all_playback().ok();
+        
+        // Reset stop flag for new playback
+        self.stop_flag.store(false, Ordering::Relaxed);
+        
         // Play to each device
         for (i, device) in devices.iter().enumerate() {
             let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
             eprintln!("Playing to device {}/{}: {}", i + 1, devices.len(), device_name);
-            self.play_to_device(device, samples.clone(), sample_rate, channels)
+            self.play_to_device(device, samples.clone(), sample_rate, channels, self.stop_flag.clone())
                 .map_err(|e| format!("Failed to play to device {}: {}", device_name, e))?;
             eprintln!("Successfully started playback on device: {}", device_name);
         }
@@ -231,6 +247,7 @@ impl AudioOutputState {
         samples: Vec<f32>,
         sample_rate: u32,
         channels: u16,
+        stop_flag: Arc<AtomicBool>,
     ) -> Result<(), String> {
         let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
         eprintln!("play_to_device: Starting playback to device: {}", device_name);
@@ -281,6 +298,7 @@ impl AudioOutputState {
             buffer_size: cpal::BufferSize::Default,
         };
 
+        let stop_flag_clone = stop_flag.clone();
         let stream = match config.sample_format() {
             SampleFormat::F32 => {
                 let buffer = buffer_clone.clone();
@@ -289,6 +307,14 @@ impl AudioOutputState {
                     .build_output_stream(
                         &stream_config,
                         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                            // Check stop flag - if set, output silence
+                            if stop_flag_clone.load(Ordering::Relaxed) {
+                                for sample in data.iter_mut() {
+                                    *sample = 0.0;
+                                }
+                                return;
+                            }
+                            
                             let mut idx = pos.load(Ordering::Relaxed);
                             let buf = buffer.lock().unwrap();
                             for sample in data.iter_mut() {
@@ -313,6 +339,14 @@ impl AudioOutputState {
                     .build_output_stream(
                         &stream_config,
                         move |data: &mut [i16], _: &cpal::OutputCallbackInfo| {
+                            // Check stop flag - if set, output silence
+                            if stop_flag_clone.load(Ordering::Relaxed) {
+                                for sample in data.iter_mut() {
+                                    *sample = 0;
+                                }
+                                return;
+                            }
+                            
                             let mut idx = pos.load(Ordering::Relaxed);
                             let buf = buffer.lock().unwrap();
                             for sample in data.iter_mut() {
@@ -337,6 +371,14 @@ impl AudioOutputState {
                     .build_output_stream(
                         &stream_config,
                         move |data: &mut [u16], _: &cpal::OutputCallbackInfo| {
+                            // Check stop flag - if set, output silence
+                            if stop_flag_clone.load(Ordering::Relaxed) {
+                                for sample in data.iter_mut() {
+                                    *sample = 32768;
+                                }
+                                return;
+                            }
+                            
                             let mut idx = pos.load(Ordering::Relaxed);
                             let buf = buffer.lock().unwrap();
                             for sample in data.iter_mut() {
@@ -364,15 +406,6 @@ impl AudioOutputState {
         })?;
         
         eprintln!("play_to_device: Stream started successfully");
-
-        // Keep stream alive until playback completes
-        // In a real implementation, we'd track this and clean up when done
-        eprintln!("play_to_device: Keeping stream alive for ~{} seconds", duration_secs.min(30));
-        std::thread::spawn(move || {
-            let sleep_duration = std::time::Duration::from_secs(duration_secs.min(30));
-            std::thread::sleep(sleep_duration);
-            eprintln!("play_to_device: Stream sleep completed, stream will be dropped");
-        });
 
         eprintln!("play_to_device: Function completed successfully");
         Ok(())
