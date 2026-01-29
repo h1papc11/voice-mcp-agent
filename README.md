@@ -85,6 +85,7 @@ Powered by Alibaba's **Qwen3-TTS** — a breakthrough model that achieves near-p
 
 - **Create profiles** from audio files or record directly in-app
 - **Import/Export** profiles to share or backup
+- **Multi-sample support** — combine multiple samples for higher quality cloning
 - **Organize** with descriptions and language tags
 
 ### Speech Generation
@@ -93,9 +94,19 @@ Powered by Alibaba's **Qwen3-TTS** — a breakthrough model that achieves near-p
 - **Batch generation** for long-form content
 - **Smart caching** — regenerate instantly with voice prompt caching
 
+### Stories Editor
+
+Create multi-voice narratives, podcasts, and conversations with a timeline-based editor.
+
+- **Multi-track composition** — arrange multiple voice tracks in a single project
+- **Inline audio editing** — trim and split clips directly in the timeline
+- **Auto-playback** — preview stories with synchronized playhead
+- **Voice mixing** — build conversations with multiple participants
+
 ### Recording & Transcription
 
 - **In-app recording** with waveform visualization
+- **System audio capture** — record desktop audio on macOS and Windows
 - **Automatic transcription** powered by Whisper
 - **Export recordings** in multiple formats
 
