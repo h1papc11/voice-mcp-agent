@@ -1,7 +1,7 @@
+import { useMatchRoute } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useMatchRoute } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import {
@@ -12,21 +12,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import { LANGUAGE_OPTIONS } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
-import { useStory, useAddStoryItem } from '@/lib/hooks/useStories';
-import { useUIStore } from '@/stores/uiStore';
-import { useStoryStore } from '@/stores/storyStore';
-import { useToast } from '@/components/ui/use-toast';
+import { useAddStoryItem, useStory } from '@/lib/hooks/useStories';
 import { cn } from '@/lib/utils/cn';
+import { useStoryStore } from '@/stores/storyStore';
+import { useUIStore } from '@/stores/uiStore';
 
 interface FloatingGenerateBoxProps {
   isPlayerOpen?: boolean;
   showVoiceSelector?: boolean;
 }
 
-export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = false }: FloatingGenerateBoxProps) {
+export function FloatingGenerateBox({
+  isPlayerOpen = false,
+  showVoiceSelector = false,
+}: FloatingGenerateBoxProps) {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
@@ -42,7 +45,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
   const { data: currentStory } = useStory(selectedStoryId);
   const addStoryItem = useAddStoryItem();
   const { toast } = useToast();
-  
+
   // Calculate if track editor is visible (on stories route with items)
   const hasTrackEditor = isStoriesRoute && currentStory && currentStory.items.length > 0;
 
@@ -63,7 +66,8 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
         } catch (error) {
           toast({
             title: 'Failed to add to story',
-            description: error instanceof Error ? error.message : 'Could not add generation to story',
+            description:
+              error instanceof Error ? error.message : 'Could not add generation to story',
             variant: 'destructive',
           });
         }
@@ -124,7 +128,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
       }, 200); // Wait for animation to complete
       return () => clearTimeout(timeoutId);
     }
-    
+
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -135,7 +139,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
       const maxHeight = 300; // Max height in pixels
       const targetHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
       textarea.style.height = `${targetHeight}px`;
-      
+
       // Show scrollbar if content exceeds max height
       if (scrollHeight > maxHeight) {
         textarea.style.overflowY = 'auto';
@@ -148,18 +152,18 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
     const timeoutId = setTimeout(() => {
       adjustHeight();
     }, 200);
-    
+
     // Adjust on mount and when value changes
     adjustHeight();
-    
+
     // Watch for input changes
     textarea.addEventListener('input', adjustHeight);
-    
+
     return () => {
       clearTimeout(timeoutId);
       textarea.removeEventListener('input', adjustHeight);
     };
-  }, [formValue, isInstructMode, isExpanded]);
+  }, [isExpanded]);
 
   async function onSubmit(data: Parameters<typeof handleSubmit>[0]) {
     await handleSubmit(data, selectedProfileId);
@@ -171,17 +175,17 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
       className={cn(
         'fixed right-auto',
         isStoriesRoute
-          // Position aligned with story list: after sidebar + padding, width 360px
-          ? 'left-[calc(5rem+2rem)] w-[360px]'
+          ? // Position aligned with story list: after sidebar + padding, width 360px
+            'left-[calc(5rem+2rem)] w-[360px]'
           : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
       )}
       style={{
         // On stories route: offset by track editor height when visible
         // On other routes: offset by audio player height when visible
-        bottom: hasTrackEditor 
-          ? `${trackEditorHeight + 24}px` 
-          : isPlayerOpen 
-            ? 'calc(7rem + 1.5rem)' 
+        bottom: hasTrackEditor
+          ? `${trackEditorHeight + 24}px`
+          : isPlayerOpen
+            ? 'calc(7rem + 1.5rem)'
             : '1.5rem',
       }}
     >
@@ -192,10 +196,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="flex gap-2">
-              <motion.div
-                className="flex-1"
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
+              <motion.div className="flex-1" transition={{ duration: 0.3, ease: 'easeOut' }}>
                 {isInstructMode && (
                   <span className="text-xs text-accent font-medium mb-1 block">
                     Delivery instructions:
