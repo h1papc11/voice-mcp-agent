@@ -74,24 +74,31 @@ Thank you for your interest in contributing to Voicebox! This document provides 
    This creates the SQLite database at `data/voicebox.db`.
 
 5. **Start development servers**
-   
-   **Terminal 1: Backend server**
+
+   Development requires two terminals: one for the Python backend, one for the Tauri app.
+
+   **Terminal 1: Backend server** (start this first)
    ```bash
    cd backend
    source venv/bin/activate  # Activate venv if not already active
    bun run dev:server
-   # Or manually: uvicorn main:app --reload --port 8000
+   # Or manually: uvicorn main:app --reload --port 17493
    ```
-   Backend will be available at `http://localhost:8000`
-   
+   Backend will be available at `http://localhost:17493`
+
    **Terminal 2: Desktop app**
    ```bash
    bun run dev
    ```
    This will:
+   - Create a placeholder sidecar binary (for Tauri compilation)
    - Start Vite dev server on port 5173
    - Launch Tauri window pointing to localhost:5173
+   - Connect to the Python server you started in Terminal 1
    - Enable hot reload
+
+   > **Note:** In dev mode, the app connects to your manually-started Python server.
+   > The bundled server binary is only used in production builds.
 
    **Optional: Web app**
    ```bash
