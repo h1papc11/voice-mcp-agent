@@ -42,17 +42,19 @@
 
 <br/>
 
-## Why Voicebox?
+## What is Voicebox?
 
-Voice AI is exploding, but most tools are either cloud-locked, expensive, or a nightmare to set up. Voicebox is different:
+Voicebox is a **local-first voice cloning studio** with DAW-like features for professional voice synthesis. Think of it as the **Ollama for voice** — download models, clone voices, and generate speech entirely on your machine.
 
-- **100% Local** — Your voice data never leaves your machine
-- **Lightweight** — No bloated Electron, native Tauri performance
-- **Fast** — Near-instant on CUDA, optimized for Apple Silicon
-- **Flexible** — Use the app, integrate the API, or both
-- **Open Source** — No subscriptions, no limits, no lock-in
+Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives you:
 
-Built with **Tauri** (Rust), **TypeScript**, **React**, and **Python**. Native performance meets modern DX.
+- **Complete privacy** — models and voice data stay on your machine
+- **Professional tools** — multi-track timeline editor, audio trimming, conversation mixing
+- **Model flexibility** — currently powered by Qwen3-TTS, with support for XTTS, Bark, and other models coming soon
+- **API-first** — use the desktop app or integrate voice synthesis into your own projects
+- **Native performance** — built with Tauri (Rust), not Electron
+
+Download a voice model, clone any voice from a few seconds of audio, and compose multi-voice projects with studio-grade editing tools. No Python install required, no cloud dependency, no limits.
 
 ---
 
