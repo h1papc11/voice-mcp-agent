@@ -1209,22 +1209,22 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     
     config = model_configs[request.model_name]
     
-    try:
-        # Start tracking download
-        task_manager.start_download(request.model_name)
-        
-        # Trigger download by loading the model (which will download if not cached)
-        # Run in background to avoid blocking
-        await asyncio.to_thread(config["load_func"])
-        
-        # Mark download as complete
-        task_manager.complete_download(request.model_name)
-        
-        return {"message": f"Model {request.model_name} download started"}
-    except Exception as e:
-        # Mark download as failed
-        task_manager.error_download(request.model_name, str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    async def download_in_background():
+        """Download model in background without blocking the HTTP request."""
+        try:
+            await asyncio.to_thread(config["load_func"])
+            task_manager.complete_download(request.model_name)
+        except Exception as e:
+            task_manager.error_download(request.model_name, str(e))
+
+    # Start tracking download
+    task_manager.start_download(request.model_name)
+
+    # Start download in background task (don't await)
+    asyncio.create_task(download_in_background())
+
+    # Return immediately - frontend should poll progress endpoint
+    return {"message": f"Model {request.model_name} download started"}
 
 
 @app.delete("/models/{model_name}")
