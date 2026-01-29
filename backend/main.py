@@ -19,7 +19,7 @@ import io
 from pathlib import Path
 import uuid
 
-from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories
+from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
@@ -27,7 +27,7 @@ from .utils.tasks import get_task_manager
 app = FastAPI(
     title="voicebox API",
     description="Production-quality Qwen3-TTS voice cloning API",
-    version="0.1.0",
+    version=__version__,
 )
 
 # CORS middleware
@@ -47,13 +47,13 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "voicebox API", "version": "0.1.7"}
+    return {"message": "voicebox API", "version": __version__}
 
 
 @app.get("/health", response_model=models.HealthResponse)
 async def health():
     """Health check endpoint."""
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import hf_hub_download, constants as hf_constants
     from pathlib import Path
     import os
     
@@ -101,8 +101,8 @@ async def health():
                     model_downloaded = True
                     break
         except (ImportError, Exception):
-            # Method 2: Check cache directory
-            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
+            cache_dir = hf_constants.HF_HUB_CACHE
             repo_cache = Path(cache_dir) / "models--" + default_model_id.replace("/", "--")
             if repo_cache.exists():
                 has_model_files = (
@@ -994,7 +994,7 @@ async def get_model_progress(model_name: str):
 @app.get("/models/status", response_model=models.ModelStatusListResponse)
 async def get_model_status():
     """Get status of all available models."""
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import hf_hub_download, constants as hf_constants
     from pathlib import Path
     import os
     
@@ -1097,10 +1097,10 @@ async def get_model_status():
                             pass
                         break
             
-            # Method 2: Fallback to checking cache directory directly
+            # Method 2: Fallback to checking cache directory directly (using HuggingFace's OS-specific cache location)
             if not downloaded:
                 try:
-                    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                    cache_dir = hf_constants.HF_HUB_CACHE
                     repo_cache = Path(cache_dir) / "models--" + config["hf_repo_id"].replace("/", "--")
                     
                     if repo_cache.exists():
@@ -1232,6 +1232,7 @@ async def delete_model(model_name: str):
     """Delete a downloaded model from the HuggingFace cache."""
     import shutil
     import os
+    from huggingface_hub import constants as hf_constants
     
     # Map model names to HuggingFace repo IDs
     model_configs = {
@@ -1284,8 +1285,8 @@ async def delete_model(model_name: str):
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:
                 transcribe.unload_whisper_model()
         
-        # Find and delete the cache directory
-        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+        # Find and delete the cache directory (using HuggingFace's OS-specific cache location)
+        cache_dir = hf_constants.HF_HUB_CACHE
         repo_cache_dir = Path(cache_dir) / ("models--" + hf_repo_id.replace("/", "--"))
         
         # Check if the cache directory exists
@@ -1395,6 +1396,16 @@ async def startup_event():
     database.init_db()
     print(f"Database initialized at {database._db_path}")
     print(f"GPU available: {_get_gpu_status()}")
+
+    # Ensure HuggingFace cache directory exists
+    try:
+        from huggingface_hub import constants as hf_constants
+        cache_dir = Path(hf_constants.HF_HUB_CACHE)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        print(f"HuggingFace cache directory: {cache_dir}")
+    except Exception as e:
+        print(f"Warning: Could not create HuggingFace cache directory: {e}")
+        print("Model downloads may fail. Please ensure the directory exists and has write permissions.")
 
 
 @app.on_event("shutdown")
