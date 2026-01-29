@@ -123,3 +123,68 @@ export interface ActiveTasksResponse {
   downloads: ActiveDownloadTask[];
   generations: ActiveGenerationTask[];
 }
+
+export interface StoryCreate {
+  name: string;
+  description?: string;
+}
+
+export interface StoryResponse {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+}
+
+export interface StoryItemDetail {
+  id: string;
+  story_id: string;
+  generation_id: string;
+  start_time_ms: number;
+  track: number;
+  created_at: string;
+  profile_id: string;
+  profile_name: string;
+  text: string;
+  language: string;
+  audio_path: string;
+  duration: number;
+  seed?: number;
+  instruct?: string;
+  generation_created_at: string;
+}
+
+export interface StoryDetailResponse {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  items: StoryItemDetail[];
+}
+
+export interface StoryItemCreate {
+  generation_id: string;
+  start_time_ms?: number;
+  track?: number;
+}
+
+export interface StoryItemUpdateTime {
+  generation_id: string;
+  start_time_ms: number;
+}
+
+export interface StoryItemBatchUpdate {
+  updates: StoryItemUpdateTime[];
+}
+
+export interface StoryItemReorder {
+  generation_ids: string[];
+}
+
+export interface StoryItemMove {
+  start_time_ms: number;
+  track: number;
+}

@@ -193,3 +193,87 @@ class ChannelVoiceAssignment(BaseModel):
 class ProfileChannelAssignment(BaseModel):
     """Request model for assigning channels to a profile."""
     channel_ids: List[str]
+
+
+class StoryCreate(BaseModel):
+    """Request model for creating a story."""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+
+
+class StoryResponse(BaseModel):
+    """Response model for story (list view)."""
+    id: str
+    name: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    item_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class StoryItemDetail(BaseModel):
+    """Detail model for story item with generation info."""
+    id: str
+    story_id: str
+    generation_id: str
+    start_time_ms: int
+    track: int = 0
+    created_at: datetime
+    # Generation details
+    profile_id: str
+    profile_name: str
+    text: str
+    language: str
+    audio_path: str
+    duration: float
+    seed: Optional[int]
+    instruct: Optional[str]
+    generation_created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StoryDetailResponse(BaseModel):
+    """Response model for story with items."""
+    id: str
+    name: str
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+    items: List[StoryItemDetail] = []
+
+    class Config:
+        from_attributes = True
+
+
+class StoryItemCreate(BaseModel):
+    """Request model for adding a generation to a story."""
+    generation_id: str
+    start_time_ms: Optional[int] = None  # If not provided, will be calculated automatically
+    track: Optional[int] = 0  # Track number (0 = main track)
+
+
+class StoryItemUpdateTime(BaseModel):
+    """Request model for updating a story item's timecode."""
+    generation_id: str
+    start_time_ms: int = Field(..., ge=0)
+
+
+class StoryItemBatchUpdate(BaseModel):
+    """Request model for batch updating story item timecodes."""
+    updates: List[StoryItemUpdateTime]
+
+
+class StoryItemReorder(BaseModel):
+    """Request model for reordering story items."""
+    generation_ids: List[str] = Field(..., min_length=1)
+
+
+class StoryItemMove(BaseModel):
+    """Request model for moving a story item (position and/or track)."""
+    start_time_ms: int = Field(..., ge=0)
+    track: int = 0

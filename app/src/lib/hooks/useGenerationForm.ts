@@ -21,7 +21,7 @@ const generationSchema = z.object({
 export type GenerationFormValues = z.infer<typeof generationSchema>;
 
 interface UseGenerationFormOptions {
-  onSuccess?: () => void;
+  onSuccess?: (generationId: string) => void;
   defaultValues?: Partial<GenerationFormValues>;
 }
 
@@ -100,7 +100,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       setAudio(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
 
       form.reset();
-      options.onSuccess?.();
+      options.onSuccess?.(result.id);
     } catch (error) {
       toast({
         title: 'Generation failed',

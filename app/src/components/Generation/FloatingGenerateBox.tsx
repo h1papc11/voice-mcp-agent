@@ -1,5 +1,6 @@
+import { useMatchRoute } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, MessageSquare, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
@@ -11,24 +12,66 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
 import { LANGUAGE_OPTIONS } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
-import { useProfile } from '@/lib/hooks/useProfiles';
+import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
+import { useAddStoryItem, useStory } from '@/lib/hooks/useStories';
+import { cn } from '@/lib/utils/cn';
+import { useStoryStore } from '@/stores/storyStore';
 import { useUIStore } from '@/stores/uiStore';
 
 interface FloatingGenerateBoxProps {
-  isPlayerOpen: boolean;
+  isPlayerOpen?: boolean;
+  showVoiceSelector?: boolean;
 }
 
-export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) {
+export function FloatingGenerateBox({
+  isPlayerOpen = false,
+  showVoiceSelector = false,
+}: FloatingGenerateBoxProps) {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
+  const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
+  const { data: profiles } = useProfiles();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isInstructMode, setIsInstructMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const matchRoute = useMatchRoute();
+  const isStoriesRoute = matchRoute({ to: '/stories' });
+  const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
+  const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
+  const { data: currentStory } = useStory(selectedStoryId);
+  const addStoryItem = useAddStoryItem();
+  const { toast } = useToast();
+
+  // Calculate if track editor is visible (on stories route with items)
+  const hasTrackEditor = isStoriesRoute && currentStory && currentStory.items.length > 0;
 
   const { form, handleSubmit, isPending } = useGenerationForm({
-    onSuccess: () => {
+    onSuccess: async (generationId) => {
       setIsExpanded(false);
+      // If on stories route and a story is selected, add generation to story
+      if (isStoriesRoute && selectedStoryId && generationId) {
+        try {
+          await addStoryItem.mutateAsync({
+            storyId: selectedStoryId,
+            data: { generation_id: generationId },
+          });
+          toast({
+            title: 'Added to story',
+            description: `Generation added to "${currentStory?.name || 'story'}"`,
+          });
+        } catch (error) {
+          toast({
+            title: 'Failed to add to story',
+            description:
+              error instanceof Error ? error.message : 'Could not add generation to story',
+            variant: 'destructive',
+          });
+        }
+      }
     },
   });
 
@@ -62,6 +105,66 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
     };
   }, [isExpanded]);
 
+  // Set first voice as default if none selected
+  useEffect(() => {
+    if (!selectedProfileId && profiles && profiles.length > 0) {
+      setSelectedProfileId(profiles[0].id);
+    }
+  }, [selectedProfileId, profiles, setSelectedProfileId]);
+
+  // Get current form value to trigger resize when it changes
+  const formValue = form.watch(isInstructMode ? 'instruct' : 'text');
+
+  // Auto-resize textarea based on content (only when expanded)
+  useEffect(() => {
+    if (!isExpanded) {
+      // Reset textarea height after collapse animation completes
+      const timeoutId = setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.style.height = '32px';
+          textarea.style.overflowY = 'hidden';
+        }
+      }, 200); // Wait for animation to complete
+      return () => clearTimeout(timeoutId);
+    }
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const adjustHeight = () => {
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const minHeight = 100; // Expanded minimum
+      const maxHeight = 300; // Max height in pixels
+      const targetHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+      textarea.style.height = `${targetHeight}px`;
+
+      // Show scrollbar if content exceeds max height
+      if (scrollHeight > maxHeight) {
+        textarea.style.overflowY = 'auto';
+      } else {
+        textarea.style.overflowY = 'hidden';
+      }
+    };
+
+    // Small delay to let framer animation complete
+    const timeoutId = setTimeout(() => {
+      adjustHeight();
+    }, 200);
+
+    // Adjust on mount and when value changes
+    adjustHeight();
+
+    // Watch for input changes
+    textarea.addEventListener('input', adjustHeight);
+
+    return () => {
+      clearTimeout(timeoutId);
+      textarea.removeEventListener('input', adjustHeight);
+    };
+  }, [isExpanded]);
+
   async function onSubmit(data: Parameters<typeof handleSubmit>[0]) {
     await handleSubmit(data, selectedProfileId);
   }
@@ -69,9 +172,21 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
   return (
     <motion.div
       ref={containerRef}
-      className="fixed left-[calc(5rem+2rem)] right-auto w-[calc((100%-5rem-4rem)/2-1rem)]"
+      className={cn(
+        'fixed right-auto',
+        isStoriesRoute
+          ? // Position aligned with story list: after sidebar + padding, width 360px
+            'left-[calc(5rem+2rem)] w-[360px]'
+          : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
+      )}
       style={{
-        bottom: isPlayerOpen ? 'calc(7rem + 1.5rem)' : '1.5rem',
+        // On stories route: offset by track editor height when visible
+        // On other routes: offset by audio player height when visible
+        bottom: hasTrackEditor
+          ? `${trackEditorHeight + 24}px`
+          : isPlayerOpen
+            ? 'calc(7rem + 1.5rem)'
+            : '1.5rem',
       }}
     >
       <motion.div
@@ -81,32 +196,54 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="flex gap-2">
-              <motion.div
-                className="flex-1"
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
+              <motion.div className="flex-1" transition={{ duration: 0.3, ease: 'easeOut' }}>
+                {isInstructMode && (
+                  <span className="text-xs text-accent font-medium mb-1 block">
+                    Delivery instructions:
+                  </span>
+                )}
                 <FormField
                   control={form.control}
-                  name="text"
+                  name={isInstructMode ? 'instruct' : 'text'}
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Textarea
-                          placeholder={
-                            selectedProfile
-                              ? `Generate speech using ${selectedProfile.name}...`
-                              : 'Select a voice profile above...'
-                          }
-                          className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 overflow-hidden transition-all"
-                          style={{
-                            minHeight: isExpanded ? '100px' : '32px',
-                            height: isExpanded ? '100px' : '32px',
+                        <motion.div
+                          animate={{
+                            height: isExpanded ? 'auto' : '32px',
                           }}
-                          disabled={!selectedProfileId}
-                          onClick={() => setIsExpanded(true)}
-                          onFocus={() => setIsExpanded(true)}
-                          {...field}
-                        />
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <Textarea
+                            {...field}
+                            ref={(node: HTMLTextAreaElement | null) => {
+                              // Store ref for auto-resize
+                              textareaRef.current = node;
+                              // Forward ref to react-hook-form
+                              if (typeof field.ref === 'function') {
+                                field.ref(node);
+                              }
+                            }}
+                            placeholder={
+                              isInstructMode
+                                ? 'Add delivery instructions...'
+                                : isStoriesRoute && currentStory
+                                  ? `Generate speech for "${currentStory.name}"...`
+                                  : selectedProfile
+                                    ? `Generate speech using ${selectedProfile.name}...`
+                                    : 'Select a voice profile above...'
+                            }
+                            className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full"
+                            style={{
+                              minHeight: isExpanded ? '100px' : '32px',
+                              maxHeight: '300px',
+                            }}
+                            disabled={!selectedProfileId}
+                            onClick={() => setIsExpanded(true)}
+                            onFocus={() => setIsExpanded(true)}
+                          />
+                        </motion.div>
                       </FormControl>
                       <FormMessage className="text-xs" />
                     </FormItem>
@@ -114,18 +251,43 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
                 />
               </motion.div>
 
-              <Button
-                type="submit"
-                disabled={isPending || !selectedProfileId}
-                className="h-10 w-10 rounded-full bg-accent hover:bg-accent/90 hover:scale-105 text-accent-foreground shadow-lg hover:shadow-accent/50 shrink-0 transition-all duration-200"
-                size="icon"
-              >
-                {isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-              </Button>
+              <div className="relative shrink-0">
+                <Button
+                  type="submit"
+                  disabled={isPending || !selectedProfileId}
+                  className="h-10 w-10 rounded-full bg-accent hover:bg-accent/90 hover:scale-105 text-accent-foreground shadow-lg hover:shadow-accent/50 transition-all duration-200"
+                  size="icon"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                </Button>
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.2 }}
+                      className="absolute top-0 right-[calc(100%+0.5rem)]"
+                    >
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsInstructMode(!isInstructMode)}
+                        className={`h-10 w-10 rounded-full bg-card border border-border hover:bg-background/50 transition-all duration-200 ${
+                          isInstructMode ? 'text-accent' : ''
+                        }`}
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             <AnimatePresence>
@@ -137,11 +299,31 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
                 className=" mt-3"
               >
                 <div className="flex items-center gap-2">
+                  {showVoiceSelector && (
+                    <div className="flex-1">
+                      <Select
+                        value={selectedProfileId || ''}
+                        onValueChange={(value) => setSelectedProfileId(value || null)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all w-full">
+                          <SelectValue placeholder="Select a voice..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {profiles?.map((profile) => (
+                            <SelectItem key={profile.id} value={profile.id} className="text-xs">
+                              {profile.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <FormField
                     control={form.control}
                     name="language"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem className="flex-1 space-y-0">
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
@@ -165,7 +347,7 @@ export function FloatingGenerateBox({ isPlayerOpen }: FloatingGenerateBoxProps) 
                     control={form.control}
                     name="modelSize"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem className="flex-1 space-y-0">
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">

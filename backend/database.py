@@ -51,6 +51,29 @@ class Generation(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Story(Base):
+    """Story database model."""
+    __tablename__ = "stories"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class StoryItem(Base):
+    """Story item database model (links generations to stories)."""
+    __tablename__ = "story_items"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    story_id = Column(String, ForeignKey("stories.id"), nullable=False)
+    generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
+    start_time_ms = Column(Integer, nullable=False, default=0)  # Milliseconds from story start
+    track = Column(Integer, nullable=False, default=0)  # Track number (0 = main track)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Project(Base):
     """Audio studio project database model."""
     __tablename__ = "projects"
@@ -108,6 +131,10 @@ def init_db():
     )
 
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    # Run migrations before creating tables
+    _run_migrations(engine)
+    
     Base.metadata.create_all(bind=engine)
     
     # Create default channel if it doesn't exist
@@ -134,6 +161,101 @@ def init_db():
             db.commit()
     finally:
         db.close()
+
+
+def _run_migrations(engine):
+    """Run database migrations."""
+    from sqlalchemy import inspect, text
+    
+    inspector = inspect(engine)
+    
+    # Check if story_items table exists
+    if 'story_items' not in inspector.get_table_names():
+        return  # Table doesn't exist yet, will be created fresh
+    
+    # Get columns in story_items table
+    columns = {col['name'] for col in inspector.get_columns('story_items')}
+    
+    # Migration: Remove position column and ensure start_time_ms exists
+    # SQLite doesn't support DROP COLUMN easily, so we recreate the table
+    if 'position' in columns:
+        print("Migrating story_items: removing position column, using start_time_ms")
+        
+        with engine.connect() as conn:
+            # Check if start_time_ms already exists
+            has_start_time = 'start_time_ms' in columns
+            
+            if not has_start_time:
+                # First, add the new column temporarily
+                conn.execute(text("ALTER TABLE story_items ADD COLUMN start_time_ms INTEGER DEFAULT 0"))
+                
+                # Calculate timecodes from position ordering
+                result = conn.execute(text("""
+                    SELECT si.id, si.story_id, si.position, g.duration
+                    FROM story_items si
+                    JOIN generations g ON si.generation_id = g.id
+                    ORDER BY si.story_id, si.position
+                """))
+                
+                rows = result.fetchall()
+                
+                current_story_id = None
+                current_time_ms = 0
+                
+                for row in rows:
+                    item_id, story_id, position, duration = row
+                    
+                    if story_id != current_story_id:
+                        current_story_id = story_id
+                        current_time_ms = 0
+                    
+                    conn.execute(
+                        text("UPDATE story_items SET start_time_ms = :time WHERE id = :id"),
+                        {"time": current_time_ms, "id": item_id}
+                    )
+                    
+                    current_time_ms += int(duration * 1000) + 200
+                
+                conn.commit()
+            
+            # Now recreate the table without the position column
+            # 1. Create new table
+            conn.execute(text("""
+                CREATE TABLE story_items_new (
+                    id VARCHAR PRIMARY KEY,
+                    story_id VARCHAR NOT NULL,
+                    generation_id VARCHAR NOT NULL,
+                    start_time_ms INTEGER NOT NULL DEFAULT 0,
+                    created_at DATETIME,
+                    FOREIGN KEY (story_id) REFERENCES stories(id),
+                    FOREIGN KEY (generation_id) REFERENCES generations(id)
+                )
+            """))
+            
+            # 2. Copy data
+            conn.execute(text("""
+                INSERT INTO story_items_new (id, story_id, generation_id, start_time_ms, created_at)
+                SELECT id, story_id, generation_id, start_time_ms, created_at FROM story_items
+            """))
+            
+            # 3. Drop old table
+            conn.execute(text("DROP TABLE story_items"))
+            
+            # 4. Rename new table
+            conn.execute(text("ALTER TABLE story_items_new RENAME TO story_items"))
+            
+            conn.commit()
+            print("Migrated story_items table to use start_time_ms (removed position column)")
+    
+    # Migration: Add track column if it doesn't exist
+    # Re-check columns after potential position migration
+    columns = {col['name'] for col in inspector.get_columns('story_items')}
+    if 'track' not in columns:
+        print("Migrating story_items: adding track column")
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE story_items ADD COLUMN track INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            print("Added track column to story_items")
 
 
 def get_db():

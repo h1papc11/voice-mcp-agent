@@ -19,7 +19,7 @@ import io
 from pathlib import Path
 import uuid
 
-from . import database, models, profiles, history, tts, transcribe, config, export_import, channels
+from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
@@ -47,7 +47,7 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "voicebox API", "version": "0.1.5"}
+    return {"message": "voicebox API", "version": "0.1.6"}
 
 
 @app.get("/health", response_model=models.HealthResponse)
@@ -696,6 +696,168 @@ async def transcribe_audio(
     finally:
         # Clean up temp file
         Path(tmp_path).unlink(missing_ok=True)
+
+
+# ============================================
+# STORY ENDPOINTS
+# ============================================
+
+@app.get("/stories", response_model=List[models.StoryResponse])
+async def list_stories(db: Session = Depends(get_db)):
+    """List all stories."""
+    return await stories.list_stories(db)
+
+
+@app.post("/stories", response_model=models.StoryResponse)
+async def create_story(
+    data: models.StoryCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a new story."""
+    try:
+        return await stories.create_story(data, db)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/stories/{story_id}", response_model=models.StoryDetailResponse)
+async def get_story(
+    story_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get a story with all its items."""
+    story = await stories.get_story(story_id, db)
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    return story
+
+
+@app.put("/stories/{story_id}", response_model=models.StoryResponse)
+async def update_story(
+    story_id: str,
+    data: models.StoryCreate,
+    db: Session = Depends(get_db),
+):
+    """Update a story."""
+    story = await stories.update_story(story_id, data, db)
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    return story
+
+
+@app.delete("/stories/{story_id}")
+async def delete_story(
+    story_id: str,
+    db: Session = Depends(get_db),
+):
+    """Delete a story."""
+    success = await stories.delete_story(story_id, db)
+    if not success:
+        raise HTTPException(status_code=404, detail="Story not found")
+    return {"message": "Story deleted successfully"}
+
+
+@app.post("/stories/{story_id}/items", response_model=models.StoryItemDetail)
+async def add_story_item(
+    story_id: str,
+    data: models.StoryItemCreate,
+    db: Session = Depends(get_db),
+):
+    """Add a generation to a story."""
+    item = await stories.add_item_to_story(story_id, data, db)
+    if not item:
+        raise HTTPException(status_code=404, detail="Story or generation not found")
+    return item
+
+
+@app.delete("/stories/{story_id}/items/{generation_id}")
+async def remove_story_item(
+    story_id: str,
+    generation_id: str,
+    db: Session = Depends(get_db),
+):
+    """Remove a generation from a story."""
+    success = await stories.remove_item_from_story(story_id, generation_id, db)
+    if not success:
+        raise HTTPException(status_code=404, detail="Story item not found")
+    return {"message": "Item removed successfully"}
+
+
+@app.put("/stories/{story_id}/items/times")
+async def update_story_item_times(
+    story_id: str,
+    data: models.StoryItemBatchUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update story item timecodes."""
+    success = await stories.update_story_item_times(story_id, data, db)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid timecode update request")
+    return {"message": "Item timecodes updated successfully"}
+
+
+@app.put("/stories/{story_id}/items/reorder", response_model=List[models.StoryItemDetail])
+async def reorder_story_items(
+    story_id: str,
+    data: models.StoryItemReorder,
+    db: Session = Depends(get_db),
+):
+    """Reorder story items and recalculate timecodes."""
+    items = await stories.reorder_story_items(story_id, data.generation_ids, db)
+    if items is None:
+        raise HTTPException(status_code=400, detail="Invalid reorder request - ensure all generation IDs belong to this story")
+    return items
+
+
+@app.put("/stories/{story_id}/items/{generation_id}/move", response_model=models.StoryItemDetail)
+async def move_story_item(
+    story_id: str,
+    generation_id: str,
+    data: models.StoryItemMove,
+    db: Session = Depends(get_db),
+):
+    """Move a story item (update position and/or track)."""
+    item = await stories.move_story_item(story_id, generation_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item not found")
+    return item
+
+
+@app.get("/stories/{story_id}/export-audio")
+async def export_story_audio(
+    story_id: str,
+    db: Session = Depends(get_db),
+):
+    """Export story as single mixed audio file with timecode-based mixing."""
+    try:
+        # Get story to create filename
+        story = db.query(database.Story).filter_by(id=story_id).first()
+        if not story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        
+        # Export audio
+        audio_bytes = await stories.export_story_audio(story_id, db)
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Story has no audio items")
+        
+        # Create safe filename
+        safe_name = "".join(c for c in story.name if c.isalnum() or c in (' ', '-', '_')).strip()
+        if not safe_name:
+            safe_name = "story"
+        filename = f"{safe_name}.wav"
+        
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(audio_bytes),
+            media_type="audio/wav",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================

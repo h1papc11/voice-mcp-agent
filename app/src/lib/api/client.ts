@@ -13,6 +13,14 @@ import type {
   ModelStatusListResponse,
   ModelDownloadRequest,
   ActiveTasksResponse,
+  StoryCreate,
+  StoryResponse,
+  StoryDetailResponse,
+  StoryItemCreate,
+  StoryItemDetail,
+  StoryItemBatchUpdate,
+  StoryItemReorder,
+  StoryItemMove,
 } from './types';
 
 class ApiClient {
@@ -360,6 +368,83 @@ class ApiClient {
       method: 'PUT',
       body: JSON.stringify({ channel_ids: channelIds }),
     });
+  }
+
+  // Stories
+  async listStories(): Promise<StoryResponse[]> {
+    return this.request<StoryResponse[]>('/stories');
+  }
+
+  async createStory(data: StoryCreate): Promise<StoryResponse> {
+    return this.request<StoryResponse>('/stories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getStory(storyId: string): Promise<StoryDetailResponse> {
+    return this.request<StoryDetailResponse>(`/stories/${storyId}`);
+  }
+
+  async updateStory(storyId: string, data: StoryCreate): Promise<StoryResponse> {
+    return this.request<StoryResponse>(`/stories/${storyId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteStory(storyId: string): Promise<void> {
+    await this.request<void>(`/stories/${storyId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addStoryItem(storyId: string, data: StoryItemCreate): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async removeStoryItem(storyId: string, generationId: string): Promise<void> {
+    await this.request<void>(`/stories/${storyId}/items/${generationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateStoryItemTimes(storyId: string, data: StoryItemBatchUpdate): Promise<void> {
+    await this.request<void>(`/stories/${storyId}/items/times`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async reorderStoryItems(storyId: string, data: StoryItemReorder): Promise<StoryItemDetail[]> {
+    return this.request<StoryItemDetail[]>(`/stories/${storyId}/items/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async moveStoryItem(storyId: string, generationId: string, data: StoryItemMove): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${generationId}/move`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async exportStoryAudio(storyId: string): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/stories/${storyId}/export-audio`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: response.statusText,
+      }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
   }
 }
 
