@@ -28,6 +28,7 @@ interface StoryPlaybackState {
   stop: () => void;
   seek: (timeMs: number) => void;
   setPlaybackTiming: (contextTime: number, storyTime: number) => void; // Set timing anchors for Web Audio API
+  setActiveStory: (storyId: string, items: StoryItemDetail[], totalDurationMs: number) => void; // Activate story for seeking without playing
 }
 
 const DEFAULT_TRACK_EDITOR_HEIGHT = 250;
@@ -125,5 +126,19 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
       playbackStartContextTime: contextTime,
       playbackStartStoryTime: storyTime,
     });
+  },
+
+  setActiveStory: (storyId, items, totalDurationMs) => {
+    const currentState = get();
+    // Only update if switching to a different story
+    if (currentState.playbackStoryId !== storyId) {
+      set({
+        playbackStoryId: storyId,
+        playbackItems: items,
+        totalDurationMs,
+        currentTimeMs: 0,
+        isPlaying: false,
+      });
+    }
   },
 }));

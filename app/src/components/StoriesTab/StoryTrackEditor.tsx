@@ -139,15 +139,31 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   // Playback state
   const isPlaying = useStoryStore((state) => state.isPlaying);
   const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
-  const storeTotalDurationMs = useStoryStore((state) => state.totalDurationMs);
   const playbackStoryId = useStoryStore((state) => state.playbackStoryId);
   const play = useStoryStore((state) => state.play);
   const pause = useStoryStore((state) => state.pause);
   const stop = useStoryStore((state) => state.stop);
   const seek = useStoryStore((state) => state.seek);
+  const setActiveStory = useStoryStore((state) => state.setActiveStory);
 
   const isActiveStory = playbackStoryId === storyId;
   const isCurrentlyPlaying = isPlaying && isActiveStory;
+
+  // Auto-activate this story when the editor is shown so playhead is visible
+  useEffect(() => {
+    if (items.length > 0 && !isActiveStory) {
+      const totalDuration = Math.max(
+        ...items.map((item) => {
+          const trimStart = item.trim_start_ms || 0;
+          const trimEnd = item.trim_end_ms || 0;
+          const effectiveDuration = (item.duration * 1000) - trimStart - trimEnd;
+          return item.start_time_ms + effectiveDuration;
+        }),
+        0
+      );
+      setActiveStory(storyId, items, totalDuration);
+    }
+  }, [storyId, items, isActiveStory, setActiveStory]);
 
   // Sort items by start time for play
   const sortedItems = useMemo(() => {
@@ -656,11 +672,11 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
               <Play className="h-4 w-4" />
             )}
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleStop} disabled={!isActiveStory}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleStop} disabled={!isCurrentlyPlaying}>
             <Square className="h-3 w-3" />
           </Button>
           <span className="text-xs text-muted-foreground tabular-nums ml-2">
-            {formatTime(isActiveStory ? currentTimeMs : 0)} / {formatTime(isActiveStory ? storeTotalDurationMs : 0)}
+            {formatTime(currentTimeMs)} / {formatTime(totalDurationMs)}
           </span>
         </div>
 
@@ -875,15 +891,13 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
             );
           })}
 
-          {/* Playhead */}
-          {isActiveStory && (
-            <div
-              className="absolute top-0 bottom-0 w-1 bg-accent z-30 pointer-events-none rounded-full"
-              style={{ left: `${playheadLeft}px` }}
-            >
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full" />
-            </div>
-          )}
+          {/* Playhead - always visible */}
+          <div
+            className="absolute top-0 bottom-0 w-1 bg-accent z-30 pointer-events-none rounded-full"
+            style={{ left: `${playheadLeft}px` }}
+          >
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full" />
+          </div>
         </div>
         </div>
       </div>
