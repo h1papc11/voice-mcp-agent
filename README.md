@@ -207,7 +207,25 @@ Voicebox aims to be the **one-stop shop for everything voice** — cloning, synt
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup and contribution guidelines.
 
+**Using the Makefile (recommended):** Run `make help` to see all available commands for setup, development, building, and testing.
+
 ### Quick Start
+
+**With Makefile (Unix/macOS/Linux):**
+
+```bash
+# Clone the repo
+git clone https://github.com/voicebox-sh/voicebox.git
+cd voicebox
+
+# Setup everything
+make setup
+
+# Start development
+make dev
+```
+
+**Manual setup (all platforms):**
 
 ```bash
 # Clone the repo
