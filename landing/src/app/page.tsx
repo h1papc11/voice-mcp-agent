@@ -99,7 +99,7 @@ export default function Home() {
               <div className="flex justify-center lg:hidden my-8">
                 <div className="w-full max-w-2xl">
                   <Image
-                    src="/assets/app-screenshot-2.webp"
+                    src="/assets/app-screenshot-1.webp"
                     alt="Voicebox Application Screenshot"
                     width={1920}
                     height={1080}
