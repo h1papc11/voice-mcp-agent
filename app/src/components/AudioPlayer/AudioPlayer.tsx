@@ -402,6 +402,11 @@ export function AudioPlayer() {
           wavesurfer.play();
         } else {
           setIsPlaying(false);
+          // Trigger finish callback if set
+          const onFinish = usePlayerStore.getState().onFinish;
+          if (onFinish) {
+            onFinish();
+          }
         }
       });
 
@@ -652,6 +657,29 @@ export function AudioPlayer() {
     // Clear the restart flag
     clearRestartFlag();
   }, [shouldRestart, duration, setIsPlaying, clearRestartFlag]);
+
+  // Handle shouldAutoPlay flag - for story mode auto-advance
+  const shouldAutoPlay = usePlayerStore((state) => state.shouldAutoPlay);
+  const clearAutoPlayFlag = usePlayerStore((state) => state.clearAutoPlayFlag);
+  
+  useEffect(() => {
+    const wavesurfer = wavesurferRef.current;
+    if (!wavesurfer || !shouldAutoPlay || duration === 0) {
+      return;
+    }
+
+    // Auto-play the newly loaded audio
+    debug.log('Auto-playing next track in story mode');
+    wavesurfer.seekTo(0);
+    wavesurfer.play().catch((error) => {
+      debug.error('Failed to auto-play:', error);
+      setIsPlaying(false);
+      setError(`Playback error: ${error instanceof Error ? error.message : String(error)}`);
+    });
+
+    // Clear the auto-play flag
+    clearAutoPlayFlag();
+  }, [shouldAutoPlay, duration, setIsPlaying, clearAutoPlayFlag]);
 
   // Handle loop - WaveSurfer handles this via the 'finish' event
 

@@ -5,6 +5,7 @@ import { MainEditor } from '@/components/MainEditor/MainEditor';
 import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
 import { ServerTab } from '@/components/ServerTab/ServerTab';
 import { Sidebar } from '@/components/Sidebar';
+import { StoriesTab } from '@/components/StoriesTab/StoriesTab';
 import { Toaster } from '@/components/ui/toaster';
 import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
@@ -77,6 +78,13 @@ const indexRoute = createRoute({
   component: MainEditor,
 });
 
+// Stories route
+const storiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/stories',
+  component: StoriesTab,
+});
+
 // Voices route
 const voicesRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -108,6 +116,7 @@ const serverRoute = createRoute({
 // Route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  storiesRoute,
   voicesRoute,
   audioRoute,
   modelsRoute,
