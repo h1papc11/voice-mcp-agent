@@ -53,7 +53,7 @@ async def root():
 @app.get("/health", response_model=models.HealthResponse)
 async def health():
     """Health check endpoint."""
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import hf_hub_download, constants as hf_constants
     from pathlib import Path
     import os
     
@@ -101,8 +101,8 @@ async def health():
                     model_downloaded = True
                     break
         except (ImportError, Exception):
-            # Method 2: Check cache directory
-            cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+            # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
+            cache_dir = hf_constants.HF_HUB_CACHE
             repo_cache = Path(cache_dir) / "models--" + default_model_id.replace("/", "--")
             if repo_cache.exists():
                 has_model_files = (
@@ -953,7 +953,7 @@ async def get_model_progress(model_name: str):
 @app.get("/models/status", response_model=models.ModelStatusListResponse)
 async def get_model_status():
     """Get status of all available models."""
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import hf_hub_download, constants as hf_constants
     from pathlib import Path
     import os
     
@@ -1056,10 +1056,10 @@ async def get_model_status():
                             pass
                         break
             
-            # Method 2: Fallback to checking cache directory directly
+            # Method 2: Fallback to checking cache directory directly (using HuggingFace's OS-specific cache location)
             if not downloaded:
                 try:
-                    cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+                    cache_dir = hf_constants.HF_HUB_CACHE
                     repo_cache = Path(cache_dir) / "models--" + config["hf_repo_id"].replace("/", "--")
                     
                     if repo_cache.exists():
@@ -1191,6 +1191,7 @@ async def delete_model(model_name: str):
     """Delete a downloaded model from the HuggingFace cache."""
     import shutil
     import os
+    from huggingface_hub import constants as hf_constants
     
     # Map model names to HuggingFace repo IDs
     model_configs = {
@@ -1243,8 +1244,8 @@ async def delete_model(model_name: str):
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:
                 transcribe.unload_whisper_model()
         
-        # Find and delete the cache directory
-        cache_dir = os.path.expanduser("~/.cache/huggingface/hub")
+        # Find and delete the cache directory (using HuggingFace's OS-specific cache location)
+        cache_dir = hf_constants.HF_HUB_CACHE
         repo_cache_dir = Path(cache_dir) / ("models--" + hf_repo_id.replace("/", "--"))
         
         # Check if the cache directory exists
