@@ -126,7 +126,7 @@ build-web: ## Build web app
 
 .PHONY: db-init db-reset generate-api
 
-db-init: ## Initialize SQLite database
+db-init: $(VENV)/bin/activate ## Initialize SQLite database
 	@echo -e "$(BLUE)Initializing database...$(NC)"
 	cd $(BACKEND_DIR) && $(PYTHON_VENV) -c "from database import init_db; init_db()"
 	@echo -e "$(GREEN)✓ Database created at $(BACKEND_DIR)/data/voicebox.db$(NC)"
@@ -180,6 +180,7 @@ test-backend: ## Run Python backend tests (requires pytest)
 		cd $(BACKEND_DIR) && $(VENV_BIN)/pytest -v; \
 	else \
 		echo -e "$(YELLOW)pytest not installed. Run: $(PIP) install pytest$(NC)"; \
+		exit 1; \
 	fi
 
 test-frontend: ## Run frontend tests (requires test script in package.json)
@@ -188,6 +189,7 @@ test-frontend: ## Run frontend tests (requires test script in package.json)
 		bun run test; \
 	else \
 		echo -e "$(YELLOW)No test script configured$(NC)"; \
+		exit 1; \
 	fi
 
 # =============================================================================
