@@ -1,5 +1,18 @@
 import { create } from 'zustand';
 
+// Draft state for the create voice profile form
+export interface ProfileFormDraft {
+  name: string;
+  description: string;
+  language: string;
+  referenceText: string;
+  sampleMode: 'upload' | 'record' | 'system';
+  // Note: File objects can't be persisted, so we store metadata
+  sampleFileName?: string;
+  sampleFileType?: string;
+  sampleFileData?: string; // Base64 encoded
+}
+
 interface UIStore {
   // Sidebar
   sidebarOpen: boolean;
@@ -17,6 +30,10 @@ interface UIStore {
   // Selected profile for generation
   selectedProfileId: string | null;
   setSelectedProfileId: (id: string | null) => void;
+
+  // Profile form draft (for persisting create voice modal state)
+  profileFormDraft: ProfileFormDraft | null;
+  setProfileFormDraft: (draft: ProfileFormDraft | null) => void;
 
   // Theme
   theme: 'light' | 'dark';
@@ -37,6 +54,9 @@ export const useUIStore = create<UIStore>((set) => ({
 
   selectedProfileId: null,
   setSelectedProfileId: (id) => set({ selectedProfileId: id }),
+
+  profileFormDraft: null,
+  setProfileFormDraft: (draft) => set({ profileFormDraft: draft }),
 
   theme: 'light',
   setTheme: (theme) => {

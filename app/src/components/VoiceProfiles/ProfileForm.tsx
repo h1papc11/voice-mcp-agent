@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Mic, Monitor, Upload } from 'lucide-react';
+import { Mic, Monitor, Upload, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -43,7 +43,7 @@ import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { isTauri } from '@/lib/tauri';
 import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
-import { useUIStore } from '@/stores/uiStore';
+import { useUIStore, type ProfileFormDraft } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
@@ -75,11 +75,35 @@ const profileSchema = baseProfileSchema.refine(
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
+// Helper to convert File to base64
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Helper to convert base64 to File
+function base64ToFile(base64: string, fileName: string, fileType: string): File {
+  const arr = base64.split(',');
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], fileName, { type: fileType });
+}
+
 export function ProfileForm() {
   const open = useUIStore((state) => state.profileDialogOpen);
   const setOpen = useUIStore((state) => state.setProfileDialogOpen);
   const editingProfileId = useUIStore((state) => state.editingProfileId);
   const setEditingProfileId = useUIStore((state) => state.setEditingProfileId);
+  const profileFormDraft = useUIStore((state) => state.profileFormDraft);
+  const setProfileFormDraft = useUIStore((state) => state.setProfileFormDraft);
   const { data: editingProfile } = useProfile(editingProfileId || '');
   const createProfile = useCreateProfile();
   const updateProfile = useUpdateProfile();
@@ -220,6 +244,7 @@ export function ProfileForm() {
     }
   }, [systemRecordingError, toast]);
 
+  // Restore form state from draft or editing profile
   useEffect(() => {
     if (editingProfile) {
       form.reset({
@@ -229,7 +254,27 @@ export function ProfileForm() {
         sampleFile: undefined,
         referenceText: undefined,
       });
-    } else {
+    } else if (profileFormDraft && open) {
+      // Restore from draft when opening in create mode
+      form.reset({
+        name: profileFormDraft.name,
+        description: profileFormDraft.description,
+        language: profileFormDraft.language as LanguageCode,
+        referenceText: profileFormDraft.referenceText,
+        sampleFile: undefined,
+      });
+      setSampleMode(profileFormDraft.sampleMode);
+      // Restore the file if we have it saved
+      if (profileFormDraft.sampleFileData && profileFormDraft.sampleFileName && profileFormDraft.sampleFileType) {
+        const file = base64ToFile(
+          profileFormDraft.sampleFileData,
+          profileFormDraft.sampleFileName,
+          profileFormDraft.sampleFileType
+        );
+        form.setValue('sampleFile', file);
+      }
+    } else if (!open) {
+      // Only reset to defaults when modal is closed and no draft
       form.reset({
         name: '',
         description: '',
@@ -239,7 +284,7 @@ export function ProfileForm() {
       });
       setSampleMode('upload');
     }
-  }, [editingProfile, form]);
+  }, [editingProfile, profileFormDraft, open, form]);
 
   async function handleTranscribe() {
     const file = form.getValues('sampleFile');
@@ -383,6 +428,8 @@ export function ProfileForm() {
         }
       }
 
+      // Clear draft and reset form on success
+      setProfileFormDraft(null);
       form.reset();
       setEditingProfileId(null);
       setOpen(false);
@@ -395,12 +442,40 @@ export function ProfileForm() {
     }
   }
 
-  function handleOpenChange(open: boolean) {
-    setOpen(open);
-    if (!open) {
+  async function handleOpenChange(newOpen: boolean) {
+    if (!newOpen && isCreating) {
+      // Save draft when closing the create modal
+      const values = form.getValues();
+      const hasContent = values.name || values.description || values.referenceText || values.sampleFile;
+      
+      if (hasContent) {
+        const draft: ProfileFormDraft = {
+          name: values.name || '',
+          description: values.description || '',
+          language: values.language || 'en',
+          referenceText: values.referenceText || '',
+          sampleMode,
+        };
+        
+        // Save file as base64 if present
+        if (values.sampleFile) {
+          try {
+            draft.sampleFileName = values.sampleFile.name;
+            draft.sampleFileType = values.sampleFile.type;
+            draft.sampleFileData = await fileToBase64(values.sampleFile);
+          } catch {
+            // If file conversion fails, just don't save the file
+          }
+        }
+        
+        setProfileFormDraft(draft);
+      }
+    }
+    
+    setOpen(newOpen);
+    if (!newOpen) {
       setEditingProfileId(null);
-      form.reset();
-      setSampleMode('upload');
+      // Don't reset form here - let the effect handle it based on draft state
       if (isRecording) {
         cancelRecording();
       }
@@ -421,6 +496,31 @@ export function ProfileForm() {
               ? 'Update your voice profile details and manage samples.'
               : 'Create a new voice profile with an audio sample to clone the voice.'}
           </DialogDescription>
+          {isCreating && profileFormDraft && (
+            <div className="flex items-center gap-2 pt-2">
+              <span className="text-xs text-muted-foreground">Draft restored</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground"
+                onClick={() => {
+                  setProfileFormDraft(null);
+                  form.reset({
+                    name: '',
+                    description: '',
+                    language: 'en',
+                    sampleFile: undefined,
+                    referenceText: '',
+                  });
+                  setSampleMode('upload');
+                }}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Discard
+              </Button>
+            </div>
+          )}
         </DialogHeader>
 
         <Form {...form}>

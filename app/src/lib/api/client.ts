@@ -1,4 +1,5 @@
 import { useServerStore } from '@/stores/serverStore';
+import type { LanguageCode } from '@/lib/constants/languages';
 import type {
   VoiceProfileCreate,
   VoiceProfileResponse,
@@ -254,7 +255,7 @@ class ApiClient {
   }
 
   // Transcription
-  async transcribeAudio(file: File, language?: 'en' | 'zh'): Promise<TranscriptionResponse> {
+  async transcribeAudio(file: File, language?: LanguageCode): Promise<TranscriptionResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (language) {

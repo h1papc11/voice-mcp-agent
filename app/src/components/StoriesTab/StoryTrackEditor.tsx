@@ -565,7 +565,14 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedClipId, handleSplit, handleDuplicate, handleDelete, setSelectedClipId, handlePlayPause]);
+  }, [
+    selectedClipId,
+    handleSplit,
+    handleDuplicate,
+    handleDelete,
+    setSelectedClipId,
+    handlePlayPause,
+  ]);
 
   // Add global mouse listeners for trimming
   useEffect(() => {
