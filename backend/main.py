@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+import asyncio
 import uvicorn
 import argparse
 import torch
@@ -465,6 +466,36 @@ async def generate_speech(
         tts_model = tts.get_tts_model()
         # Load the requested model size if different from current (async to not block)
         model_size = data.model_size or "1.7B"
+
+        # Check if model needs to be downloaded first
+        model_path = tts_model._get_model_path(model_size)
+        if model_path.startswith("Qwen/"):
+            # Model not cached - check if it exists remotely or needs download
+            from huggingface_hub import constants as hf_constants
+            repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
+            if not repo_cache.exists():
+                # Start download in background
+                model_name = f"qwen-tts-{model_size}"
+
+                async def download_model_background():
+                    try:
+                        await tts_model.load_model_async(model_size)
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_model_background())
+
+                # Return 202 Accepted with download info
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True
+                    }
+                )
+
         await tts_model.load_model_async(model_size)
         audio, sample_rate = await tts_model.generate(
             data.text,
@@ -698,6 +729,37 @@ async def transcribe_audio(
         
         # Transcribe
         whisper_model = transcribe.get_whisper_model()
+
+        # Check if Whisper model is downloaded (uses default size "base")
+        model_size = whisper_model.model_size
+        model_name = f"openai/whisper-{model_size}"
+
+        # Check if model is cached
+        from huggingface_hub import constants as hf_constants
+        repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
+        if not repo_cache.exists():
+            # Start download in background
+            progress_model_name = f"whisper-{model_size}"
+
+            async def download_whisper_background():
+                try:
+                    await whisper_model.load_model_async(model_size)
+                except Exception as e:
+                    get_task_manager().error_download(progress_model_name, str(e))
+
+            get_task_manager().start_download(progress_model_name)
+            asyncio.create_task(download_whisper_background())
+
+            # Return 202 Accepted
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "message": f"Whisper model {model_size} is being downloaded. Please wait and try again.",
+                    "model_name": progress_model_name,
+                    "downloading": True
+                }
+            )
+
         text = await whisper_model.transcribe(tmp_path, language)
         
         return models.TranscriptionResponse(
@@ -1223,22 +1285,22 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     
     config = model_configs[request.model_name]
     
-    try:
-        # Start tracking download
-        task_manager.start_download(request.model_name)
-        
-        # Trigger download by loading the model (which will download if not cached)
-        # Run in background to avoid blocking
-        await asyncio.to_thread(config["load_func"])
-        
-        # Mark download as complete
-        task_manager.complete_download(request.model_name)
-        
-        return {"message": f"Model {request.model_name} download started"}
-    except Exception as e:
-        # Mark download as failed
-        task_manager.error_download(request.model_name, str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+    async def download_in_background():
+        """Download model in background without blocking the HTTP request."""
+        try:
+            await asyncio.to_thread(config["load_func"])
+            task_manager.complete_download(request.model_name)
+        except Exception as e:
+            task_manager.error_download(request.model_name, str(e))
+
+    # Start tracking download
+    task_manager.start_download(request.model_name)
+
+    # Start download in background task (don't await)
+    asyncio.create_task(download_in_background())
+
+    # Return immediately - frontend should poll progress endpoint
+    return {"message": f"Model {request.model_name} download started"}
 
 
 @app.delete("/models/{model_name}")
