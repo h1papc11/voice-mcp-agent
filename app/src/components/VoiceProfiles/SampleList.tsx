@@ -14,7 +14,7 @@ export function SampleList({ profileId }: SampleListProps) {
   const { data: samples, isLoading } = useProfileSamples(profileId);
   const deleteSample = useDeleteSample();
   const [uploadOpen, setUploadOpen] = useState(false);
-  const setAudio = usePlayerStore((state) => state.setAudio);
+  const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const currentAudioId = usePlayerStore((state) => state.audioId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
 
@@ -26,7 +26,7 @@ export function SampleList({ profileId }: SampleListProps) {
 
   const handlePlay = (referenceText: string, sampleId: string) => {
     const audioUrl = apiClient.getSampleUrl(sampleId);
-    setAudio(audioUrl, sampleId, referenceText.substring(0, 50));
+    setAudioWithAutoPlay(audioUrl, sampleId, null, referenceText.substring(0, 50));
   };
 
   if (isLoading) {

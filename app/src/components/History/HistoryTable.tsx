@@ -53,7 +53,7 @@ export function HistoryTable() {
   const exportGeneration = useExportGeneration();
   const exportGenerationAudio = useExportGenerationAudio();
   const importGeneration = useImportGeneration();
-  const setAudio = usePlayerStore((state) => state.setAudio);
+  const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const restartCurrentAudio = usePlayerStore((state) => state.restartCurrentAudio);
   const currentAudioId = usePlayerStore((state) => state.audioId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
@@ -77,9 +77,9 @@ export function HistoryTable() {
     if (currentAudioId === audioId) {
       restartCurrentAudio();
     } else {
-      // Otherwise, load the new audio
+      // Otherwise, load the new audio and auto-play it
       const audioUrl = apiClient.getAudioUrl(audioId);
-      setAudio(audioUrl, audioId, profileId, text.substring(0, 50));
+      setAudioWithAutoPlay(audioUrl, audioId, profileId, text.substring(0, 50));
     }
   };
 
@@ -233,7 +233,11 @@ export function HistoryTable() {
                   </div>
 
                   {/* Far right - Ellipsis actions */}
-                  <div className="w-10 shrink-0 flex justify-end">
+                  <div 
+                    className="w-10 shrink-0 flex justify-end"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -241,7 +245,6 @@ export function HistoryTable() {
                           size="icon"
                           className="h-8 w-8"
                           aria-label="Actions"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>

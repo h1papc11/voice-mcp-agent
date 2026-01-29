@@ -28,7 +28,7 @@ interface UseGenerationFormOptions {
 export function useGenerationForm(options: UseGenerationFormOptions = {}) {
   const { toast } = useToast();
   const generation = useGeneration();
-  const setAudio = usePlayerStore((state) => state.setAudio);
+  const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
   const [downloadingModelName, setDownloadingModelName] = useState<string | null>(null);
   const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       });
 
       const audioUrl = apiClient.getAudioUrl(result.id);
-      setAudio(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
+      setAudioWithAutoPlay(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
 
       form.reset();
       options.onSuccess?.(result.id);

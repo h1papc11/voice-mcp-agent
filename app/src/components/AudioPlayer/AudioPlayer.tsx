@@ -357,14 +357,22 @@ export function AudioPlayer() {
           }
         }
 
-        // Standard WaveSurfer auto-play
-        // Use a small delay to ensure audio element is fully ready
-        setTimeout(() => {
-          wavesurfer.play().catch((error) => {
-            debug.error('Failed to autoplay:', error);
-            // Don't show error for autoplay failures (browser restrictions)
-          });
-        }, 100);
+        // Only auto-play if shouldAutoPlay flag is set (user explicitly clicked to play)
+        const shouldAutoPlayNow = usePlayerStore.getState().shouldAutoPlay;
+        if (shouldAutoPlayNow) {
+          // Clear the flag first
+          usePlayerStore.getState().clearAutoPlayFlag();
+          
+          // Use a small delay to ensure audio element is fully ready
+          setTimeout(() => {
+            wavesurfer.play().catch((error) => {
+              debug.error('Failed to autoplay:', error);
+              // Don't show error for autoplay failures (browser restrictions)
+            });
+          }, 100);
+        } else {
+          debug.log('Skipping auto-play - shouldAutoPlay is false');
+        }
       });
 
       // Handle play/pause
