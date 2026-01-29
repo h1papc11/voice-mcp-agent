@@ -18,6 +18,9 @@ import tempfile
 import io
 from pathlib import Path
 import uuid
+import asyncio
+import signal
+import os
 
 from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
@@ -50,13 +53,24 @@ async def root():
     return {"message": "voicebox API", "version": __version__}
 
 
+@app.post("/shutdown")
+async def shutdown():
+    """Gracefully shutdown the server."""
+    async def shutdown_async():
+        await asyncio.sleep(0.1)  # Give response time to send
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    asyncio.create_task(shutdown_async())
+    return {"message": "Shutting down..."}
+
+
 @app.get("/health", response_model=models.HealthResponse)
 async def health():
     """Health check endpoint."""
     from huggingface_hub import hf_hub_download, constants as hf_constants
     from pathlib import Path
     import os
-    
+
     tts_model = tts.get_tts_model()
 
     # Check for GPU availability (CUDA or MPS)
