@@ -89,6 +89,9 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
       playbackItems: items,
       totalDurationMs: maxEndTimeMs,
       currentTimeMs: startTimeMs,
+      // Reset timing anchors - will be set fresh by the playback hook
+      playbackStartContextTime: null,
+      playbackStartStoryTime: null,
     });
   },
 
