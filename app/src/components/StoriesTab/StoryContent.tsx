@@ -31,9 +31,6 @@ import { useStoryPlayback } from '@/lib/hooks/useStoryPlayback';
 import { useStoryStore } from '@/stores/storyStore';
 import { SortableStoryChatItem } from './StoryChatItem';
 
-// Height of the floating generate box plus some padding
-const GENERATE_BOX_HEIGHT = 160;
-
 export function StoryContent() {
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
   const { data: story, isLoading } = useStory(selectedStoryId);
@@ -68,8 +65,8 @@ export function StoryContent() {
   // Track editor is shown when story has items
   const hasBottomBar = story && story.items.length > 0;
 
-  // Calculate dynamic bottom padding: track editor + generate box + gap
-  const bottomPadding = hasBottomBar ? trackEditorHeight + GENERATE_BOX_HEIGHT + 24 : 0;
+  // Calculate dynamic bottom padding: track editor + gap
+  const bottomPadding = hasBottomBar ? trackEditorHeight + 24 : 0;
 
   // Drag and drop sensors
   const sensors = useSensors(

@@ -345,7 +345,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 z-50">
-      <div className="border-t bg-card overflow-hidden relative" ref={containerRef}>
+      <div className="border-t bg-background/30 backdrop-blur-2xl overflow-hidden relative" ref={containerRef}>
       {/* Resize handle at top */}
       <button
         type="button"

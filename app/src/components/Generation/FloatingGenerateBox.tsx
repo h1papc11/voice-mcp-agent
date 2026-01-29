@@ -34,6 +34,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
   const [isExpanded, setIsExpanded] = useState(false);
   const [isInstructMode, setIsInstructMode] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const matchRoute = useMatchRoute();
   const isStoriesRoute = matchRoute({ to: '/stories' });
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
@@ -100,6 +101,66 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
     };
   }, [isExpanded]);
 
+  // Set first voice as default if none selected
+  useEffect(() => {
+    if (!selectedProfileId && profiles && profiles.length > 0) {
+      setSelectedProfileId(profiles[0].id);
+    }
+  }, [selectedProfileId, profiles, setSelectedProfileId]);
+
+  // Get current form value to trigger resize when it changes
+  const formValue = form.watch(isInstructMode ? 'instruct' : 'text');
+
+  // Auto-resize textarea based on content (only when expanded)
+  useEffect(() => {
+    if (!isExpanded) {
+      // Reset textarea height after collapse animation completes
+      const timeoutId = setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.style.height = '32px';
+          textarea.style.overflowY = 'hidden';
+        }
+      }, 200); // Wait for animation to complete
+      return () => clearTimeout(timeoutId);
+    }
+    
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const adjustHeight = () => {
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      const minHeight = 100; // Expanded minimum
+      const maxHeight = 300; // Max height in pixels
+      const targetHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
+      textarea.style.height = `${targetHeight}px`;
+      
+      // Show scrollbar if content exceeds max height
+      if (scrollHeight > maxHeight) {
+        textarea.style.overflowY = 'auto';
+      } else {
+        textarea.style.overflowY = 'hidden';
+      }
+    };
+
+    // Small delay to let framer animation complete
+    const timeoutId = setTimeout(() => {
+      adjustHeight();
+    }, 200);
+    
+    // Adjust on mount and when value changes
+    adjustHeight();
+    
+    // Watch for input changes
+    textarea.addEventListener('input', adjustHeight);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      textarea.removeEventListener('input', adjustHeight);
+    };
+  }, [formValue, isInstructMode, isExpanded]);
+
   async function onSubmit(data: Parameters<typeof handleSubmit>[0]) {
     await handleSubmit(data, selectedProfileId);
   }
@@ -146,26 +207,42 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <Textarea
-                          placeholder={
-                            isInstructMode
-                              ? 'Add delivery instructions...'
-                              : isStoriesRoute && currentStory
-                                ? `Generate speech for "${currentStory.name}"...`
-                                : selectedProfile
-                                  ? `Generate speech using ${selectedProfile.name}...`
-                                  : 'Select a voice profile above...'
-                          }
-                          className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 overflow-hidden transition-all"
-                          style={{
-                            minHeight: isExpanded ? '100px' : '32px',
-                            height: isExpanded ? '100px' : '32px',
+                        <motion.div
+                          animate={{
+                            height: isExpanded ? 'auto' : '32px',
                           }}
-                          disabled={!selectedProfileId}
-                          onClick={() => setIsExpanded(true)}
-                          onFocus={() => setIsExpanded(true)}
-                          {...field}
-                        />
+                          transition={{ duration: 0.15, ease: 'easeOut' }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          <Textarea
+                            {...field}
+                            ref={(node: HTMLTextAreaElement | null) => {
+                              // Store ref for auto-resize
+                              textareaRef.current = node;
+                              // Forward ref to react-hook-form
+                              if (typeof field.ref === 'function') {
+                                field.ref(node);
+                              }
+                            }}
+                            placeholder={
+                              isInstructMode
+                                ? 'Add delivery instructions...'
+                                : isStoriesRoute && currentStory
+                                  ? `Generate speech for "${currentStory.name}"...`
+                                  : selectedProfile
+                                    ? `Generate speech using ${selectedProfile.name}...`
+                                    : 'Select a voice profile above...'
+                            }
+                            className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full"
+                            style={{
+                              minHeight: isExpanded ? '100px' : '32px',
+                              maxHeight: '300px',
+                            }}
+                            disabled={!selectedProfileId}
+                            onClick={() => setIsExpanded(true)}
+                            onFocus={() => setIsExpanded(true)}
+                          />
+                        </motion.div>
                       </FormControl>
                       <FormMessage className="text-xs" />
                     </FormItem>
