@@ -12,7 +12,7 @@ APP_DIR := app
 
 # Python (prefer 3.12, fallback to 3.13, then python3)
 PYTHON := $(shell command -v python3.12 2>/dev/null || command -v python3.13 2>/dev/null || echo python3)
-VENV := $(BACKEND_DIR)/venv
+VENV := $(CURDIR)/$(BACKEND_DIR)/venv
 VENV_BIN := $(VENV)/bin
 PIP := $(VENV_BIN)/pip
 PYTHON_VENV := $(VENV_BIN)/python
@@ -71,14 +71,15 @@ setup-rust: ## Install Rust toolchain (if not present)
 
 dev: ## Start backend + desktop app (parallel)
 	@echo -e "$(BLUE)Starting development servers...$(NC)"
+	@echo -e "$(YELLOW)Note: If Tauri fails, run 'make build-server' first or use separate terminals$(NC)"
 	@trap 'kill 0' EXIT; \
 		$(MAKE) dev-backend & \
 		sleep 2 && $(MAKE) dev-frontend & \
 		wait
 
 dev-backend: ## Start FastAPI backend server
-	@echo -e "$(BLUE)Starting backend server on http://localhost:8000$(NC)"
-	cd $(BACKEND_DIR) && $(VENV_BIN)/uvicorn main:app --reload --port 8000
+	@echo -e "$(BLUE)Starting backend server on http://localhost:17493$(NC)"
+	$(VENV_BIN)/uvicorn backend.main:app --reload --port 17493
 
 dev-frontend: ## Start Tauri desktop app
 	@echo -e "$(BLUE)Starting Tauri desktop app...$(NC)"
@@ -108,7 +109,7 @@ build: build-server build-tauri ## Build everything (server binary + desktop app
 
 build-server: ## Build Python server binary
 	@echo -e "$(BLUE)Building server binary...$(NC)"
-	./scripts/build-server.sh
+	PATH="$(VENV_BIN):$$PATH" ./scripts/build-server.sh
 
 build-tauri: ## Build Tauri desktop app
 	@echo -e "$(BLUE)Building Tauri desktop app...$(NC)"
@@ -201,7 +202,7 @@ logs: ## Tail backend logs
 
 docs: ## Open API documentation (backend must be running)
 	@echo -e "$(BLUE)Opening API docs...$(NC)"
-	open http://localhost:8000/docs 2>/dev/null || xdg-open http://localhost:8000/docs
+	open http://localhost:17493/docs 2>/dev/null || xdg-open http://localhost:17493/docs
 
 # =============================================================================
 # CLEAN
