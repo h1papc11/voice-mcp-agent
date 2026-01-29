@@ -10,8 +10,8 @@ TAURI_DIR := tauri
 WEB_DIR := web
 APP_DIR := app
 
-# Python
-PYTHON := python3
+# Python (prefer 3.12, fallback to 3.13, then python3)
+PYTHON := $(shell command -v python3.12 2>/dev/null || command -v python3.13 2>/dev/null || echo python3)
 VENV := $(BACKEND_DIR)/venv
 VENV_BIN := $(VENV)/bin
 PIP := $(VENV_BIN)/pip
@@ -53,6 +53,11 @@ setup-python: $(VENV)/bin/activate ## Set up Python virtual environment and depe
 
 $(VENV)/bin/activate:
 	@echo -e "$(BLUE)Creating Python virtual environment...$(NC)"
+	@PY_MINOR=$$($(PYTHON) -c "import sys; print(sys.version_info[1])"); \
+	if [ "$$PY_MINOR" -gt 13 ]; then \
+		echo -e "$(YELLOW)Warning: Python 3.$$PY_MINOR detected. ML packages may not be compatible.$(NC)"; \
+		echo -e "$(YELLOW)Recommended: Use Python 3.12 or 3.13 (brew install python@3.12)$(NC)"; \
+	fi
 	$(PYTHON) -m venv $(VENV)
 
 setup-rust: ## Install Rust toolchain (if not present)
