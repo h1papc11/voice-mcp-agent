@@ -111,6 +111,7 @@ interface StoryTrackEditorProps {
 }
 
 const TRACK_HEIGHT = 48;
+const TIME_RULER_HEIGHT = 24; // h-6 = 1.5rem = 24px
 const MIN_PIXELS_PER_SECOND = 10;
 const MAX_PIXELS_PER_SECOND = 200;
 const DEFAULT_PIXELS_PER_SECOND = 50;
@@ -589,7 +590,8 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     });
     setDragPosition({
       x: rect.left - tracksRef.current.getBoundingClientRect().left + tracksRef.current.scrollLeft,
-      y: rect.top - tracksRef.current.getBoundingClientRect().top,
+      // Subtract ruler height since clips are positioned relative to tracks area, not the scrollable container
+      y: rect.top - tracksRef.current.getBoundingClientRect().top - TIME_RULER_HEIGHT,
     });
     setDraggingItem(item.id);
   };
@@ -600,7 +602,8 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
       const rect = tracksRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left + tracksRef.current.scrollLeft - dragOffset.x;
-      const y = e.clientY - rect.top - dragOffset.y;
+      // Subtract ruler height since clips are positioned relative to tracks area
+      const y = e.clientY - rect.top - dragOffset.y - TIME_RULER_HEIGHT;
 
       setDragPosition({ x: Math.max(0, x), y });
     },
