@@ -679,6 +679,22 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   // Playhead position
   const playheadLeft = msToPixels(currentTimeMs);
 
+  // Auto-scroll timeline to follow playhead during playback
+  useEffect(() => {
+    if (!isCurrentlyPlaying || !tracksRef.current) return;
+
+    const container = tracksRef.current;
+    const containerWidth = container.clientWidth;
+    const scrollLeft = container.scrollLeft;
+    const halfwayPoint = scrollLeft + containerWidth / 2;
+
+    // If playhead is past the halfway point, scroll to keep it centered
+    if (playheadLeft > halfwayPoint) {
+      const targetScroll = playheadLeft - containerWidth / 2;
+      container.scrollLeft = targetScroll;
+    }
+  }, [isCurrentlyPlaying, playheadLeft]);
+
   // Calculate tracks area height
   const tracksAreaHeight = tracks.length * TRACK_HEIGHT;
   const timelineContainerHeight = editorHeight - 40; // Subtract toolbar height
