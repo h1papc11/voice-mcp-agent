@@ -121,10 +121,16 @@ class ProgressManager:
         logger.info(f"SSE client subscribed to {model_name}, total listeners: {len(self._listeners[model_name])}")
 
         try:
-            # Send initial progress if available
+            # Send initial progress if available and still in progress
             if model_name in self._progress:
-                logger.info(f"Sending initial progress for {model_name}: {self._progress[model_name].get('status')}")
-                yield f"data: {json.dumps(self._progress[model_name])}\n\n"
+                status = self._progress[model_name].get('status')
+                # Only send initial progress if download is actually in progress
+                # Don't send old 'complete' or 'error' status from previous downloads
+                if status in ('downloading', 'extracting'):
+                    logger.info(f"Sending initial progress for {model_name}: {status}")
+                    yield f"data: {json.dumps(self._progress[model_name])}\n\n"
+                else:
+                    logger.info(f"Skipping initial progress for {model_name} (status: {status})")
             else:
                 logger.info(f"No initial progress available for {model_name}")
 

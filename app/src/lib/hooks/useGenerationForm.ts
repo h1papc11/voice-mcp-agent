@@ -70,6 +70,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       const modelName = `qwen-tts-${data.modelSize}`;
       const displayName = data.modelSize === '1.7B' ? 'Qwen TTS 1.7B' : 'Qwen TTS 0.6B';
 
+      let isDownloading = false;
       try {
         const modelStatus = await apiClient.getModelStatus();
         const model = modelStatus.models.find((m) => m.model_name === modelName);
@@ -77,6 +78,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         if (model && !model.downloaded) {
           setDownloadingModelName(modelName);
           setDownloadingDisplayName(displayName);
+          isDownloading = true;
         }
       } catch (error) {
         console.error('Failed to check model status:', error);
@@ -101,16 +103,21 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
 
       form.reset();
       options.onSuccess?.(result.id);
+
+      if (isDownloading) {
+        setDownloadingModelName(null);
+        setDownloadingDisplayName(null);
+      }
     } catch (error) {
       toast({
         title: 'Generation failed',
         description: error instanceof Error ? error.message : 'Failed to generate audio',
         variant: 'destructive',
       });
-    } finally {
-      setIsGenerating(false);
       setDownloadingModelName(null);
       setDownloadingDisplayName(null);
+    } finally {
+      setIsGenerating(false);
     }
   }
 
