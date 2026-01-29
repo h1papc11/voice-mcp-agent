@@ -303,6 +303,60 @@ async fn start_server(
     Ok(format!("http://127.0.0.1:{}", SERVER_PORT))
 }
 
+/// Check if a Windows process is still running
+#[cfg(windows)]
+fn is_process_running(pid: u32) -> bool {
+    use std::process::Command;
+    if let Ok(output) = Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+        .output()
+    {
+        // If process exists, tasklist returns it in output
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        return !output_str.trim().is_empty() && output_str.contains(&pid.to_string());
+    }
+    false
+}
+
+/// Kill entire Windows process tree by enumerating children
+#[cfg(windows)]
+fn kill_windows_process_tree(parent_pid: u32) -> Result<(), String> {
+    use std::process::Command;
+
+    // Find all child processes using WMIC
+    let output = Command::new("wmic")
+        .args([
+            "process",
+            "where",
+            &format!("ParentProcessId={}", parent_pid),
+            "get",
+            "ProcessId"
+        ])
+        .output();
+
+    if let Ok(output) = output {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        for line in output_str.lines().skip(1) { // Skip header
+            if let Ok(child_pid) = line.trim().parse::<u32>() {
+                println!("Found child process: {}", child_pid);
+                // Recursively kill child's children
+                let _ = kill_windows_process_tree(child_pid);
+                // Kill the child
+                let _ = Command::new("taskkill")
+                    .args(["/PID", &child_pid.to_string(), "/F"])
+                    .output();
+            }
+        }
+    }
+
+    // Kill the parent process
+    let _ = Command::new("taskkill")
+        .args(["/PID", &parent_pid.to_string(), "/F"])
+        .output();
+
+    Ok(())
+}
+
 #[command]
 async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
     let pid = state.server_pid.lock().unwrap().take();
@@ -332,13 +386,59 @@ async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
         
         #[cfg(windows)]
         {
-            use std::process::Command;
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/T", "/F"])
-                .output();
+            // Layer 1: Try graceful HTTP shutdown first
+            println!("Attempting graceful shutdown via HTTP...");
+            let client = reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(2))
+                .build()
+                .unwrap();
+
+            let shutdown_result = client
+                .post(&format!("http://127.0.0.1:{}/shutdown", SERVER_PORT))
+                .send();
+
+            if shutdown_result.is_ok() {
+                println!("HTTP shutdown sent, waiting for graceful exit...");
+                // Wait up to 3 seconds for graceful shutdown
+                for i in 0..30 {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    if !is_process_running(pid) {
+                        println!("Process exited gracefully after {}ms", i * 100);
+                        return Ok(());
+                    }
+                }
+                println!("Graceful shutdown timed out, forcing kill...");
+            } else {
+                println!("HTTP shutdown failed, forcing kill...");
+            }
+
+            // Layer 2: Kill process tree with enumeration
+            println!("Killing process tree for wrapper PID {}...", pid);
+            kill_windows_process_tree(pid)?;
+
+            // Layer 3: Verify and kill by name if still running
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if is_process_running(pid) {
+                println!("Process tree kill failed, killing by name...");
+                use std::process::Command;
+                let _ = Command::new("taskkill")
+                    .args(["/IM", "voicebox-server.exe", "/T", "/F"])
+                    .output();
+            }
+
+            // Layer 4: Final verification
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            if is_process_running(pid) {
+                eprintln!("WARNING: Failed to kill server after all attempts");
+            } else {
+                println!("Server killed successfully");
+            }
         }
-        
-        println!("stop_server: Process group kill completed");
+
+        #[cfg(unix)]
+        {
+            println!("stop_server: Process group kill completed");
+        }
     }
     
     Ok(())
@@ -560,11 +660,54 @@ pub fn run() {
                             
                             #[cfg(windows)]
                             {
-                                // On Windows, use taskkill with /T to kill child processes
-                                use std::process::Command;
-                                let _ = Command::new("taskkill")
-                                    .args(["/PID", &pid.to_string(), "/T", "/F"])
-                                    .output();
+                                // Layer 1: Try graceful HTTP shutdown first
+                                println!("Attempting graceful shutdown via HTTP...");
+                                let client = reqwest::blocking::Client::builder()
+                                    .timeout(std::time::Duration::from_secs(2))
+                                    .build()
+                                    .unwrap();
+
+                                let shutdown_result = client
+                                    .post(&format!("http://127.0.0.1:{}/shutdown", SERVER_PORT))
+                                    .send();
+
+                                if shutdown_result.is_ok() {
+                                    println!("HTTP shutdown sent, waiting for graceful exit...");
+                                    // Wait up to 3 seconds for graceful shutdown
+                                    for i in 0..30 {
+                                        std::thread::sleep(std::time::Duration::from_millis(100));
+                                        if !is_process_running(pid) {
+                                            println!("Process exited gracefully after {}ms", i * 100);
+                                            println!("Server process tree kill completed");
+                                            return;
+                                        }
+                                    }
+                                    println!("Graceful shutdown timed out, forcing kill...");
+                                } else {
+                                    println!("HTTP shutdown failed, forcing kill...");
+                                }
+
+                                // Layer 2: Kill process tree with enumeration
+                                println!("Killing process tree for wrapper PID {}...", pid);
+                                let _ = kill_windows_process_tree(pid);
+
+                                // Layer 3: Verify and kill by name if still running
+                                std::thread::sleep(std::time::Duration::from_millis(200));
+                                if is_process_running(pid) {
+                                    println!("Process tree kill failed, killing by name...");
+                                    use std::process::Command;
+                                    let _ = Command::new("taskkill")
+                                        .args(["/IM", "voicebox-server.exe", "/T", "/F"])
+                                        .output();
+                                }
+
+                                // Layer 4: Final verification
+                                std::thread::sleep(std::time::Duration::from_millis(200));
+                                if is_process_running(pid) {
+                                    eprintln!("WARNING: Failed to kill server after all attempts");
+                                } else {
+                                    println!("Server killed successfully");
+                                }
                                 println!("Server process tree kill completed");
                             }
                         } else {

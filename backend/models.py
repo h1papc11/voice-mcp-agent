@@ -118,6 +118,7 @@ class HealthResponse(BaseModel):
     model_downloaded: Optional[bool] = None  # Whether model is cached/downloaded
     model_size: Optional[str] = None  # Current model size if loaded
     gpu_available: bool
+    gpu_type: Optional[str] = None  # GPU type (CUDA, MPS, or None)
     vram_used_mb: Optional[float] = None
 
 
