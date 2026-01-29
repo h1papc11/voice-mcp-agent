@@ -180,7 +180,7 @@ export default function Home() {
             <div className="hidden lg:block relative">
               <div className="absolute right-0 top-0 -mt-10 w-[200%] -mr-[100%]">
                 <Image
-                  src="/assets/app-screenshot-2.webp"
+                  src="/assets/app-screenshot-1.webp"
                   alt="Voicebox Application Screenshot"
                   width={1920}
                   height={1080}
@@ -195,12 +195,12 @@ export default function Home() {
 
       {/* Screenshots Section */}
       <section className="py-12 sm:py-16 md:py-20">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="w-full md:w-[150%] md:-ml-[25%]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-8">
             <div className="w-full">
               <Image
-                src="/assets/app-screenshot-1.webp"
-                alt="Voicebox Screenshot 1"
+                src="/assets/app-screenshot-2.webp"
+                alt="Voicebox Screenshot 2"
                 width={1920}
                 height={1080}
                 className="w-full h-auto rounded-lg shadow-lg"
@@ -208,8 +208,8 @@ export default function Home() {
             </div>
             <div className="w-full">
               <Image
-                src="/assets/app-screenshot-2.webp"
-                alt="Voicebox Screenshot 2"
+                src="/assets/app-screenshot-1.webp"
+                alt="Voicebox Screenshot 1"
                 width={1920}
                 height={1080}
                 className="w-full h-auto rounded-lg shadow-lg"
