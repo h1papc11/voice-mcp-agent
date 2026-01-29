@@ -19,14 +19,12 @@ const DEFAULT_PIXELS_PER_SECOND = 50;
 const DEFAULT_TRACKS = [1, 0, -1]; // Default 3 tracks
 const MIN_EDITOR_HEIGHT = 120;
 const MAX_EDITOR_HEIGHT = 500;
-const DEFAULT_EDITOR_HEIGHT = 200;
 
 export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const [pixelsPerSecond, setPixelsPerSecond] = useState(DEFAULT_PIXELS_PER_SECOND);
   const [draggingItem, setDraggingItem] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
-  const [editorHeight, setEditorHeight] = useState(DEFAULT_EDITOR_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const tracksRef = useRef<HTMLDivElement>(null);
@@ -34,6 +32,10 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const resizeStartHeight = useRef(0);
   const moveItem = useMoveStoryItem();
   const { toast } = useToast();
+
+  // Track editor height from store (shared with FloatingGenerateBox)
+  const editorHeight = useStoryStore((state) => state.trackEditorHeight);
+  const setEditorHeight = useStoryStore((state) => state.setTrackEditorHeight);
 
   // Playback state
   const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
@@ -116,7 +118,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
       Math.max(MIN_EDITOR_HEIGHT, resizeStartHeight.current + deltaY)
     );
     setEditorHeight(newHeight);
-  }, [isResizing]);
+  }, [isResizing, setEditorHeight]);
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
@@ -247,15 +249,12 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const timelineContainerHeight = editorHeight - 40; // Subtract toolbar height
 
   if (items.length === 0) {
-    return (
-      <div className="h-[200px] border rounded-lg bg-card flex items-center justify-center text-muted-foreground">
-        <p className="text-sm">Add audio clips to see the track editor</p>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="border rounded-lg bg-card overflow-hidden relative" ref={containerRef}>
+    <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 z-50">
+      <div className="border-t bg-card overflow-hidden relative" ref={containerRef}>
       {/* Resize handle at top */}
       <button
         type="button"
@@ -382,6 +381,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

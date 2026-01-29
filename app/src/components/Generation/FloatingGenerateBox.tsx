@@ -22,11 +22,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils/cn';
 
 interface FloatingGenerateBoxProps {
-  isPlayerOpen: boolean;
+  isPlayerOpen?: boolean;
   showVoiceSelector?: boolean;
 }
 
-export function FloatingGenerateBox({ isPlayerOpen, showVoiceSelector = false }: FloatingGenerateBoxProps) {
+export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = false }: FloatingGenerateBoxProps) {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
@@ -37,9 +37,13 @@ export function FloatingGenerateBox({ isPlayerOpen, showVoiceSelector = false }:
   const matchRoute = useMatchRoute();
   const isStoriesRoute = matchRoute({ to: '/stories' });
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
+  const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
   const { data: currentStory } = useStory(selectedStoryId);
   const addStoryItem = useAddStoryItem();
   const { toast } = useToast();
+  
+  // Calculate if track editor is visible (on stories route with items)
+  const hasTrackEditor = isStoriesRoute && currentStory && currentStory.items.length > 0;
 
   const { form, handleSubmit, isPending } = useGenerationForm({
     onSuccess: async (generationId) => {
@@ -110,7 +114,13 @@ export function FloatingGenerateBox({ isPlayerOpen, showVoiceSelector = false }:
           : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
       )}
       style={{
-        bottom: isPlayerOpen ? 'calc(7rem + 1.5rem)' : '1.5rem',
+        // On stories route: offset by track editor height when visible
+        // On other routes: offset by audio player height when visible
+        bottom: hasTrackEditor 
+          ? `${trackEditorHeight + 24}px` 
+          : isPlayerOpen 
+            ? 'calc(7rem + 1.5rem)' 
+            : '1.5rem',
       }}
     >
       <motion.div

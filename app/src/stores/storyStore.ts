@@ -6,6 +6,10 @@ interface StoryPlaybackState {
   selectedStoryId: string | null;
   setSelectedStoryId: (id: string | null) => void;
 
+  // Track editor UI state
+  trackEditorHeight: number;
+  setTrackEditorHeight: (height: number) => void;
+
   // Playback state
   isPlaying: boolean;
   currentTimeMs: number;
@@ -24,10 +28,16 @@ interface StoryPlaybackState {
   setPlaybackTiming: (contextTime: number, storyTime: number) => void; // Set timing anchors for Web Audio API
 }
 
+const DEFAULT_TRACK_EDITOR_HEIGHT = 200;
+
 export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   // Selection
   selectedStoryId: null,
   setSelectedStoryId: (id) => set({ selectedStoryId: id }),
+
+  // Track editor UI state
+  trackEditorHeight: DEFAULT_TRACK_EDITOR_HEIGHT,
+  setTrackEditorHeight: (height) => set({ trackEditorHeight: height }),
 
   // Playback state
   isPlaying: false,

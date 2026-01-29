@@ -17,14 +17,14 @@ import { Download, Pause, Play } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { Slider } from '@/components/ui/slider';
 import { useStory, useRemoveStoryItem, useExportStoryAudio, useReorderStoryItems } from '@/lib/hooks/useStories';
 import { useStoryStore } from '@/stores/storyStore';
-import { usePlayerStore } from '@/stores/playerStore';
 import { SortableStoryChatItem } from './StoryChatItem';
-import { cn } from '@/lib/utils/cn';
 import { useStoryPlayback } from '@/lib/hooks/useStoryPlayback';
+
+// Height of the floating generate box plus some padding
+const GENERATE_BOX_HEIGHT = 160;
 
 export function StoryContent() {
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
@@ -34,8 +34,15 @@ export function StoryContent() {
   const exportAudio = useExportStoryAudio();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const audioUrl = usePlayerStore((state) => state.audioUrl);
-  const isPlayerVisible = !!audioUrl;
+  
+  // Get track editor height from store for dynamic padding
+  const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
+  
+  // Track editor is shown when story has items
+  const hasBottomBar = story && story.items.length > 0;
+  
+  // Calculate dynamic bottom padding: track editor + generate box + gap
+  const bottomPadding = hasBottomBar ? trackEditorHeight + GENERATE_BOX_HEIGHT + 24 : 0;
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -261,10 +268,8 @@ export function StoryContent() {
       {/* Content */}
       <div
         ref={scrollRef}
-        className={cn(
-          'flex-1 min-h-0 overflow-y-auto space-y-3',
-          isPlayerVisible && BOTTOM_SAFE_AREA_PADDING,
-        )}
+        className="flex-1 min-h-0 overflow-y-auto space-y-3"
+        style={{ paddingBottom: bottomPadding > 0 ? `${bottomPadding}px` : undefined }}
       >
         {sortedItems.length === 0 ? (
           <div className="text-center py-12 px-5 border-2 border-dashed border-muted rounded-md text-muted-foreground">
