@@ -14,14 +14,19 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Download, Pause, Play } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
 import { Slider } from '@/components/ui/slider';
-import { useStory, useRemoveStoryItem, useExportStoryAudio, useReorderStoryItems } from '@/lib/hooks/useStories';
+import { useToast } from '@/components/ui/use-toast';
+import {
+  useStory,
+  useRemoveStoryItem,
+  useExportStoryAudio,
+  useReorderStoryItems,
+} from '@/lib/hooks/useStories';
+import { useStoryPlayback } from '@/lib/hooks/useStoryPlayback';
 import { useStoryStore } from '@/stores/storyStore';
 import { SortableStoryChatItem } from './StoryChatItem';
-import { useStoryPlayback } from '@/lib/hooks/useStoryPlayback';
 
 // Height of the floating generate box plus some padding
 const GENERATE_BOX_HEIGHT = 160;
@@ -34,13 +39,13 @@ export function StoryContent() {
   const exportAudio = useExportStoryAudio();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
-  
+
   // Get track editor height from store for dynamic padding
   const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
-  
+
   // Track editor is shown when story has items
   const hasBottomBar = story && story.items.length > 0;
-  
+
   // Calculate dynamic bottom padding: track editor + generate box + gap
   const bottomPadding = hasBottomBar ? trackEditorHeight + GENERATE_BOX_HEIGHT + 24 : 0;
 
@@ -66,6 +71,10 @@ export function StoryContent() {
   const stop = useStoryStore((state) => state.stop);
   const seek = useStoryStore((state) => state.seek);
 
+  // Refs for auto-scrolling to playing item
+  const itemRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
+  const lastScrolledItemRef = useRef<string | null>(null);
+
   // Use playback hook
   useStoryPlayback(story?.items);
 
@@ -74,6 +83,39 @@ export function StoryContent() {
     if (!story?.items) return [];
     return [...story.items].sort((a, b) => a.start_time_ms - b.start_time_ms);
   }, [story?.items]);
+
+  // Find the currently playing item based on timecode
+  const currentlyPlayingItemId = useMemo(() => {
+    if (!isPlaying || playbackStoryId !== story?.id || !sortedItems.length) {
+      return null;
+    }
+    const playingItem = sortedItems.find((item) => {
+      const itemStart = item.start_time_ms;
+      const itemEnd = item.start_time_ms + item.duration * 1000;
+      return currentTimeMs >= itemStart && currentTimeMs < itemEnd;
+    });
+    return playingItem?.generation_id ?? null;
+  }, [isPlaying, playbackStoryId, story?.id, sortedItems, currentTimeMs]);
+
+  // Auto-scroll to the currently playing item
+  useEffect(() => {
+    if (!currentlyPlayingItemId || currentlyPlayingItemId === lastScrolledItemRef.current) {
+      return;
+    }
+
+    const element = itemRefsMap.current.get(currentlyPlayingItemId);
+    if (element && scrollRef.current) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      lastScrolledItemRef.current = currentlyPlayingItemId;
+    }
+  }, [currentlyPlayingItemId]);
+
+  // Reset last scrolled item when playback stops
+  useEffect(() => {
+    if (!isPlaying) {
+      lastScrolledItemRef.current = null;
+    }
+  }, [isPlaying]);
 
   const handleRemoveItem = (generationId: string) => {
     if (!story) return;
@@ -235,7 +277,12 @@ export function StoryContent() {
                     Stop
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={handleExportAudio} disabled={exportAudio.isPending}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportAudio}
+                  disabled={exportAudio.isPending}
+                >
                   <Download className="mr-2 h-4 w-4" />
                   Export Audio
                 </Button>
@@ -288,15 +335,25 @@ export function StoryContent() {
             >
               <div className="space-y-3">
                 {sortedItems.map((item, index) => (
-                  <SortableStoryChatItem
+                  <div
                     key={item.id}
-                    item={item}
-                    storyId={story.id}
-                    index={index}
-                    onRemove={() => handleRemoveItem(item.generation_id)}
-                    currentTimeMs={currentTimeMs}
-                    isPlaying={isPlaying && playbackStoryId === story.id}
-                  />
+                    ref={(el) => {
+                      if (el) {
+                        itemRefsMap.current.set(item.generation_id, el);
+                      } else {
+                        itemRefsMap.current.delete(item.generation_id);
+                      }
+                    }}
+                  >
+                    <SortableStoryChatItem
+                      item={item}
+                      storyId={story.id}
+                      index={index}
+                      onRemove={() => handleRemoveItem(item.generation_id)}
+                      currentTimeMs={currentTimeMs}
+                      isPlaying={isPlaying && playbackStoryId === story.id}
+                    />
+                  </div>
                 ))}
               </div>
             </SortableContext>
@@ -306,4 +363,3 @@ export function StoryContent() {
     </div>
   );
 }
-

@@ -26,6 +26,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
   const [isResizing, setIsResizing] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const tracksRef = useRef<HTMLDivElement>(null);
   const resizeStartY = useRef(0);
@@ -50,6 +51,24 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     return Array.from(trackSet).sort((a, b) => b - a); // Higher tracks on top
   }, [items]);
 
+  // Track container width for full-width minimum
+  useEffect(() => {
+    const container = tracksRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+
+    observer.observe(container);
+    // Set initial width
+    setContainerWidth(container.clientWidth);
+
+    return () => observer.disconnect();
+  }, []);
+
   // Calculate total duration
   const totalDurationMs = useMemo(() => {
     if (items.length === 0) return 10000; // Default 10 seconds
@@ -59,8 +78,9 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     );
   }, [items]);
 
-  // Calculate timeline width
-  const timelineWidth = (totalDurationMs / 1000) * pixelsPerSecond + 200; // Extra padding
+  // Calculate timeline width - at least full container width
+  const contentWidth = (totalDurationMs / 1000) * pixelsPerSecond + 200; // Content width with padding
+  const timelineWidth = Math.max(contentWidth, containerWidth);
 
   // Generate time markers
   const timeMarkers = useMemo(() => {

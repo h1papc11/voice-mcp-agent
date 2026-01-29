@@ -20,7 +20,6 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
   const playbackItems = useStoryStore((state) => state.playbackItems);
   const playbackStartContextTime = useStoryStore((state) => state.playbackStartContextTime);
   const playbackStartStoryTime = useStoryStore((state) => state.playbackStartStoryTime);
-  const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
   const setPlaybackTiming = useStoryStore((state) => state.setPlaybackTiming);
 
   // AudioContext instance (created once)
@@ -44,9 +43,8 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
       );
 
       // Create master gain node for volume control
-      // Set to 0.5 to prevent distortion from overlapping audio
       masterGainRef.current = audioContextRef.current.createGain();
-      masterGainRef.current.gain.value = 0.05;
+      masterGainRef.current.gain.value = 1;
       masterGainRef.current.connect(audioContextRef.current.destination);
     }
     // Resume context if suspended (browser autoplay policy)
@@ -332,36 +330,41 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
     schedulePlayback,
   ]);
 
-  // Handle play/pause/seek changes - set timing anchors and schedule playback
+  // Handle play/pause changes - stop sources when paused
   useEffect(() => {
-    if (!isPlaying || !playbackItems || playbackItems.length === 0) {
+    if (!isPlaying) {
       console.log('[StoryPlayback] Stopping playback');
       stopAllSources();
+    }
+  }, [isPlaying, stopAllSources]);
+
+  // Handle seek - reset timing anchors when they become null (triggered by seek)
+  useEffect(() => {
+    if (!isPlaying || !playbackItems || playbackItems.length === 0) {
+      return;
+    }
+
+    // Only run when timing anchors are null (after a seek)
+    if (playbackStartContextTime !== null && playbackStartStoryTime !== null) {
       return;
     }
 
     const audioContext = getAudioContext();
     const currentContextTime = audioContext.currentTime;
-    const currentStoryTime = currentTimeMs;
+    const currentStoryTime = useStoryStore.getState().currentTimeMs;
 
-    // If timing anchors are not set (or were reset by seek), set them now
-    if (playbackStartContextTime === null || playbackStartStoryTime === null) {
-      console.log('[StoryPlayback] Setting timing anchors:', {
-        contextTime: currentContextTime,
-        storyTime: currentStoryTime,
-      });
-      setPlaybackTiming(currentContextTime, currentStoryTime);
-    }
+    console.log('[StoryPlayback] Setting timing anchors after seek:', {
+      contextTime: currentContextTime,
+      storyTime: currentStoryTime,
+    });
+    setPlaybackTiming(currentContextTime, currentStoryTime);
 
-    // Stop all existing sources
+    // Stop all existing sources and reschedule from new position
     stopAllSources();
-
-    // Schedule playback from current position
     schedulePlayback(currentStoryTime, playbackItems);
   }, [
     isPlaying,
     playbackItems,
-    currentTimeMs,
     playbackStartContextTime,
     playbackStartStoryTime,
     getAudioContext,
