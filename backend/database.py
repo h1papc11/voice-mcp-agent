@@ -70,6 +70,7 @@ class StoryItem(Base):
     story_id = Column(String, ForeignKey("stories.id"), nullable=False)
     generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
     start_time_ms = Column(Integer, nullable=False, default=0)  # Milliseconds from story start
+    track = Column(Integer, nullable=False, default=0)  # Track number (0 = main track)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -245,6 +246,16 @@ def _run_migrations(engine):
             
             conn.commit()
             print("Migrated story_items table to use start_time_ms (removed position column)")
+    
+    # Migration: Add track column if it doesn't exist
+    # Re-check columns after potential position migration
+    columns = {col['name'] for col in inspector.get_columns('story_items')}
+    if 'track' not in columns:
+        print("Migrating story_items: adding track column")
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE story_items ADD COLUMN track INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            print("Added track column to story_items")
 
 
 def get_db():

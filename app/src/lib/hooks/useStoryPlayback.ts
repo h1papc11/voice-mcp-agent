@@ -1,77 +1,274 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useStoryStore } from '@/stores/storyStore';
 import { apiClient } from '@/lib/api/client';
 import type { StoryItemDetail } from '@/lib/api/types';
+import { useStoryStore } from '@/stores/storyStore';
+
+interface ActiveSource {
+  source: AudioBufferSourceNode;
+  generationId: string;
+  startTimeMs: number;
+  endTimeMs: number;
+}
 
 /**
- * Hook for managing timecode-based story playback.
- * Uses a single audio element for reliable playback.
+ * Hook for managing timecode-based story playback using Web Audio API.
+ * Supports multiple simultaneous audio sources for overlapping clips on different tracks.
+ * Uses AudioContext for sample-accurate timing synchronization.
  */
-export function useStoryPlayback(_items: StoryItemDetail[] | undefined) {
+export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
   const isPlaying = useStoryStore((state) => state.isPlaying);
   const playbackItems = useStoryStore((state) => state.playbackItems);
-  const tick = useStoryStore((state) => state.tick);
+  const playbackStartContextTime = useStoryStore((state) => state.playbackStartContextTime);
+  const playbackStartStoryTime = useStoryStore((state) => state.playbackStartStoryTime);
+  const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
+  const setPlaybackTiming = useStoryStore((state) => state.setPlaybackTiming);
 
-  // Single audio element for playback
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const currentItemIdRef = useRef<string | null>(null);
+  // AudioContext instance (created once)
+  const audioContextRef = useRef<AudioContext | null>(null);
+  // Master gain for volume control
+  const masterGainRef = useRef<GainNode | null>(null);
+  // Preloaded AudioBuffers by generation_id
+  const audioBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
+  // Currently playing AudioBufferSourceNodes by generation_id
+  const activeSourcesRef = useRef<Map<string, ActiveSource>>(new Map());
+  // Animation frame for syncing visual playhead
   const animationFrameRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(Date.now());
 
-  // Get or create audio element
-  const getAudio = useCallback(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.preload = 'auto';
+  // Get or create AudioContext and audio graph
+  const getAudioContext = useCallback(() => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+      console.log(
+        '[StoryPlayback] Created AudioContext, sample rate:',
+        audioContextRef.current.sampleRate,
+      );
+
+      // Create master gain node for volume control
+      // Set to 0.5 to prevent distortion from overlapping audio
+      masterGainRef.current = audioContextRef.current.createGain();
+      masterGainRef.current.gain.value = 0.05;
+      masterGainRef.current.connect(audioContextRef.current.destination);
     }
-    return audioRef.current;
+    // Resume context if suspended (browser autoplay policy)
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume().catch(() => {
+        // Ignore resume errors
+      });
+    }
+    return audioContextRef.current;
   }, []);
 
-  // Find the item that should be playing at a given time
-  const findActiveItem = useCallback((timeMs: number, items: StoryItemDetail[]): StoryItemDetail | null => {
+  // Stop a source
+  const stopSource = useCallback((generationId: string) => {
+    const activeSource = activeSourcesRef.current.get(generationId);
+    if (activeSource) {
+      try {
+        activeSource.source.stop();
+      } catch {
+        // Source may have already stopped
+      }
+      activeSourcesRef.current.delete(generationId);
+    }
+  }, []);
+
+  // Preload audio files as AudioBuffers
+  useEffect(() => {
+    if (!items || items.length === 0) {
+      // Clear preloaded buffers when no items
+      audioBuffersRef.current.clear();
+      return;
+    }
+
+    const currentIds = new Set(items.map((item) => item.generation_id));
+    const audioContext = getAudioContext();
+
+    // Remove buffers for items that no longer exist
+    for (const [id] of audioBuffersRef.current) {
+      if (!currentIds.has(id)) {
+        audioBuffersRef.current.delete(id);
+      }
+    }
+
+    // Preload audio for new items
+    const preloadPromises: Promise<void>[] = [];
     for (const item of items) {
-      const itemStart = item.start_time_ms;
-      const itemEnd = item.start_time_ms + item.duration * 1000;
-      if (timeMs >= itemStart && timeMs < itemEnd) {
-        return item;
+      if (!audioBuffersRef.current.has(item.generation_id)) {
+        const audioUrl = apiClient.getAudioUrl(item.generation_id);
+        console.log('[StoryPlayback] Preloading audio buffer:', item.generation_id);
+
+        const preloadPromise = fetch(audioUrl)
+          .then((response) => response.arrayBuffer())
+          .then((arrayBuffer) => audioContext.decodeAudioData(arrayBuffer))
+          .then((audioBuffer) => {
+            audioBuffersRef.current.set(item.generation_id, audioBuffer);
+            console.log(
+              '[StoryPlayback] Preloaded buffer:',
+              item.generation_id,
+              'duration:',
+              audioBuffer.duration,
+            );
+          })
+          .catch((err) => {
+            console.error('[StoryPlayback] Failed to preload audio:', item.generation_id, err);
+          });
+
+        preloadPromises.push(preloadPromise);
       }
     }
-    return null;
-  }, []);
 
-  // Find the next item after a given time
-  const findNextItem = useCallback((timeMs: number, items: StoryItemDetail[]): StoryItemDetail | null => {
-    const sorted = [...items].sort((a, b) => a.start_time_ms - b.start_time_ms);
-    for (const item of sorted) {
-      if (item.start_time_ms > timeMs) {
-        return item;
-      }
-    }
-    return null;
-  }, []);
+    Promise.all(preloadPromises).then(() => {
+      console.log('[StoryPlayback] Preloaded', audioBuffersRef.current.size, 'audio buffers');
+    });
+  }, [items, getAudioContext]);
 
-  // Cleanup
+  // Cleanup AudioContext on unmount
   useEffect(() => {
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
+      // Stop all sources
+      for (const [generationId] of activeSourcesRef.current) {
+        stopSource(generationId);
       }
+      activeSourcesRef.current.clear();
+
+      // Clean up audio graph
+      if (masterGainRef.current) {
+        masterGainRef.current.disconnect();
+        masterGainRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {
+          // Ignore errors when closing
+        });
+        audioContextRef.current = null;
+      }
+
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, []);
+  }, [stopSource]);
 
-  // Main playback effect
+  // Find ALL items that should be playing at a given story time
+  const findActiveItems = useCallback(
+    (storyTimeMs: number, itemList: StoryItemDetail[]): StoryItemDetail[] => {
+      return itemList.filter((item) => {
+        const itemStart = item.start_time_ms;
+        const itemEnd = item.start_time_ms + item.duration * 1000;
+        return storyTimeMs >= itemStart && storyTimeMs < itemEnd;
+      });
+    },
+    [],
+  );
+
+  // Convert AudioContext time to story time (ms)
+  const contextTimeToStoryTime = useCallback(
+    (contextTime: number): number => {
+      if (playbackStartContextTime === null || playbackStartStoryTime === null) {
+        return 0;
+      }
+      const elapsedContextTime = contextTime - playbackStartContextTime;
+      return playbackStartStoryTime + elapsedContextTime * 1000;
+    },
+    [playbackStartContextTime, playbackStartStoryTime],
+  );
+
+  // Convert story time (ms) to AudioContext time
+  const storyTimeToContextTime = useCallback(
+    (storyTimeMs: number): number => {
+      if (playbackStartContextTime === null || playbackStartStoryTime === null) {
+        return 0;
+      }
+      const elapsedStoryTime = (storyTimeMs - playbackStartStoryTime) / 1000;
+      return playbackStartContextTime + elapsedStoryTime;
+    },
+    [playbackStartContextTime, playbackStartStoryTime],
+  );
+
+  // Stop all sources
+  const stopAllSources = useCallback(() => {
+    console.log('[StoryPlayback] Stopping all sources');
+    for (const [generationId] of activeSourcesRef.current) {
+      stopSource(generationId);
+    }
+    activeSourcesRef.current.clear();
+  }, [stopSource]);
+
+  // Schedule playback for all items that should be playing
+  const schedulePlayback = useCallback(
+    (storyTimeMs: number, itemList: StoryItemDetail[]) => {
+      const audioContext = getAudioContext();
+      const currentContextTime = audioContext.currentTime;
+
+      // Find all items that should be playing
+      const shouldBePlaying = findActiveItems(storyTimeMs, itemList);
+      const shouldBePlayingIds = new Set(shouldBePlaying.map((item) => item.generation_id));
+
+      // Stop sources that shouldn't be playing anymore
+      for (const [generationId] of activeSourcesRef.current) {
+        if (!shouldBePlayingIds.has(generationId)) {
+          stopSource(generationId);
+        }
+      }
+
+      // Schedule new sources for items that should be playing
+      for (const item of shouldBePlaying) {
+        if (!activeSourcesRef.current.has(item.generation_id)) {
+          const buffer = audioBuffersRef.current.get(item.generation_id);
+          if (!buffer) {
+            console.warn('[StoryPlayback] Buffer not loaded for:', item.generation_id);
+            continue;
+          }
+
+          // Calculate when this item should start in AudioContext time
+          const itemStartContextTime = storyTimeToContextTime(item.start_time_ms);
+          const itemEndStoryTime = item.start_time_ms + item.duration * 1000;
+
+          // Calculate offset into the buffer (if seeking mid-way)
+          const offsetIntoBuffer = Math.max(0, (storyTimeMs - item.start_time_ms) / 1000);
+          const duration = item.duration - offsetIntoBuffer;
+
+          // If the item should have already started, schedule it to start immediately
+          const startAtContextTime = Math.max(currentContextTime, itemStartContextTime);
+
+          console.log('[StoryPlayback] Scheduling source:', {
+            generationId: item.generation_id,
+            storyTimeMs,
+            itemStart: item.start_time_ms,
+            offsetIntoBuffer,
+            startAtContextTime,
+            duration,
+          });
+
+          const source = audioContext.createBufferSource();
+          source.buffer = buffer;
+          source.connect(masterGainRef.current || audioContext.destination);
+
+          const activeSource: ActiveSource = {
+            source,
+            generationId: item.generation_id,
+            startTimeMs: item.start_time_ms,
+            endTimeMs: itemEndStoryTime,
+          };
+
+          activeSourcesRef.current.set(item.generation_id, activeSource);
+
+          // Schedule playback
+          source.start(startAtContextTime, offsetIntoBuffer, duration);
+
+          // Clean up when source ends
+          source.onended = () => {
+            console.log('[StoryPlayback] Source ended:', item.generation_id);
+            activeSourcesRef.current.delete(item.generation_id);
+          };
+        }
+      }
+    },
+    [getAudioContext, findActiveItems, storyTimeToContextTime, stopSource],
+  );
+
+  // Sync visual playhead from AudioContext time
   useEffect(() => {
-    const audio = getAudio();
-
-    if (!isPlaying || !playbackItems || playbackItems.length === 0) {
-      console.log('[StoryPlayback] Stopping playback');
-      audio.pause();
-      currentItemIdRef.current = null;
-      
+    if (!isPlaying || playbackStartContextTime === null || playbackStartStoryTime === null) {
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
@@ -79,115 +276,97 @@ export function useStoryPlayback(_items: StoryItemDetail[] | undefined) {
       return;
     }
 
-    const items = playbackItems; // Capture for closure
-    console.log('[StoryPlayback] Starting playback');
+    const audioContext = getAudioContext();
+    const itemList = playbackItems || [];
 
-    const playItem = (item: StoryItemDetail, offsetMs: number = 0) => {
-      console.log('[StoryPlayback] Playing item:', item.generation_id, 'offset:', offsetMs);
-      currentItemIdRef.current = item.generation_id;
-      
-      const audioUrl = apiClient.getAudioUrl(item.generation_id);
-      audio.src = audioUrl;
-      
-      audio.onloadedmetadata = () => {
-        const offsetSeconds = Math.max(0, offsetMs / 1000);
-        audio.currentTime = offsetSeconds;
-        audio.play().catch(err => {
-          console.error('[StoryPlayback] Play failed:', err);
-        });
-      };
+    const syncPlayhead = () => {
+      if (!useStoryStore.getState().isPlaying) {
+        return;
+      }
 
-      audio.onerror = (e) => {
-        console.error('[StoryPlayback] Audio error:', e);
-      };
-
-      // When this audio ends, advance the clock and check for next item
-      audio.onended = () => {
-        console.log('[StoryPlayback] Audio ended');
-        const state = useStoryStore.getState();
-        if (!state.isPlaying || !state.playbackItems) return;
-
-        // Find what's next
-        const nextItem = findNextItem(state.currentTimeMs, state.playbackItems);
-        if (nextItem) {
-          // Jump to next item's start
-          useStoryStore.setState({ currentTimeMs: nextItem.start_time_ms });
-          playItem(nextItem, 0);
-        } else {
-          // No more items
-          console.log('[StoryPlayback] Story complete');
-          useStoryStore.getState().stop();
-        }
-      };
-    };
-
-    // Animation frame for updating the clock
-    const updateClock = () => {
-      if (!useStoryStore.getState().isPlaying) return;
-
-      const now = Date.now();
-      const deltaMs = now - lastTimeRef.current;
-      lastTimeRef.current = now;
-
-      // Update master clock
-      tick(deltaMs);
-
-      const currentTime = useStoryStore.getState().currentTimeMs;
+      const currentContextTime = audioContext.currentTime;
+      const currentStoryTime = contextTimeToStoryTime(currentContextTime);
       const totalDuration = useStoryStore.getState().totalDurationMs;
 
-      // Check if we need to start playing a different item
-      const activeItem = findActiveItem(currentTime, items);
-      
-      if (activeItem && currentItemIdRef.current !== activeItem.generation_id) {
-        // Need to switch to a different item
-        const offset = currentTime - activeItem.start_time_ms;
-        playItem(activeItem, offset);
-      } else if (!activeItem && currentItemIdRef.current) {
-        // We're in a gap between items, pause audio
-        audio.pause();
-        currentItemIdRef.current = null;
-        
-        // Check if there's a next item to wait for
-        const nextItem = findNextItem(currentTime, items);
-        if (!nextItem && currentTime >= totalDuration) {
+      // Update store with current story time
+      useStoryStore.setState({ currentTimeMs: Math.min(currentStoryTime, totalDuration) });
+
+      // Schedule any items that should be playing
+      schedulePlayback(currentStoryTime, itemList);
+
+      // Check if we've reached the end
+      if (currentStoryTime >= totalDuration) {
+        // Check if all sources have ended
+        if (activeSourcesRef.current.size === 0) {
           console.log('[StoryPlayback] Reached end');
           useStoryStore.getState().stop();
           return;
         }
       }
 
-      // Continue loop
-      animationFrameRef.current = requestAnimationFrame(updateClock);
+      // Continue sync loop
+      animationFrameRef.current = requestAnimationFrame(syncPlayhead);
     };
 
-    // Start with the first item
-    const currentTime = useStoryStore.getState().currentTimeMs;
-    const activeItem = findActiveItem(currentTime, items);
-    
-    if (activeItem) {
-      const offset = currentTime - activeItem.start_time_ms;
-      playItem(activeItem, offset);
-    } else {
-      // Maybe we're before all items start, find the first one
-      const firstItem = [...items].sort((a, b) => a.start_time_ms - b.start_time_ms)[0];
-      if (firstItem && currentTime < firstItem.start_time_ms) {
-        // Wait for the first item
-        console.log('[StoryPlayback] Waiting for first item at', firstItem.start_time_ms);
-      }
-    }
+    // Initial sync
+    const currentContextTime = audioContext.currentTime;
+    const currentStoryTime = contextTimeToStoryTime(currentContextTime);
+    schedulePlayback(currentStoryTime, itemList);
 
-    // Start clock
-    lastTimeRef.current = Date.now();
-    animationFrameRef.current = requestAnimationFrame(updateClock);
+    // Start sync loop
+    animationFrameRef.current = requestAnimationFrame(syncPlayhead);
 
     return () => {
-      audio.onended = null;
-      audio.onloadedmetadata = null;
-      audio.onerror = null;
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
     };
-  }, [isPlaying, playbackItems, getAudio, findActiveItem, findNextItem, tick]);
+  }, [
+    isPlaying,
+    playbackItems,
+    playbackStartContextTime,
+    playbackStartStoryTime,
+    getAudioContext,
+    contextTimeToStoryTime,
+    schedulePlayback,
+  ]);
+
+  // Handle play/pause/seek changes - set timing anchors and schedule playback
+  useEffect(() => {
+    if (!isPlaying || !playbackItems || playbackItems.length === 0) {
+      console.log('[StoryPlayback] Stopping playback');
+      stopAllSources();
+      return;
+    }
+
+    const audioContext = getAudioContext();
+    const currentContextTime = audioContext.currentTime;
+    const currentStoryTime = currentTimeMs;
+
+    // If timing anchors are not set (or were reset by seek), set them now
+    if (playbackStartContextTime === null || playbackStartStoryTime === null) {
+      console.log('[StoryPlayback] Setting timing anchors:', {
+        contextTime: currentContextTime,
+        storyTime: currentStoryTime,
+      });
+      setPlaybackTiming(currentContextTime, currentStoryTime);
+    }
+
+    // Stop all existing sources
+    stopAllSources();
+
+    // Schedule playback from current position
+    schedulePlayback(currentStoryTime, playbackItems);
+  }, [
+    isPlaying,
+    playbackItems,
+    currentTimeMs,
+    playbackStartContextTime,
+    playbackStartStoryTime,
+    getAudioContext,
+    stopAllSources,
+    schedulePlayback,
+    setPlaybackTiming,
+  ]);
 }

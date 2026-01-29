@@ -809,6 +809,20 @@ async def reorder_story_items(
     return items
 
 
+@app.put("/stories/{story_id}/items/{generation_id}/move", response_model=models.StoryItemDetail)
+async def move_story_item(
+    story_id: str,
+    generation_id: str,
+    data: models.StoryItemMove,
+    db: Session = Depends(get_db),
+):
+    """Move a story item (update position and/or track)."""
+    item = await stories.move_story_item(story_id, generation_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item not found")
+    return item
+
+
 @app.get("/stories/{story_id}/export-audio")
 async def export_story_audio(
     story_id: str,

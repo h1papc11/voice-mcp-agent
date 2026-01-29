@@ -17,6 +17,7 @@ from .models import (
     StoryItemDetail,
     StoryItemCreate,
     StoryItemBatchUpdate,
+    StoryItemMove,
 )
 from .database import Story as DBStory, StoryItem as DBStoryItem, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.audio import load_audio, save_audio
@@ -127,6 +128,7 @@ async def get_story(
             story_id=item.story_id,
             generation_id=item.generation_id,
             start_time_ms=item.start_time_ms,
+            track=item.track,
             created_at=item.created_at,
             profile_id=generation.profile_id,
             profile_name=profile_name,
@@ -249,6 +251,7 @@ async def add_item_to_story(
             story_id=existing.story_id,
             generation_id=existing.generation_id,
             start_time_ms=existing.start_time_ms,
+            track=existing.track,
             created_at=existing.created_at,
             profile_id=generation.profile_id,
             profile_name=profile.name if profile else "Unknown",
@@ -288,12 +291,16 @@ async def add_item_to_story(
             # Add 200ms gap after the last item
             start_time_ms = max_end_time_ms + 200
 
+    # Get track from data or default to 0
+    track = data.track if data.track is not None else 0
+
     # Create item
     item = DBStoryItem(
         id=str(uuid.uuid4()),
         story_id=story_id,
         generation_id=data.generation_id,
         start_time_ms=start_time_ms,
+        track=track,
         created_at=datetime.utcnow(),
     )
 
@@ -313,6 +320,72 @@ async def add_item_to_story(
         story_id=item.story_id,
         generation_id=item.generation_id,
         start_time_ms=item.start_time_ms,
+        track=item.track,
+        created_at=item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile.name if profile else "Unknown",
+        text=generation.text,
+        language=generation.language,
+        audio_path=generation.audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+    )
+
+
+async def move_story_item(
+    story_id: str,
+    generation_id: str,
+    data: StoryItemMove,
+    db: Session,
+) -> Optional[StoryItemDetail]:
+    """
+    Move a story item (update position and/or track).
+
+    Args:
+        story_id: Story ID
+        generation_id: Generation ID of the item to move
+        data: New position and track data
+        db: Database session
+
+    Returns:
+        Updated item detail or None if not found
+    """
+    # Get the item
+    item = db.query(DBStoryItem).filter_by(
+        story_id=story_id,
+        generation_id=generation_id
+    ).first()
+    if not item:
+        return None
+
+    # Get the generation
+    generation = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not generation:
+        return None
+
+    # Update position and track
+    item.start_time_ms = data.start_time_ms
+    item.track = data.track
+
+    # Update story updated_at
+    story = db.query(DBStory).filter_by(id=story_id).first()
+    if story:
+        story.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(item)
+
+    # Get profile name
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+
+    return StoryItemDetail(
+        id=item.id,
+        story_id=item.story_id,
+        generation_id=item.generation_id,
+        start_time_ms=item.start_time_ms,
+        track=item.track,
         created_at=item.created_at,
         profile_id=generation.profile_id,
         profile_name=profile.name if profile else "Unknown",
@@ -464,6 +537,7 @@ async def reorder_story_items(
             story_id=item.story_id,
             generation_id=item.generation_id,
             start_time_ms=item.start_time_ms,
+            track=item.track,
             created_at=item.created_at,
             profile_id=generation.profile_id,
             profile_name=profile_name,

@@ -12,13 +12,16 @@ interface StoryPlaybackState {
   totalDurationMs: number;
   playbackStoryId: string | null;
   playbackItems: StoryItemDetail[] | null;
+  // Web Audio API timing (null when not playing)
+  playbackStartContextTime: number | null; // AudioContext.currentTime when playback started
+  playbackStartStoryTime: number | null; // Story time (ms) when playback started
 
   // Actions
   play: (storyId: string, items: StoryItemDetail[]) => void;
   pause: () => void;
   stop: () => void;
   seek: (timeMs: number) => void;
-  tick: (deltaMs: number) => void; // Called by animation frame
+  setPlaybackTiming: (contextTime: number, storyTime: number) => void; // Set timing anchors for Web Audio API
 }
 
 export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
@@ -32,6 +35,8 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   totalDurationMs: 0,
   playbackStoryId: null,
   playbackItems: null,
+  playbackStartContextTime: null,
+  playbackStartStoryTime: null,
 
   // Actions
   play: (storyId, items) => {
@@ -72,7 +77,10 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   },
 
   pause: () => {
-    set({ isPlaying: false });
+    set({ 
+      isPlaying: false,
+      // Keep timing anchors so we can resume from same position
+    });
   },
 
   stop: () => {
@@ -82,32 +90,26 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
       playbackStoryId: null,
       playbackItems: null,
       totalDurationMs: 0,
+      playbackStartContextTime: null,
+      playbackStartStoryTime: null,
     });
   },
 
   seek: (timeMs) => {
     const state = get();
     const clampedTime = Math.max(0, Math.min(timeMs, state.totalDurationMs));
-    set({ currentTimeMs: clampedTime });
+    set({ 
+      currentTimeMs: clampedTime,
+      // Reset timing anchors - will be set by hook when playback resumes
+      playbackStartContextTime: null,
+      playbackStartStoryTime: null,
+    });
   },
 
-  tick: (deltaMs) => {
-    const state = get();
-    if (!state.isPlaying || !state.playbackItems) {
-      return;
-    }
-
-    const newTime = state.currentTimeMs + deltaMs;
-    const clampedTime = Math.min(newTime, state.totalDurationMs);
-
-    // Auto-stop when reaching the end
-    if (clampedTime >= state.totalDurationMs) {
-      set({
-        currentTimeMs: state.totalDurationMs,
-        isPlaying: false,
-      });
-    } else {
-      set({ currentTimeMs: clampedTime });
-    }
+  setPlaybackTiming: (contextTime, storyTime) => {
+    set({
+      playbackStartContextTime: contextTime,
+      playbackStartStoryTime: storyTime,
+    });
   },
 }));

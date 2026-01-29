@@ -20,6 +20,7 @@ import type {
   StoryItemDetail,
   StoryItemBatchUpdate,
   StoryItemReorder,
+  StoryItemMove,
 } from './types';
 
 class ApiClient {
@@ -420,6 +421,13 @@ class ApiClient {
 
   async reorderStoryItems(storyId: string, data: StoryItemReorder): Promise<StoryItemDetail[]> {
     return this.request<StoryItemDetail[]>(`/stories/${storyId}/items/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async moveStoryItem(storyId: string, generationId: string, data: StoryItemMove): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${generationId}/move`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });

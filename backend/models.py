@@ -220,6 +220,7 @@ class StoryItemDetail(BaseModel):
     story_id: str
     generation_id: str
     start_time_ms: int
+    track: int = 0
     created_at: datetime
     # Generation details
     profile_id: str
@@ -253,6 +254,7 @@ class StoryItemCreate(BaseModel):
     """Request model for adding a generation to a story."""
     generation_id: str
     start_time_ms: Optional[int] = None  # If not provided, will be calculated automatically
+    track: Optional[int] = 0  # Track number (0 = main track)
 
 
 class StoryItemUpdateTime(BaseModel):
@@ -269,3 +271,9 @@ class StoryItemBatchUpdate(BaseModel):
 class StoryItemReorder(BaseModel):
     """Request model for reordering story items."""
     generation_ids: List[str] = Field(..., min_length=1)
+
+
+class StoryItemMove(BaseModel):
+    """Request model for moving a story item (position and/or track)."""
+    start_time_ms: int = Field(..., ge=0)
+    track: int = 0

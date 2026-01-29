@@ -143,6 +143,7 @@ export interface StoryItemDetail {
   story_id: string;
   generation_id: string;
   start_time_ms: number;
+  track: number;
   created_at: string;
   profile_id: string;
   profile_name: string;
@@ -167,6 +168,7 @@ export interface StoryDetailResponse {
 export interface StoryItemCreate {
   generation_id: string;
   start_time_ms?: number;
+  track?: number;
 }
 
 export interface StoryItemUpdateTime {
@@ -180,4 +182,9 @@ export interface StoryItemBatchUpdate {
 
 export interface StoryItemReorder {
   generation_ids: string[];
+}
+
+export interface StoryItemMove {
+  start_time_ms: number;
+  track: number;
 }

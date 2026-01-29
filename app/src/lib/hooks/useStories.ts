@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import type { StoryCreate, StoryItemCreate, StoryItemBatchUpdate, StoryItemReorder } from '@/lib/api/types';
+import type { StoryCreate, StoryItemCreate, StoryItemBatchUpdate, StoryItemReorder, StoryItemMove } from '@/lib/api/types';
 import { isTauri } from '@/lib/tauri';
 
 export function useStories() {
@@ -98,6 +98,19 @@ export function useReorderStoryItems() {
   return useMutation({
     mutationFn: ({ storyId, data }: { storyId: string; data: StoryItemReorder }) =>
       apiClient.reorderStoryItems(storyId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+      queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
+    },
+  });
+}
+
+export function useMoveStoryItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ storyId, generationId, data }: { storyId: string; generationId: string; data: StoryItemMove }) =>
+      apiClient.moveStoryItem(storyId, generationId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stories'] });
       queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
