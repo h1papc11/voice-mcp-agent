@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import type { StoryCreate, StoryItemCreate, StoryItemBatchUpdate, StoryItemReorder, StoryItemMove } from '@/lib/api/types';
+import type { StoryCreate, StoryItemCreate, StoryItemBatchUpdate, StoryItemReorder, StoryItemMove, StoryItemTrim, StoryItemSplit } from '@/lib/api/types';
 import { isTauri } from '@/lib/tauri';
 
 export function useStories() {
@@ -70,8 +70,8 @@ export function useRemoveStoryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ storyId, generationId }: { storyId: string; generationId: string }) =>
-      apiClient.removeStoryItem(storyId, generationId),
+    mutationFn: ({ storyId, itemId }: { storyId: string; itemId: string }) =>
+      apiClient.removeStoryItem(storyId, itemId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stories'] });
       queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
@@ -109,8 +109,47 @@ export function useMoveStoryItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ storyId, generationId, data }: { storyId: string; generationId: string; data: StoryItemMove }) =>
-      apiClient.moveStoryItem(storyId, generationId, data),
+    mutationFn: ({ storyId, itemId, data }: { storyId: string; itemId: string; data: StoryItemMove }) =>
+      apiClient.moveStoryItem(storyId, itemId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+      queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
+    },
+  });
+}
+
+export function useTrimStoryItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ storyId, itemId, data }: { storyId: string; itemId: string; data: StoryItemTrim }) =>
+      apiClient.trimStoryItem(storyId, itemId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+      queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
+    },
+  });
+}
+
+export function useSplitStoryItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ storyId, itemId, data }: { storyId: string; itemId: string; data: StoryItemSplit }) =>
+      apiClient.splitStoryItem(storyId, itemId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['stories'] });
+      queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });
+    },
+  });
+}
+
+export function useDuplicateStoryItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ storyId, itemId }: { storyId: string; itemId: string }) =>
+      apiClient.duplicateStoryItem(storyId, itemId),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['stories'] });
       queryClient.invalidateQueries({ queryKey: ['stories', variables.storyId] });

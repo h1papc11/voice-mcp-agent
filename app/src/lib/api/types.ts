@@ -144,6 +144,8 @@ export interface StoryItemDetail {
   generation_id: string;
   start_time_ms: number;
   track: number;
+  trim_start_ms: number;
+  trim_end_ms: number;
   created_at: string;
   profile_id: string;
   profile_name: string;
@@ -187,4 +189,13 @@ export interface StoryItemReorder {
 export interface StoryItemMove {
   start_time_ms: number;
   track: number;
+}
+
+export interface StoryItemTrim {
+  trim_start_ms: number;
+  trim_end_ms: number;
+}
+
+export interface StoryItemSplit {
+  split_time_ms: number;
 }

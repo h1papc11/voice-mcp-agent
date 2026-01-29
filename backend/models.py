@@ -221,6 +221,8 @@ class StoryItemDetail(BaseModel):
     generation_id: str
     start_time_ms: int
     track: int = 0
+    trim_start_ms: int = 0
+    trim_end_ms: int = 0
     created_at: datetime
     # Generation details
     profile_id: str
@@ -277,3 +279,14 @@ class StoryItemMove(BaseModel):
     """Request model for moving a story item (position and/or track)."""
     start_time_ms: int = Field(..., ge=0)
     track: int = 0
+
+
+class StoryItemTrim(BaseModel):
+    """Request model for trimming a story item."""
+    trim_start_ms: int = Field(..., ge=0)
+    trim_end_ms: int = Field(..., ge=0)
+
+
+class StoryItemSplit(BaseModel):
+    """Request model for splitting a story item."""
+    split_time_ms: int = Field(..., ge=0)  # Time within the clip to split at (relative to clip start)

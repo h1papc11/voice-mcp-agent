@@ -770,14 +770,14 @@ async def add_story_item(
     return item
 
 
-@app.delete("/stories/{story_id}/items/{generation_id}")
+@app.delete("/stories/{story_id}/items/{item_id}")
 async def remove_story_item(
     story_id: str,
-    generation_id: str,
+    item_id: str,
     db: Session = Depends(get_db),
 ):
-    """Remove a generation from a story."""
-    success = await stories.remove_item_from_story(story_id, generation_id, db)
+    """Remove a story item from a story."""
+    success = await stories.remove_item_from_story(story_id, item_id, db)
     if not success:
         raise HTTPException(status_code=404, detail="Story item not found")
     return {"message": "Item removed successfully"}
@@ -809,15 +809,56 @@ async def reorder_story_items(
     return items
 
 
-@app.put("/stories/{story_id}/items/{generation_id}/move", response_model=models.StoryItemDetail)
+@app.put("/stories/{story_id}/items/{item_id}/move", response_model=models.StoryItemDetail)
 async def move_story_item(
     story_id: str,
-    generation_id: str,
+    item_id: str,
     data: models.StoryItemMove,
     db: Session = Depends(get_db),
 ):
     """Move a story item (update position and/or track)."""
-    item = await stories.move_story_item(story_id, generation_id, data, db)
+    item = await stories.move_story_item(story_id, item_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item not found")
+    return item
+
+
+@app.put("/stories/{story_id}/items/{item_id}/trim", response_model=models.StoryItemDetail)
+async def trim_story_item(
+    story_id: str,
+    item_id: str,
+    data: models.StoryItemTrim,
+    db: Session = Depends(get_db),
+):
+    """Trim a story item (update trim_start_ms and trim_end_ms)."""
+    item = await stories.trim_story_item(story_id, item_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item not found or invalid trim values")
+    return item
+
+
+@app.post("/stories/{story_id}/items/{item_id}/split", response_model=List[models.StoryItemDetail])
+async def split_story_item(
+    story_id: str,
+    item_id: str,
+    data: models.StoryItemSplit,
+    db: Session = Depends(get_db),
+):
+    """Split a story item at a given time, creating two clips."""
+    items = await stories.split_story_item(story_id, item_id, data, db)
+    if items is None:
+        raise HTTPException(status_code=404, detail="Story item not found or invalid split point")
+    return items
+
+
+@app.post("/stories/{story_id}/items/{item_id}/duplicate", response_model=models.StoryItemDetail)
+async def duplicate_story_item(
+    story_id: str,
+    item_id: str,
+    db: Session = Depends(get_db),
+):
+    """Duplicate a story item, creating a copy with all properties."""
+    item = await stories.duplicate_story_item(story_id, item_id, db)
     if item is None:
         raise HTTPException(status_code=404, detail="Story item not found")
     return item

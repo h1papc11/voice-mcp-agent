@@ -18,6 +18,8 @@ from .models import (
     StoryItemCreate,
     StoryItemBatchUpdate,
     StoryItemMove,
+    StoryItemTrim,
+    StoryItemSplit,
 )
 from .database import Story as DBStory, StoryItem as DBStoryItem, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.audio import load_audio, save_audio
@@ -129,6 +131,8 @@ async def get_story(
             generation_id=item.generation_id,
             start_time_ms=item.start_time_ms,
             track=item.track,
+            trim_start_ms=getattr(item, 'trim_start_ms', 0),
+            trim_end_ms=getattr(item, 'trim_end_ms', 0),
             created_at=item.created_at,
             profile_id=generation.profile_id,
             profile_name=profile_name,
@@ -252,6 +256,8 @@ async def add_item_to_story(
             generation_id=existing.generation_id,
             start_time_ms=existing.start_time_ms,
             track=existing.track,
+            trim_start_ms=getattr(existing, 'trim_start_ms', 0),
+            trim_end_ms=getattr(existing, 'trim_end_ms', 0),
             created_at=existing.created_at,
             profile_id=generation.profile_id,
             profile_name=profile.name if profile else "Unknown",
@@ -321,6 +327,8 @@ async def add_item_to_story(
         generation_id=item.generation_id,
         start_time_ms=item.start_time_ms,
         track=item.track,
+        trim_start_ms=getattr(item, 'trim_start_ms', 0),
+        trim_end_ms=getattr(item, 'trim_end_ms', 0),
         created_at=item.created_at,
         profile_id=generation.profile_id,
         profile_name=profile.name if profile else "Unknown",
@@ -336,7 +344,7 @@ async def add_item_to_story(
 
 async def move_story_item(
     story_id: str,
-    generation_id: str,
+    item_id: str,
     data: StoryItemMove,
     db: Session,
 ) -> Optional[StoryItemDetail]:
@@ -345,7 +353,7 @@ async def move_story_item(
 
     Args:
         story_id: Story ID
-        generation_id: Generation ID of the item to move
+        item_id: Story item ID
         data: New position and track data
         db: Database session
 
@@ -354,14 +362,14 @@ async def move_story_item(
     """
     # Get the item
     item = db.query(DBStoryItem).filter_by(
+        id=item_id,
         story_id=story_id,
-        generation_id=generation_id
     ).first()
     if not item:
         return None
 
     # Get the generation
-    generation = db.query(DBGeneration).filter_by(id=generation_id).first()
+    generation = db.query(DBGeneration).filter_by(id=item.generation_id).first()
     if not generation:
         return None
 
@@ -386,6 +394,8 @@ async def move_story_item(
         generation_id=item.generation_id,
         start_time_ms=item.start_time_ms,
         track=item.track,
+        trim_start_ms=getattr(item, 'trim_start_ms', 0),
+        trim_end_ms=getattr(item, 'trim_end_ms', 0),
         created_at=item.created_at,
         profile_id=generation.profile_id,
         profile_name=profile.name if profile else "Unknown",
@@ -401,23 +411,23 @@ async def move_story_item(
 
 async def remove_item_from_story(
     story_id: str,
-    generation_id: str,
+    item_id: str,
     db: Session,
 ) -> bool:
     """
-    Remove a generation from a story.
+    Remove a story item from a story.
 
     Args:
         story_id: Story ID
-        generation_id: Generation ID to remove
+        item_id: Story item ID to remove
         db: Database session
 
     Returns:
         True if removed, False if not found
     """
     item = db.query(DBStoryItem).filter_by(
+        id=item_id,
         story_id=story_id,
-        generation_id=generation_id
     ).first()
     if not item:
         return False
@@ -432,6 +442,277 @@ async def remove_item_from_story(
 
     db.commit()
     return True
+
+
+async def trim_story_item(
+    story_id: str,
+    item_id: str,
+    data: StoryItemTrim,
+    db: Session,
+) -> Optional[StoryItemDetail]:
+    """
+    Trim a story item (update trim_start_ms and trim_end_ms).
+
+    Args:
+        story_id: Story ID
+        item_id: Story item ID
+        data: Trim data (trim_start_ms, trim_end_ms)
+        db: Database session
+
+    Returns:
+        Updated item detail or None if not found
+    """
+    # Get the item
+    item = db.query(DBStoryItem).filter_by(
+        id=item_id,
+        story_id=story_id,
+    ).first()
+    if not item:
+        return None
+
+    # Get the generation
+    generation = db.query(DBGeneration).filter_by(id=item.generation_id).first()
+    if not generation:
+        return None
+
+    # Validate trim values don't exceed duration
+    max_duration_ms = int(generation.duration * 1000)
+    if data.trim_start_ms + data.trim_end_ms >= max_duration_ms:
+        return None  # Invalid trim - would result in zero or negative duration
+
+    # Update trim values
+    item.trim_start_ms = data.trim_start_ms
+    item.trim_end_ms = data.trim_end_ms
+
+    # Update story updated_at
+    story = db.query(DBStory).filter_by(id=story_id).first()
+    if story:
+        story.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(item)
+
+    # Get profile name
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+
+    return StoryItemDetail(
+        id=item.id,
+        story_id=item.story_id,
+        generation_id=item.generation_id,
+        start_time_ms=item.start_time_ms,
+        track=item.track,
+        trim_start_ms=item.trim_start_ms,
+        trim_end_ms=item.trim_end_ms,
+        created_at=item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile.name if profile else "Unknown",
+        text=generation.text,
+        language=generation.language,
+        audio_path=generation.audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+    )
+
+
+async def split_story_item(
+    story_id: str,
+    item_id: str,
+    data: StoryItemSplit,
+    db: Session,
+) -> Optional[List[StoryItemDetail]]:
+    """
+    Split a story item at a given time, creating two clips.
+
+    Args:
+        story_id: Story ID
+        item_id: Story item ID to split
+        data: Split data (split_time_ms - time within clip to split at)
+        db: Database session
+
+    Returns:
+        List of two updated item details (original and new) or None if not found/invalid
+    """
+    # Get the item
+    item = db.query(DBStoryItem).filter_by(
+        id=item_id,
+        story_id=story_id,
+    ).first()
+    if not item:
+        return None
+
+    # Get the generation
+    generation = db.query(DBGeneration).filter_by(id=item.generation_id).first()
+    if not generation:
+        return None
+
+    # Calculate effective duration and validate split point
+    current_trim_start = getattr(item, 'trim_start_ms', 0)
+    current_trim_end = getattr(item, 'trim_end_ms', 0)
+    original_duration_ms = int(generation.duration * 1000)
+    effective_duration_ms = original_duration_ms - current_trim_start - current_trim_end
+
+    # Validate split_time_ms is within the effective duration
+    if data.split_time_ms <= 0 or data.split_time_ms >= effective_duration_ms:
+        return None  # Invalid split point
+
+    # Calculate the absolute time in the original audio where we're splitting
+    absolute_split_ms = current_trim_start + data.split_time_ms
+
+    # Update original clip: trim from the end
+    item.trim_end_ms = original_duration_ms - absolute_split_ms
+
+    # Create new clip: starts after the split, trimmed from the start
+    new_item = DBStoryItem(
+        id=str(uuid.uuid4()),
+        story_id=story_id,
+        generation_id=item.generation_id,  # Same generation, different trim
+        start_time_ms=item.start_time_ms + data.split_time_ms,
+        track=item.track,
+        trim_start_ms=absolute_split_ms,
+        trim_end_ms=current_trim_end,
+        created_at=datetime.utcnow(),
+    )
+
+    db.add(new_item)
+
+    # Update story updated_at
+    story = db.query(DBStory).filter_by(id=story_id).first()
+    if story:
+        story.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(item)
+    db.refresh(new_item)
+
+    # Get profile name
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+    profile_name = profile.name if profile else "Unknown"
+
+    # Build response items
+    original_item_detail = StoryItemDetail(
+        id=item.id,
+        story_id=item.story_id,
+        generation_id=item.generation_id,
+        start_time_ms=item.start_time_ms,
+        track=item.track,
+        trim_start_ms=item.trim_start_ms,
+        trim_end_ms=item.trim_end_ms,
+        created_at=item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile_name,
+        text=generation.text,
+        language=generation.language,
+        audio_path=generation.audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+    )
+
+    new_item_detail = StoryItemDetail(
+        id=new_item.id,
+        story_id=new_item.story_id,
+        generation_id=new_item.generation_id,
+        start_time_ms=new_item.start_time_ms,
+        track=new_item.track,
+        trim_start_ms=new_item.trim_start_ms,
+        trim_end_ms=new_item.trim_end_ms,
+        created_at=new_item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile_name,
+        text=generation.text,
+        language=generation.language,
+        audio_path=generation.audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+    )
+
+    return [original_item_detail, new_item_detail]
+
+
+async def duplicate_story_item(
+    story_id: str,
+    item_id: str,
+    db: Session,
+) -> Optional[StoryItemDetail]:
+    """
+    Duplicate a story item, creating a copy with all properties.
+
+    Args:
+        story_id: Story ID
+        item_id: Story item ID to duplicate
+        db: Database session
+
+    Returns:
+        New item detail or None if not found
+    """
+    # Get the original item
+    original_item = db.query(DBStoryItem).filter_by(
+        id=item_id,
+        story_id=story_id,
+    ).first()
+    if not original_item:
+        return None
+
+    # Get the generation
+    generation = db.query(DBGeneration).filter_by(id=original_item.generation_id).first()
+    if not generation:
+        return None
+
+    # Calculate effective duration
+    current_trim_start = getattr(original_item, 'trim_start_ms', 0)
+    current_trim_end = getattr(original_item, 'trim_end_ms', 0)
+    original_duration_ms = int(generation.duration * 1000)
+    effective_duration_ms = original_duration_ms - current_trim_start - current_trim_end
+
+    # Create duplicate item - place it right after the original
+    new_item = DBStoryItem(
+        id=str(uuid.uuid4()),
+        story_id=story_id,
+        generation_id=original_item.generation_id,  # Same generation as original
+        start_time_ms=original_item.start_time_ms + effective_duration_ms + 200,  # 200ms gap
+        track=original_item.track,
+        trim_start_ms=current_trim_start,
+        trim_end_ms=current_trim_end,
+        created_at=datetime.utcnow(),
+    )
+
+    db.add(new_item)
+
+    # Update story updated_at
+    story = db.query(DBStory).filter_by(id=story_id).first()
+    if story:
+        story.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(new_item)
+
+    # Get profile name
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+
+    return StoryItemDetail(
+        id=new_item.id,
+        story_id=new_item.story_id,
+        generation_id=new_item.generation_id,
+        start_time_ms=new_item.start_time_ms,
+        track=new_item.track,
+        trim_start_ms=new_item.trim_start_ms,
+        trim_end_ms=new_item.trim_end_ms,
+        created_at=new_item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile.name if profile else "Unknown",
+        text=generation.text,
+        language=generation.language,
+        audio_path=generation.audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+    )
 
 
 async def update_story_item_times(
@@ -538,6 +819,8 @@ async def reorder_story_items(
             generation_id=item.generation_id,
             start_time_ms=item.start_time_ms,
             track=item.track,
+            trim_start_ms=getattr(item, 'trim_start_ms', 0),
+            trim_end_ms=getattr(item, 'trim_end_ms', 0),
             created_at=item.created_at,
             profile_id=generation.profile_id,
             profile_name=profile_name,
@@ -602,14 +885,31 @@ async def export_story_audio(
             audio, sr = load_audio(str(audio_path), sample_rate=sample_rate)
             sample_rate = sr  # Use actual sample rate from first file
             
+            # Get trim values
+            trim_start_ms = getattr(item, 'trim_start_ms', 0)
+            trim_end_ms = getattr(item, 'trim_end_ms', 0)
+            
+            # Calculate effective duration
+            original_duration_ms = int(generation.duration * 1000)
+            effective_duration_ms = original_duration_ms - trim_start_ms - trim_end_ms
+            
+            # Slice audio based on trim values
+            trim_start_sample = int((trim_start_ms / 1000.0) * sample_rate)
+            trim_end_sample = int((trim_end_ms / 1000.0) * sample_rate)
+            
+            # Extract the trimmed portion
+            if trim_end_ms > 0:
+                trimmed_audio = audio[trim_start_sample:-trim_end_sample] if trim_end_sample > 0 else audio[trim_start_sample:]
+            else:
+                trimmed_audio = audio[trim_start_sample:]
+            
             # Store audio with its timecode info
             start_time_ms = item.start_time_ms
-            duration_ms = int(generation.duration * 1000)
             
             audio_data.append({
-                'audio': audio,
+                'audio': trimmed_audio,
                 'start_time_ms': start_time_ms,
-                'duration_ms': duration_ms,
+                'duration_ms': effective_duration_ms,
             })
         except Exception:
             # Skip files that can't be loaded

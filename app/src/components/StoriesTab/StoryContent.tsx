@@ -131,13 +131,13 @@ export function StoryContent() {
     }
   }, [isPlaying]);
 
-  const handleRemoveItem = (generationId: string) => {
+  const handleRemoveItem = (itemId: string) => {
     if (!story) return;
 
     removeItem.mutate(
       {
         storyId: story.id,
-        generationId,
+        itemId,
       },
       {
         onError: (error) => {
@@ -360,7 +360,7 @@ export function StoryContent() {
                       item={item}
                       storyId={story.id}
                       index={index}
-                      onRemove={() => handleRemoveItem(item.generation_id)}
+                      onRemove={() => handleRemoveItem(item.id)}
                       currentTimeMs={currentTimeMs}
                       isPlaying={isPlaying && playbackStoryId === story.id}
                     />

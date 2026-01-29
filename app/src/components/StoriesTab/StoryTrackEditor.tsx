@@ -1,21 +1,45 @@
-import { GripHorizontal, Minus, Pause, Play, Plus, Square } from 'lucide-react';
+import { Copy, GripHorizontal, Minus, Pause, Play, Plus, Scissors, Square, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
-import { useMoveStoryItem } from '@/lib/hooks/useStories';
+import { useMoveStoryItem, useTrimStoryItem, useSplitStoryItem, useDuplicateStoryItem, useRemoveStoryItem } from '@/lib/hooks/useStories';
 import { useStoryStore } from '@/stores/storyStore';
 import type { StoryItemDetail } from '@/lib/api/types';
 import { cn } from '@/lib/utils/cn';
 
-// Clip waveform component
-function ClipWaveform({ generationId, width }: { generationId: string; width: number }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+// Clip waveform component with trim support
+function ClipWaveform({ 
+  generationId, 
+  width, 
+  trimStartMs, 
+  trimEndMs, 
+  duration 
+}: { 
+  generationId: string; 
+  width: number;
+  trimStartMs: number;
+  trimEndMs: number;
+  duration: number;
+}) {
+  const waveformRef = useRef<HTMLDivElement>(null);
   const wavesurferRef = useRef<WaveSurfer | null>(null);
 
+  // Calculate the full waveform width based on the original duration
+  // The visible portion (width) represents the effective duration after trimming
+  const effectiveDurationMs = (duration * 1000) - trimStartMs - trimEndMs;
+  const fullWaveformWidth = effectiveDurationMs > 0 
+    ? (width / effectiveDurationMs) * (duration * 1000) 
+    : width;
+  
+  // Calculate how much to offset the waveform to hide the trimmed start
+  const offsetX = effectiveDurationMs > 0 
+    ? (trimStartMs / (duration * 1000)) * fullWaveformWidth 
+    : 0;
+
   useEffect(() => {
-    if (!containerRef.current || width < 20) return;
+    if (!waveformRef.current || fullWaveformWidth < 20) return;
 
     // Get CSS colors
     const root = document.documentElement;
@@ -27,7 +51,7 @@ function ClipWaveform({ generationId, width }: { generationId: string; width: nu
     const waveColor = getCSSVar('--accent-foreground');
 
     const wavesurfer = WaveSurfer.create({
-      container: containerRef.current,
+      container: waveformRef.current,
       waveColor,
       progressColor: waveColor,
       cursorWidth: 0,
@@ -50,9 +74,21 @@ function ClipWaveform({ generationId, width }: { generationId: string; width: nu
       wavesurfer.destroy();
       wavesurferRef.current = null;
     };
-  }, [generationId, width]);
+  }, [generationId, fullWaveformWidth]);
 
-  return <div ref={containerRef} className="w-full h-full opacity-60" />;
+  return (
+    <div className="w-full h-full opacity-60 overflow-hidden">
+      {/* Inner container that holds the full waveform, offset to show only visible portion */}
+      <div 
+        ref={waveformRef}
+        style={{ 
+          width: `${fullWaveformWidth}px`,
+          transform: `translateX(-${offsetX}px)`,
+        }}
+        className="h-full"
+      />
+    </div>
+  );
 }
 
 interface StoryTrackEditorProps {
@@ -80,7 +116,21 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const resizeStartY = useRef(0);
   const resizeStartHeight = useRef(0);
   const moveItem = useMoveStoryItem();
+  const trimItem = useTrimStoryItem();
+  const splitItem = useSplitStoryItem();
+  const duplicateItem = useDuplicateStoryItem();
+  const removeItem = useRemoveStoryItem();
   const { toast } = useToast();
+  
+  // Selection state
+  const selectedClipId = useStoryStore((state) => state.selectedClipId);
+  const setSelectedClipId = useStoryStore((state) => state.setSelectedClipId);
+  
+  // Trim state
+  const [trimmingItem, setTrimmingItem] = useState<string | null>(null);
+  const [trimSide, setTrimSide] = useState<'start' | 'end' | null>(null);
+  const [trimStartX, setTrimStartX] = useState(0);
+  const [tempTrimValues, setTempTrimValues] = useState<{ trim_start_ms: number; trim_end_ms: number } | null>(null);
 
   // Track editor height from store (shared with FloatingGenerateBox)
   const editorHeight = useStoryStore((state) => state.trackEditorHeight);
@@ -140,11 +190,16 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     return () => observer.disconnect();
   }, []);
 
-  // Calculate total duration
+  // Calculate effective duration (accounting for trims)
+  const getEffectiveDuration = (item: StoryItemDetail) => {
+    return item.duration * 1000 - (item.trim_start_ms || 0) - (item.trim_end_ms || 0);
+  };
+
+  // Calculate total duration (using effective durations)
   const totalDurationMs = useMemo(() => {
     if (items.length === 0) return 10000; // Default 10 seconds
     return Math.max(
-      ...items.map((item) => item.start_time_ms + item.duration * 1000),
+      ...items.map((item) => item.start_time_ms + getEffectiveDuration(item)),
       10000
     );
   }, [items]);
@@ -228,12 +283,245 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!tracksRef.current || draggingItem) return;
+    if (!tracksRef.current || draggingItem || trimmingItem) return;
     const rect = tracksRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left + tracksRef.current.scrollLeft;
     const timeMs = Math.max(0, pixelsToMs(x));
     seek(timeMs);
+    // Deselect clip when clicking on timeline
+    setSelectedClipId(null);
   };
+
+  const handleClipClick = (e: React.MouseEvent, item: StoryItemDetail) => {
+    e.stopPropagation();
+    if (draggingItem || trimmingItem) return;
+    setSelectedClipId(item.id);
+  };
+
+  const handleTrimStart = (e: React.MouseEvent, item: StoryItemDetail, side: 'start' | 'end') => {
+    e.stopPropagation();
+    if (!tracksRef.current) return;
+    setTrimmingItem(item.id);
+    setTrimSide(side);
+    setSelectedClipId(item.id);
+    setTrimStartX(e.clientX);
+    trimStartItemRef.current = {
+      item,
+      initialTrimStart: item.trim_start_ms || 0,
+      initialTrimEnd: item.trim_end_ms || 0,
+    };
+  };
+
+
+  const trimStartItemRef = useRef<{ item: StoryItemDetail; initialTrimStart: number; initialTrimEnd: number } | null>(null);
+
+  const handleTrimMove = useCallback(
+    (e: MouseEvent) => {
+      if (!trimmingItem || !trimSide || !trimStartItemRef.current) return;
+      
+      const deltaX = e.clientX - trimStartX;
+      const deltaMs = pixelsToMs(deltaX); // Signed delta in milliseconds
+      
+      const { item, initialTrimStart, initialTrimEnd } = trimStartItemRef.current;
+      const originalDurationMs = item.duration * 1000;
+      
+      let newTrimStart = initialTrimStart;
+      let newTrimEnd = initialTrimEnd;
+      
+      if (trimSide === 'start') {
+        // Moving right increases trim_start (trims more from start)
+        // Moving left decreases trim_start (restores from start)
+        newTrimStart = Math.round(Math.max(0, Math.min(initialTrimStart + deltaMs, originalDurationMs - initialTrimEnd - 100)));
+      } else {
+        // Moving right decreases trim_end (restores from end)
+        // Moving left increases trim_end (trims more from end)
+        newTrimEnd = Math.round(Math.max(0, Math.min(initialTrimEnd - deltaMs, originalDurationMs - initialTrimStart - 100)));
+      }
+      
+      // Validate that we don't exceed duration
+      if (newTrimStart + newTrimEnd >= originalDurationMs - 100) {
+        return; // Don't allow trimming to less than 100ms
+      }
+      
+      // Update temporary trim values for visual feedback
+      setTempTrimValues({
+        trim_start_ms: newTrimStart,
+        trim_end_ms: newTrimEnd,
+      });
+    },
+    [trimmingItem, trimSide, trimStartX, pixelsToMs]
+  );
+
+  const handleTrimEnd = useCallback(() => {
+    if (!trimmingItem || !trimSide || !trimStartItemRef.current) {
+      setTrimmingItem(null);
+      setTrimSide(null);
+      setTempTrimValues(null);
+      trimStartItemRef.current = null;
+      return;
+    }
+
+    const { initialTrimStart, initialTrimEnd } = trimStartItemRef.current;
+    
+    // Use temporary trim values if available, otherwise use initial values
+    // Ensure values are integers for the backend
+    const finalTrimStart = Math.round(tempTrimValues?.trim_start_ms ?? initialTrimStart);
+    const finalTrimEnd = Math.round(tempTrimValues?.trim_end_ms ?? initialTrimEnd);
+    
+    // Only update if values changed
+    if (finalTrimStart !== initialTrimStart || finalTrimEnd !== initialTrimEnd) {
+      trimItem.mutate(
+        {
+          storyId,
+          itemId: trimmingItem,
+          data: {
+            trim_start_ms: finalTrimStart,
+            trim_end_ms: finalTrimEnd,
+          },
+        },
+        {
+          onError: (error) => {
+            toast({
+              title: 'Failed to trim clip',
+              description: error instanceof Error ? error.message : String(error),
+              variant: 'destructive',
+            });
+          },
+        }
+      );
+    }
+    
+    setTrimmingItem(null);
+    setTrimSide(null);
+    setTempTrimValues(null);
+    trimStartItemRef.current = null;
+  }, [trimmingItem, trimSide, tempTrimValues, storyId, trimItem, toast]);
+
+  const handleSplit = useCallback(() => {
+    if (!selectedClipId) return;
+    
+    const item = items.find((i) => i.id === selectedClipId);
+    if (!item) return;
+
+    const splitTimeMs = currentTimeMs - item.start_time_ms;
+    const effectiveDuration = getEffectiveDuration(item);
+    
+    if (splitTimeMs <= 0 || splitTimeMs >= effectiveDuration) {
+      toast({
+        title: 'Invalid split point',
+        description: 'Playhead must be within the selected clip',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    splitItem.mutate(
+      {
+        storyId,
+        itemId: selectedClipId,
+        data: { split_time_ms: splitTimeMs },
+      },
+      {
+        onSuccess: () => {
+          setSelectedClipId(null);
+        },
+        onError: (error) => {
+          toast({
+            title: 'Failed to split clip',
+            description: error instanceof Error ? error.message : String(error),
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  }, [selectedClipId, items, currentTimeMs, getEffectiveDuration, storyId, splitItem, toast, setSelectedClipId]);
+
+  const handleDuplicate = useCallback(() => {
+    if (!selectedClipId) return;
+
+    duplicateItem.mutate(
+      {
+        storyId,
+        itemId: selectedClipId,
+      },
+      {
+        onError: (error) => {
+          toast({
+            title: 'Failed to duplicate clip',
+            description: error instanceof Error ? error.message : String(error),
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  }, [selectedClipId, storyId, duplicateItem, toast]);
+
+  const handleDelete = useCallback(() => {
+    if (!selectedClipId) return;
+
+    removeItem.mutate(
+      {
+        storyId,
+        itemId: selectedClipId,
+      },
+      {
+        onSuccess: () => {
+          setSelectedClipId(null);
+        },
+        onError: (error) => {
+          toast({
+            title: 'Failed to delete clip',
+            description: error instanceof Error ? error.message : String(error),
+            variant: 'destructive',
+          });
+        },
+      }
+    );
+  }, [selectedClipId, storyId, removeItem, toast, setSelectedClipId]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when editor is focused or no input is focused
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedClipId(null);
+      } else if (e.key === 's' || e.key === 'S') {
+        if (selectedClipId) {
+          e.preventDefault();
+          handleSplit();
+        }
+      } else if (e.key === 'd' || e.key === 'D') {
+        if (selectedClipId && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          handleDuplicate();
+        }
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedClipId) {
+          e.preventDefault();
+          handleDelete();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedClipId, handleSplit, handleDuplicate, handleDelete, setSelectedClipId]);
+
+  // Add global mouse listeners for trimming
+  useEffect(() => {
+    if (trimmingItem) {
+      window.addEventListener('mousemove', handleTrimMove);
+      window.addEventListener('mouseup', handleTrimEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleTrimMove);
+        window.removeEventListener('mouseup', handleTrimEnd);
+      };
+    }
+  }, [trimmingItem, handleTrimMove, handleTrimEnd]);
 
   const handleDragStart = (
     e: React.MouseEvent,
@@ -251,7 +539,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
       x: rect.left - tracksRef.current.getBoundingClientRect().left + tracksRef.current.scrollLeft,
       y: rect.top - tracksRef.current.getBoundingClientRect().top,
     });
-    setDraggingItem(item.generation_id);
+    setDraggingItem(item.id);
   };
 
   const handleDragMove = useCallback(
@@ -273,7 +561,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
       return;
     }
 
-    const item = items.find((i) => i.generation_id === draggingItem);
+    const item = items.find((i) => i.id === draggingItem);
     if (!item) {
       setDraggingItem(null);
       return;
@@ -292,7 +580,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
       moveItem.mutate(
         {
           storyId,
-          generationId: item.generation_id,
+          itemId: item.id,
           data: {
             start_time_ms: newTimeMs,
             track: newTrack,
@@ -302,7 +590,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
           onError: (error) => {
             toast({
               title: 'Failed to move item',
-              description: error.message,
+              description: error instanceof Error ? error.message : String(error),
               variant: 'destructive',
             });
           },
@@ -318,9 +606,10 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
   // Calculate clip position and dimensions
   const getClipStyle = (item: StoryItemDetail) => {
-    const isDragging = draggingItem === item.generation_id;
+    const isDragging = draggingItem === item.id;
     const trackIndex = getTrackIndex(item.track);
-    const width = msToPixels(item.duration * 1000);
+    const effectiveDuration = getEffectiveDuration(item);
+    const width = msToPixels(effectiveDuration);
     const left = isDragging ? dragPosition.x : msToPixels(item.start_time_ms);
     const top = isDragging ? dragPosition.y : trackIndex * TRACK_HEIGHT;
 
@@ -375,6 +664,39 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
           </span>
         </div>
 
+        {/* Clip editing controls - center */}
+        {selectedClipId && (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleSplit}
+              title="Split at playhead (S)"
+            >
+              <Scissors className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleDuplicate}
+              title="Duplicate (Cmd/Ctrl+D)"
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleDelete}
+              title="Delete (Delete/Backspace)"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Zoom controls - right side */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Zoom:</span>
@@ -421,15 +743,18 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
           onMouseUp={draggingItem ? handleDragEnd : undefined}
           onMouseLeave={draggingItem ? handleDragEnd : undefined}
         >
-          {/* Time ruler */}
-          <div
-            className="h-6 border-b bg-muted/20 sticky top-0 z-10"
+          {/* Time ruler - clickable to seek */}
+          <button
+            type="button"
+            className="h-6 border-b bg-muted/20 sticky top-0 z-10 cursor-pointer text-left"
             style={{ width: `${timelineWidth}px` }}
+            onClick={handleTimelineClick}
+            aria-label="Seek timeline"
           >
             {timeMarkers.map((ms) => (
               <div
                 key={ms}
-                className="absolute top-0 h-full flex flex-col justify-end"
+                className="absolute top-0 h-full flex flex-col justify-end pointer-events-none"
                 style={{ left: `${msToPixels(ms)}px` }}
               >
                 <div className="h-2 w-px bg-border" />
@@ -438,19 +763,19 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
                 </span>
               </div>
             ))}
-          </div>
+          </button>
 
           {/* Tracks area */}
           <div
             className="relative"
             style={{ width: `${timelineWidth}px`, height: `${tracksAreaHeight}px` }}
           >
-            {/* Track backgrounds */}
+            {/* Track backgrounds - pointer-events-none to allow clicks to pass through */}
             {tracks.map((trackNumber, index) => (
               <div
                 key={trackNumber}
                 className={cn(
-                  'absolute left-0 right-0 border-b',
+                  'absolute left-0 right-0 border-b pointer-events-none',
                   index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
                 )}
                 style={{
@@ -470,35 +795,83 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
           {/* Audio clips */}
           {items.map((item) => {
-            const isDragging = draggingItem === item.generation_id;
-            const style = getClipStyle(item);
-            const clipWidth = msToPixels(item.duration * 1000);
+            const isDragging = draggingItem === item.id;
+            const isSelected = selectedClipId === item.id;
+            const isTrimming = trimmingItem === item.id;
+            
+            // Use temporary trim values during trimming for visual feedback
+            const displayTrimStart = isTrimming && tempTrimValues ? tempTrimValues.trim_start_ms : (item.trim_start_ms || 0);
+            const displayTrimEnd = isTrimming && tempTrimValues ? tempTrimValues.trim_end_ms : (item.trim_end_ms || 0);
+            const effectiveDuration = (item.duration * 1000) - displayTrimStart - displayTrimEnd;
+            
+            const style = getClipStyle({ ...item, trim_start_ms: displayTrimStart, trim_end_ms: displayTrimEnd });
+            const clipWidth = msToPixels(effectiveDuration);
 
             return (
-              <button
-                type="button"
-                key={item.generation_id}
+              <div
+                key={item.id}
                 className={cn(
-                  'absolute rounded cursor-move select-none overflow-hidden z-10',
-                  'bg-accent/80 hover:bg-accent border border-accent-foreground/20',
-                  'flex flex-col justify-center',
-                  isDragging && 'opacity-80 shadow-lg z-20',
-                  !isDragging && 'transition-all duration-100'
+                  'absolute rounded select-none overflow-visible z-10',
+                  isSelected && 'ring-2 ring-primary ring-offset-1',
+                  isTrimming && 'ring-2 ring-accent'
                 )}
                 style={style}
-                onMouseDown={(e) => handleDragStart(e, item)}
               >
-                {/* Clip label */}
-                <div className="absolute top-0 left-1 right-1 z-10">
-                  <p className="text-[9px] font-medium text-accent-foreground truncate">
-                    {item.profile_name}
-                  </p>
-                </div>
-                {/* Waveform */}
-                <div className="absolute inset-0 top-3">
-                  <ClipWaveform generationId={item.generation_id} width={clipWidth} />
-                </div>
-              </button>
+                <button
+                  type="button"
+                  className={cn(
+                    'w-full h-full rounded cursor-move overflow-hidden',
+                    'bg-accent/80 hover:bg-accent border border-accent-foreground/20',
+                    'flex flex-col justify-center',
+                    isDragging && 'opacity-80 shadow-lg z-20',
+                    !isDragging && 'transition-all duration-100'
+                  )}
+                  onClick={(e) => handleClipClick(e, item)}
+                  onMouseDown={(e) => {
+                    // Only start drag if not clicking on trim handles
+                    if (!(e.target as HTMLElement).closest('.trim-handle')) {
+                      handleDragStart(e, item);
+                    }
+                  }}
+                >
+                  {/* Clip label */}
+                  <div className="absolute top-0 left-1 right-1 z-10">
+                    <p className="text-[9px] font-medium text-accent-foreground truncate">
+                      {item.profile_name}
+                    </p>
+                  </div>
+                  {/* Waveform */}
+                  <div className="absolute inset-0 top-3">
+                    <ClipWaveform 
+                      generationId={item.generation_id} 
+                      width={clipWidth}
+                      trimStartMs={displayTrimStart}
+                      trimEndMs={displayTrimEnd}
+                      duration={item.duration}
+                    />
+                  </div>
+                </button>
+                
+                {/* Trim handles */}
+                {isSelected && (
+                  <>
+                    {/* Left trim handle */}
+                    <button
+                      type="button"
+                      className="trim-handle absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-l"
+                      onMouseDown={(e) => handleTrimStart(e, item, 'start')}
+                      aria-label="Trim start"
+                    />
+                    {/* Right trim handle */}
+                    <button
+                      type="button"
+                      className="trim-handle absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-r"
+                      onMouseDown={(e) => handleTrimStart(e, item, 'end')}
+                      aria-label="Trim end"
+                    />
+                  </>
+                )}
+              </div>
             );
           })}
 

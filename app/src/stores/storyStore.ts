@@ -5,6 +5,8 @@ interface StoryPlaybackState {
   // Selection
   selectedStoryId: string | null;
   setSelectedStoryId: (id: string | null) => void;
+  selectedClipId: string | null;
+  setSelectedClipId: (id: string | null) => void;
 
   // Track editor UI state
   trackEditorHeight: number;
@@ -34,6 +36,8 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   // Selection
   selectedStoryId: null,
   setSelectedStoryId: (id) => set({ selectedStoryId: id }),
+  selectedClipId: null,
+  setSelectedClipId: (id) => set({ selectedClipId: id }),
 
   // Track editor UI state
   trackEditorHeight: DEFAULT_TRACK_EDITOR_HEIGHT,

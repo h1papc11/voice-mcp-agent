@@ -21,6 +21,8 @@ import type {
   StoryItemBatchUpdate,
   StoryItemReorder,
   StoryItemMove,
+  StoryItemTrim,
+  StoryItemSplit,
 } from './types';
 
 class ApiClient {
@@ -406,8 +408,8 @@ class ApiClient {
     });
   }
 
-  async removeStoryItem(storyId: string, generationId: string): Promise<void> {
-    await this.request<void>(`/stories/${storyId}/items/${generationId}`, {
+  async removeStoryItem(storyId: string, itemId: string): Promise<void> {
+    await this.request<void>(`/stories/${storyId}/items/${itemId}`, {
       method: 'DELETE',
     });
   }
@@ -426,10 +428,30 @@ class ApiClient {
     });
   }
 
-  async moveStoryItem(storyId: string, generationId: string, data: StoryItemMove): Promise<StoryItemDetail> {
-    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${generationId}/move`, {
+  async moveStoryItem(storyId: string, itemId: string, data: StoryItemMove): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${itemId}/move`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  }
+
+  async trimStoryItem(storyId: string, itemId: string, data: StoryItemTrim): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${itemId}/trim`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async splitStoryItem(storyId: string, itemId: string, data: StoryItemSplit): Promise<StoryItemDetail[]> {
+    return this.request<StoryItemDetail[]>(`/stories/${storyId}/items/${itemId}/split`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async duplicateStoryItem(storyId: string, itemId: string): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${itemId}/duplicate`, {
+      method: 'POST',
     });
   }
 

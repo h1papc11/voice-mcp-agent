@@ -5,6 +5,7 @@ import { useStoryStore } from '@/stores/storyStore';
 
 interface ActiveSource {
   source: AudioBufferSourceNode;
+  itemId: string;
   generationId: string;
   startTimeMs: number;
   endTimeMs: number;
@@ -26,9 +27,9 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
   const audioContextRef = useRef<AudioContext | null>(null);
   // Master gain for volume control
   const masterGainRef = useRef<GainNode | null>(null);
-  // Preloaded AudioBuffers by generation_id
+  // Preloaded AudioBuffers by generation_id (audio file is shared between split clips)
   const audioBuffersRef = useRef<Map<string, AudioBuffer>>(new Map());
-  // Currently playing AudioBufferSourceNodes by generation_id
+  // Currently playing AudioBufferSourceNodes by item.id (unique per clip)
   const activeSourcesRef = useRef<Map<string, ActiveSource>>(new Map());
   // Animation frame for syncing visual playhead
   const animationFrameRef = useRef<number | null>(null);
@@ -56,16 +57,16 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
     return audioContextRef.current;
   }, []);
 
-  // Stop a source
-  const stopSource = useCallback((generationId: string) => {
-    const activeSource = activeSourcesRef.current.get(generationId);
+  // Stop a source by item id
+  const stopSource = useCallback((itemId: string) => {
+    const activeSource = activeSourcesRef.current.get(itemId);
     if (activeSource) {
       try {
         activeSource.source.stop();
       } catch {
         // Source may have already stopped
       }
-      activeSourcesRef.current.delete(generationId);
+      activeSourcesRef.current.delete(itemId);
     }
   }, []);
 
@@ -123,8 +124,8 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
   useEffect(() => {
     return () => {
       // Stop all sources
-      for (const [generationId] of activeSourcesRef.current) {
-        stopSource(generationId);
+      for (const [itemId] of activeSourcesRef.current) {
+        stopSource(itemId);
       }
       activeSourcesRef.current.clear();
 
@@ -151,7 +152,11 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
     (storyTimeMs: number, itemList: StoryItemDetail[]): StoryItemDetail[] => {
       return itemList.filter((item) => {
         const itemStart = item.start_time_ms;
-        const itemEnd = item.start_time_ms + item.duration * 1000;
+        // Use effective duration (accounting for trims)
+        const trimStartMs = item.trim_start_ms || 0;
+        const trimEndMs = item.trim_end_ms || 0;
+        const effectiveDurationMs = item.duration * 1000 - trimStartMs - trimEndMs;
+        const itemEnd = item.start_time_ms + effectiveDurationMs;
         return storyTimeMs >= itemStart && storyTimeMs < itemEnd;
       });
     },
@@ -185,8 +190,8 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
   // Stop all sources
   const stopAllSources = useCallback(() => {
     console.log('[StoryPlayback] Stopping all sources');
-    for (const [generationId] of activeSourcesRef.current) {
-      stopSource(generationId);
+    for (const [itemId] of activeSourcesRef.current) {
+      stopSource(itemId);
     }
     activeSourcesRef.current.clear();
   }, [stopSource]);
@@ -199,18 +204,18 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
 
       // Find all items that should be playing
       const shouldBePlaying = findActiveItems(storyTimeMs, itemList);
-      const shouldBePlayingIds = new Set(shouldBePlaying.map((item) => item.generation_id));
+      const shouldBePlayingIds = new Set(shouldBePlaying.map((item) => item.id));
 
       // Stop sources that shouldn't be playing anymore
-      for (const [generationId] of activeSourcesRef.current) {
-        if (!shouldBePlayingIds.has(generationId)) {
-          stopSource(generationId);
+      for (const [itemId] of activeSourcesRef.current) {
+        if (!shouldBePlayingIds.has(itemId)) {
+          stopSource(itemId);
         }
       }
 
       // Schedule new sources for items that should be playing
       for (const item of shouldBePlaying) {
-        if (!activeSourcesRef.current.has(item.generation_id)) {
+        if (!activeSourcesRef.current.has(item.id)) {
           const buffer = audioBuffersRef.current.get(item.generation_id);
           if (!buffer) {
             console.warn('[StoryPlayback] Buffer not loaded for:', item.generation_id);
@@ -219,16 +224,24 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
 
           // Calculate when this item should start in AudioContext time
           const itemStartContextTime = storyTimeToContextTime(item.start_time_ms);
-          const itemEndStoryTime = item.start_time_ms + item.duration * 1000;
+          
+          // Calculate effective duration and trim offsets
+          const trimStartSec = (item.trim_start_ms || 0) / 1000;
+          const trimEndSec = (item.trim_end_ms || 0) / 1000;
+          const effectiveDuration = item.duration - trimStartSec - trimEndSec;
+          const itemEndStoryTime = item.start_time_ms + effectiveDuration * 1000;
 
           // Calculate offset into the buffer (if seeking mid-way)
-          const offsetIntoBuffer = Math.max(0, (storyTimeMs - item.start_time_ms) / 1000);
-          const duration = item.duration - offsetIntoBuffer;
+          // Offset is relative to the trimmed start of the clip
+          const offsetIntoEffectiveClip = Math.max(0, (storyTimeMs - item.start_time_ms) / 1000);
+          const offsetIntoBuffer = trimStartSec + offsetIntoEffectiveClip;
+          const duration = effectiveDuration - offsetIntoEffectiveClip;
 
           // If the item should have already started, schedule it to start immediately
           const startAtContextTime = Math.max(currentContextTime, itemStartContextTime);
 
           console.log('[StoryPlayback] Scheduling source:', {
+            itemId: item.id,
             generationId: item.generation_id,
             storyTimeMs,
             itemStart: item.start_time_ms,
@@ -243,20 +256,21 @@ export function useStoryPlayback(items: StoryItemDetail[] | undefined) {
 
           const activeSource: ActiveSource = {
             source,
+            itemId: item.id,
             generationId: item.generation_id,
             startTimeMs: item.start_time_ms,
             endTimeMs: itemEndStoryTime,
           };
 
-          activeSourcesRef.current.set(item.generation_id, activeSource);
+          activeSourcesRef.current.set(item.id, activeSource);
 
           // Schedule playback
           source.start(startAtContextTime, offsetIntoBuffer, duration);
 
           // Clean up when source ends
           source.onended = () => {
-            console.log('[StoryPlayback] Source ended:', item.generation_id);
-            activeSourcesRef.current.delete(item.generation_id);
+            console.log('[StoryPlayback] Source ended:', item.id);
+            activeSourcesRef.current.delete(item.id);
           };
         }
       }

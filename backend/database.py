@@ -71,6 +71,8 @@ class StoryItem(Base):
     generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
     start_time_ms = Column(Integer, nullable=False, default=0)  # Milliseconds from story start
     track = Column(Integer, nullable=False, default=0)  # Track number (0 = main track)
+    trim_start_ms = Column(Integer, nullable=False, default=0)  # Milliseconds trimmed from start
+    trim_end_ms = Column(Integer, nullable=False, default=0)  # Milliseconds trimmed from end
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -256,6 +258,24 @@ def _run_migrations(engine):
             conn.execute(text("ALTER TABLE story_items ADD COLUMN track INTEGER NOT NULL DEFAULT 0"))
             conn.commit()
             print("Added track column to story_items")
+    
+    # Migration: Add trim columns if they don't exist
+    # Re-check columns after potential track migration
+    columns = {col['name'] for col in inspector.get_columns('story_items')}
+    if 'trim_start_ms' not in columns:
+        print("Migrating story_items: adding trim_start_ms column")
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE story_items ADD COLUMN trim_start_ms INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            print("Added trim_start_ms column to story_items")
+    
+    columns = {col['name'] for col in inspector.get_columns('story_items')}
+    if 'trim_end_ms' not in columns:
+        print("Migrating story_items: adding trim_end_ms column")
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE story_items ADD COLUMN trim_end_ms INTEGER NOT NULL DEFAULT 0"))
+            conn.commit()
+            print("Added trim_end_ms column to story_items")
 
 
 def get_db():
