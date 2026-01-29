@@ -1,9 +1,9 @@
 import { Plus, Trash2, Play } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { apiClient } from '@/lib/api/client';
 import { useDeleteSample, useProfileSamples } from '@/lib/hooks/useProfiles';
 import { usePlayerStore } from '@/stores/playerStore';
-import { apiClient } from '@/lib/api/client';
 import { SampleUpload } from './SampleUpload';
 
 interface SampleListProps {

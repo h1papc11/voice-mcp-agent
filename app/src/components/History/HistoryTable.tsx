@@ -233,7 +233,7 @@ export function HistoryTable() {
                   </div>
 
                   {/* Far right - Ellipsis actions */}
-                  <div 
+                  <div
                     className="w-10 shrink-0 flex justify-end"
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
