@@ -1,23 +1,39 @@
-import { Copy, GripHorizontal, Minus, Pause, Play, Plus, Scissors, Square, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  GripHorizontal,
+  Minus,
+  Pause,
+  Play,
+  Plus,
+  Scissors,
+  Square,
+  Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
-import { useMoveStoryItem, useTrimStoryItem, useSplitStoryItem, useDuplicateStoryItem, useRemoveStoryItem } from '@/lib/hooks/useStories';
-import { useStoryStore } from '@/stores/storyStore';
 import type { StoryItemDetail } from '@/lib/api/types';
+import {
+  useDuplicateStoryItem,
+  useMoveStoryItem,
+  useRemoveStoryItem,
+  useSplitStoryItem,
+  useTrimStoryItem,
+} from '@/lib/hooks/useStories';
 import { cn } from '@/lib/utils/cn';
+import { useStoryStore } from '@/stores/storyStore';
 
 // Clip waveform component with trim support
-function ClipWaveform({ 
-  generationId, 
-  width, 
-  trimStartMs, 
-  trimEndMs, 
-  duration 
-}: { 
-  generationId: string; 
+function ClipWaveform({
+  generationId,
+  width,
+  trimStartMs,
+  trimEndMs,
+  duration,
+}: {
+  generationId: string;
   width: number;
   trimStartMs: number;
   trimEndMs: number;
@@ -28,15 +44,13 @@ function ClipWaveform({
 
   // Calculate the full waveform width based on the original duration
   // The visible portion (width) represents the effective duration after trimming
-  const effectiveDurationMs = (duration * 1000) - trimStartMs - trimEndMs;
-  const fullWaveformWidth = effectiveDurationMs > 0 
-    ? (width / effectiveDurationMs) * (duration * 1000) 
-    : width;
-  
+  const effectiveDurationMs = duration * 1000 - trimStartMs - trimEndMs;
+  const fullWaveformWidth =
+    effectiveDurationMs > 0 ? (width / effectiveDurationMs) * (duration * 1000) : width;
+
   // Calculate how much to offset the waveform to hide the trimmed start
-  const offsetX = effectiveDurationMs > 0 
-    ? (trimStartMs / (duration * 1000)) * fullWaveformWidth 
-    : 0;
+  const offsetX =
+    effectiveDurationMs > 0 ? (trimStartMs / (duration * 1000)) * fullWaveformWidth : 0;
 
   useEffect(() => {
     if (!waveformRef.current || fullWaveformWidth < 20) return;
@@ -79,9 +93,9 @@ function ClipWaveform({
   return (
     <div className="w-full h-full opacity-60 overflow-hidden">
       {/* Inner container that holds the full waveform, offset to show only visible portion */}
-      <div 
+      <div
         ref={waveformRef}
-        style={{ 
+        style={{
           width: `${fullWaveformWidth}px`,
           transform: `translateX(-${offsetX}px)`,
         }}
@@ -121,16 +135,19 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const duplicateItem = useDuplicateStoryItem();
   const removeItem = useRemoveStoryItem();
   const { toast } = useToast();
-  
+
   // Selection state
   const selectedClipId = useStoryStore((state) => state.selectedClipId);
   const setSelectedClipId = useStoryStore((state) => state.setSelectedClipId);
-  
+
   // Trim state
   const [trimmingItem, setTrimmingItem] = useState<string | null>(null);
   const [trimSide, setTrimSide] = useState<'start' | 'end' | null>(null);
   const [trimStartX, setTrimStartX] = useState(0);
-  const [tempTrimValues, setTempTrimValues] = useState<{ trim_start_ms: number; trim_end_ms: number } | null>(null);
+  const [tempTrimValues, setTempTrimValues] = useState<{
+    trim_start_ms: number;
+    trim_end_ms: number;
+  } | null>(null);
 
   // Track editor height from store (shared with FloatingGenerateBox)
   const editorHeight = useStoryStore((state) => state.trackEditorHeight);
@@ -156,10 +173,10 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
         ...items.map((item) => {
           const trimStart = item.trim_start_ms || 0;
           const trimEnd = item.trim_end_ms || 0;
-          const effectiveDuration = (item.duration * 1000) - trimStart - trimEnd;
+          const effectiveDuration = item.duration * 1000 - trimStart - trimEnd;
           return item.start_time_ms + effectiveDuration;
         }),
-        0
+        0,
       );
       setActiveStory(storyId, items, totalDuration);
     }
@@ -214,11 +231,8 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   // Calculate total duration (using effective durations)
   const totalDurationMs = useMemo(() => {
     if (items.length === 0) return 10000; // Default 10 seconds
-    return Math.max(
-      ...items.map((item) => item.start_time_ms + getEffectiveDuration(item)),
-      10000
-    );
-  }, [items]);
+    return Math.max(...items.map((item) => item.start_time_ms + getEffectiveDuration(item)), 10000);
+  }, [items, getEffectiveDuration]);
 
   // Calculate timeline width - at least full container width
   const contentWidth = (totalDurationMs / 1000) * pixelsPerSecond + 200; // Content width with padding
@@ -246,15 +260,9 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const msToPixels = useCallback(
-    (ms: number) => (ms / 1000) * pixelsPerSecond,
-    [pixelsPerSecond]
-  );
+  const msToPixels = useCallback((ms: number) => (ms / 1000) * pixelsPerSecond, [pixelsPerSecond]);
 
-  const pixelsToMs = useCallback(
-    (px: number) => (px / pixelsPerSecond) * 1000,
-    [pixelsPerSecond]
-  );
+  const pixelsToMs = useCallback((px: number) => (px / pixelsPerSecond) * 1000, [pixelsPerSecond]);
 
   const handleZoomIn = () => {
     setPixelsPerSecond((prev) => Math.min(prev * 1.5, MAX_PIXELS_PER_SECOND));
@@ -265,22 +273,28 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   };
 
   // Resize handlers
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-    resizeStartY.current = e.clientY;
-    resizeStartHeight.current = editorHeight;
-  }, [editorHeight]);
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      resizeStartY.current = e.clientY;
+      resizeStartHeight.current = editorHeight;
+    },
+    [editorHeight],
+  );
 
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    const deltaY = resizeStartY.current - e.clientY;
-    const newHeight = Math.min(
-      MAX_EDITOR_HEIGHT,
-      Math.max(MIN_EDITOR_HEIGHT, resizeStartHeight.current + deltaY)
-    );
-    setEditorHeight(newHeight);
-  }, [isResizing, setEditorHeight]);
+  const handleResizeMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const deltaY = resizeStartY.current - e.clientY;
+      const newHeight = Math.min(
+        MAX_EDITOR_HEIGHT,
+        Math.max(MIN_EDITOR_HEIGHT, resizeStartHeight.current + deltaY),
+      );
+      setEditorHeight(newHeight);
+    },
+    [isResizing, setEditorHeight],
+  );
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
@@ -328,44 +342,57 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     };
   };
 
-
-  const trimStartItemRef = useRef<{ item: StoryItemDetail; initialTrimStart: number; initialTrimEnd: number } | null>(null);
+  const trimStartItemRef = useRef<{
+    item: StoryItemDetail;
+    initialTrimStart: number;
+    initialTrimEnd: number;
+  } | null>(null);
 
   const handleTrimMove = useCallback(
     (e: MouseEvent) => {
       if (!trimmingItem || !trimSide || !trimStartItemRef.current) return;
-      
+
       const deltaX = e.clientX - trimStartX;
       const deltaMs = pixelsToMs(deltaX); // Signed delta in milliseconds
-      
+
       const { item, initialTrimStart, initialTrimEnd } = trimStartItemRef.current;
       const originalDurationMs = item.duration * 1000;
-      
+
       let newTrimStart = initialTrimStart;
       let newTrimEnd = initialTrimEnd;
-      
+
       if (trimSide === 'start') {
         // Moving right increases trim_start (trims more from start)
         // Moving left decreases trim_start (restores from start)
-        newTrimStart = Math.round(Math.max(0, Math.min(initialTrimStart + deltaMs, originalDurationMs - initialTrimEnd - 100)));
+        newTrimStart = Math.round(
+          Math.max(
+            0,
+            Math.min(initialTrimStart + deltaMs, originalDurationMs - initialTrimEnd - 100),
+          ),
+        );
       } else {
         // Moving right decreases trim_end (restores from end)
         // Moving left increases trim_end (trims more from end)
-        newTrimEnd = Math.round(Math.max(0, Math.min(initialTrimEnd - deltaMs, originalDurationMs - initialTrimStart - 100)));
+        newTrimEnd = Math.round(
+          Math.max(
+            0,
+            Math.min(initialTrimEnd - deltaMs, originalDurationMs - initialTrimStart - 100),
+          ),
+        );
       }
-      
+
       // Validate that we don't exceed duration
       if (newTrimStart + newTrimEnd >= originalDurationMs - 100) {
         return; // Don't allow trimming to less than 100ms
       }
-      
+
       // Update temporary trim values for visual feedback
       setTempTrimValues({
         trim_start_ms: newTrimStart,
         trim_end_ms: newTrimEnd,
       });
     },
-    [trimmingItem, trimSide, trimStartX, pixelsToMs]
+    [trimmingItem, trimSide, trimStartX, pixelsToMs],
   );
 
   const handleTrimEnd = useCallback(() => {
@@ -378,12 +405,12 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     }
 
     const { initialTrimStart, initialTrimEnd } = trimStartItemRef.current;
-    
+
     // Use temporary trim values if available, otherwise use initial values
     // Ensure values are integers for the backend
     const finalTrimStart = Math.round(tempTrimValues?.trim_start_ms ?? initialTrimStart);
     const finalTrimEnd = Math.round(tempTrimValues?.trim_end_ms ?? initialTrimEnd);
-    
+
     // Only update if values changed
     if (finalTrimStart !== initialTrimStart || finalTrimEnd !== initialTrimEnd) {
       trimItem.mutate(
@@ -403,10 +430,10 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
               variant: 'destructive',
             });
           },
-        }
+        },
       );
     }
-    
+
     setTrimmingItem(null);
     setTrimSide(null);
     setTempTrimValues(null);
@@ -415,13 +442,13 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
   const handleSplit = useCallback(() => {
     if (!selectedClipId) return;
-    
+
     const item = items.find((i) => i.id === selectedClipId);
     if (!item) return;
 
     const splitTimeMs = currentTimeMs - item.start_time_ms;
     const effectiveDuration = getEffectiveDuration(item);
-    
+
     if (splitTimeMs <= 0 || splitTimeMs >= effectiveDuration) {
       toast({
         title: 'Invalid split point',
@@ -448,9 +475,18 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
             variant: 'destructive',
           });
         },
-      }
+      },
     );
-  }, [selectedClipId, items, currentTimeMs, getEffectiveDuration, storyId, splitItem, toast, setSelectedClipId]);
+  }, [
+    selectedClipId,
+    items,
+    currentTimeMs,
+    getEffectiveDuration,
+    storyId,
+    splitItem,
+    toast,
+    setSelectedClipId,
+  ]);
 
   const handleDuplicate = useCallback(() => {
     if (!selectedClipId) return;
@@ -468,7 +504,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
             variant: 'destructive',
           });
         },
-      }
+      },
     );
   }, [selectedClipId, storyId, duplicateItem, toast]);
 
@@ -491,7 +527,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
             variant: 'destructive',
           });
         },
-      }
+      },
     );
   }, [selectedClipId, storyId, removeItem, toast, setSelectedClipId]);
 
@@ -539,10 +575,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
     }
   }, [trimmingItem, handleTrimMove, handleTrimEnd]);
 
-  const handleDragStart = (
-    e: React.MouseEvent,
-    item: StoryItemDetail
-  ) => {
+  const handleDragStart = (e: React.MouseEvent, item: StoryItemDetail) => {
     e.stopPropagation();
     if (!tracksRef.current) return;
 
@@ -568,7 +601,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
       setDragPosition({ x: Math.max(0, x), y });
     },
-    [draggingItem, dragOffset]
+    [draggingItem, dragOffset],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -610,7 +643,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
               variant: 'destructive',
             });
           },
-        }
+        },
       );
     }
 
@@ -650,257 +683,270 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 z-50">
-      <div className="border-t bg-background/30 backdrop-blur-2xl overflow-hidden relative" ref={containerRef}>
-      {/* Resize handle at top */}
-      <button
-        type="button"
-        className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center hover:bg-muted/50 transition-colors z-20 group"
-        onMouseDown={handleResizeStart}
-        aria-label="Resize track editor"
+      <div
+        className="border-t bg-background/30 backdrop-blur-2xl overflow-hidden relative"
+        ref={containerRef}
       >
-        <GripHorizontal className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground" />
-      </button>
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 mt-2">
-        {/* Play controls - left side */}
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePlayPause}>
-            {isCurrentlyPlaying ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-          </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleStop} disabled={!isCurrentlyPlaying}>
-            <Square className="h-3 w-3" />
-          </Button>
-          <span className="text-xs text-muted-foreground tabular-nums ml-2">
-            {formatTime(currentTimeMs)} / {formatTime(totalDurationMs)}
-          </span>
-        </div>
-
-        {/* Clip editing controls - center */}
-        {selectedClipId && (
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleSplit}
-              title="Split at playhead (S)"
-            >
-              <Scissors className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleDuplicate}
-              title="Duplicate (Cmd/Ctrl+D)"
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleDelete}
-              title="Delete (Delete/Backspace)"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Zoom controls - right side */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Zoom:</span>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut}>
-            <Minus className="h-3 w-3" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn}>
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Timeline container with track labels sidebar */}
-      <div className="flex" style={{ height: `${timelineContainerHeight}px` }}>
-        {/* Track labels sidebar - fixed width */}
-        <div className="w-16 shrink-0 border-r bg-muted/20 overflow-hidden">
-          {/* Spacer for time ruler */}
-          <div className="h-6 border-b bg-muted/30" />
-          {/* Track labels */}
-          <div style={{ height: `${tracksAreaHeight}px` }}>
-            {tracks.map((trackNumber, index) => (
-              <div
-                key={trackNumber}
-                className={cn(
-                  'border-b flex items-center justify-center',
-                  index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
-                )}
-                style={{ height: `${TRACK_HEIGHT}px` }}
-              >
-                <span className="text-[10px] text-muted-foreground select-none">
-                  {trackNumber}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Scrollable timeline area */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: Container handles drag events for child clips */}
-        <div
-          ref={tracksRef}
-          className="overflow-auto relative flex-1"
-          onMouseMove={draggingItem ? handleDragMove : undefined}
-          onMouseUp={draggingItem ? handleDragEnd : undefined}
-          onMouseLeave={draggingItem ? handleDragEnd : undefined}
+        {/* Resize handle at top */}
+        <button
+          type="button"
+          className="absolute top-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center hover:bg-muted/50 transition-colors z-20 group"
+          onMouseDown={handleResizeStart}
+          aria-label="Resize track editor"
         >
-          {/* Time ruler - clickable to seek */}
-          <button
-            type="button"
-            className="h-6 border-b bg-muted/20 sticky top-0 z-10 cursor-pointer text-left"
-            style={{ width: `${timelineWidth}px` }}
-            onClick={handleTimelineClick}
-            aria-label="Seek timeline"
-          >
-            {timeMarkers.map((ms) => (
-              <div
-                key={ms}
-                className="absolute top-0 h-full flex flex-col justify-end pointer-events-none"
-                style={{ left: `${msToPixels(ms)}px` }}
+          <GripHorizontal className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground" />
+        </button>
+
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 mt-2">
+          {/* Play controls - left side */}
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePlayPause}>
+              {isCurrentlyPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={handleStop}
+              disabled={!isCurrentlyPlaying}
+            >
+              <Square className="h-3 w-3" />
+            </Button>
+            <span className="text-xs text-muted-foreground tabular-nums ml-2">
+              {formatTime(currentTimeMs)} / {formatTime(totalDurationMs)}
+            </span>
+          </div>
+
+          {/* Clip editing controls - center */}
+          {selectedClipId && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleSplit}
+                title="Split at playhead (S)"
               >
-                <div className="h-2 w-px bg-border" />
-                <span className="text-[10px] text-muted-foreground ml-1 select-none">
-                  {formatTime(ms)}
-                </span>
-              </div>
-            ))}
-          </button>
+                <Scissors className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleDuplicate}
+                title="Duplicate (Cmd/Ctrl+D)"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleDelete}
+                title="Delete (Delete/Backspace)"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
 
-          {/* Tracks area */}
+          {/* Zoom controls - right side */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Zoom:</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut}>
+              <Minus className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn}>
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Timeline container with track labels sidebar */}
+        <div className="flex" style={{ height: `${timelineContainerHeight}px` }}>
+          {/* Track labels sidebar - fixed width */}
+          <div className="w-16 shrink-0 border-r bg-muted/20 overflow-hidden">
+            {/* Spacer for time ruler */}
+            <div className="h-6 border-b bg-muted/30" />
+            {/* Track labels */}
+            <div style={{ height: `${tracksAreaHeight}px` }}>
+              {tracks.map((trackNumber, index) => (
+                <div
+                  key={trackNumber}
+                  className={cn(
+                    'border-b flex items-center justify-center',
+                    index % 2 === 0 ? 'bg-background' : 'bg-muted/10',
+                  )}
+                  style={{ height: `${TRACK_HEIGHT}px` }}
+                >
+                  <span className="text-[10px] text-muted-foreground select-none">
+                    {trackNumber}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Scrollable timeline area */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: Container handles drag events for child clips */}
           <div
-            className="relative"
-            style={{ width: `${timelineWidth}px`, height: `${tracksAreaHeight}px` }}
+            ref={tracksRef}
+            className="overflow-auto relative flex-1"
+            onMouseMove={draggingItem ? handleDragMove : undefined}
+            onMouseUp={draggingItem ? handleDragEnd : undefined}
+            onMouseLeave={draggingItem ? handleDragEnd : undefined}
           >
-            {/* Track backgrounds - pointer-events-none to allow clicks to pass through */}
-            {tracks.map((trackNumber, index) => (
-              <div
-                key={trackNumber}
-                className={cn(
-                  'absolute left-0 right-0 border-b pointer-events-none',
-                  index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
-                )}
-                style={{
-                  top: `${index * TRACK_HEIGHT}px`,
-                  height: `${TRACK_HEIGHT}px`,
-                }}
-              />
-            ))}
-
-            {/* Click area for seeking - z-index lower than clips */}
+            {/* Time ruler - clickable to seek */}
             <button
               type="button"
-              className="absolute inset-0 z-0 cursor-pointer"
+              className="h-6 border-b bg-muted/20 sticky top-0 z-10 cursor-pointer text-left"
+              style={{ width: `${timelineWidth}px` }}
               onClick={handleTimelineClick}
               aria-label="Seek timeline"
-            />
-
-          {/* Audio clips */}
-          {items.map((item) => {
-            const isDragging = draggingItem === item.id;
-            const isSelected = selectedClipId === item.id;
-            const isTrimming = trimmingItem === item.id;
-            
-            // Use temporary trim values during trimming for visual feedback
-            const displayTrimStart = isTrimming && tempTrimValues ? tempTrimValues.trim_start_ms : (item.trim_start_ms || 0);
-            const displayTrimEnd = isTrimming && tempTrimValues ? tempTrimValues.trim_end_ms : (item.trim_end_ms || 0);
-            const effectiveDuration = (item.duration * 1000) - displayTrimStart - displayTrimEnd;
-            
-            const style = getClipStyle({ ...item, trim_start_ms: displayTrimStart, trim_end_ms: displayTrimEnd });
-            const clipWidth = msToPixels(effectiveDuration);
-
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  'absolute rounded select-none overflow-visible z-10',
-                  isSelected && 'ring-2 ring-primary ring-offset-1',
-                  isTrimming && 'ring-2 ring-accent'
-                )}
-                style={style}
-              >
-                <button
-                  type="button"
-                  className={cn(
-                    'w-full h-full rounded cursor-move overflow-hidden',
-                    'bg-accent/80 hover:bg-accent border border-accent-foreground/20',
-                    'flex flex-col justify-center',
-                    isDragging && 'opacity-80 shadow-lg z-20',
-                    !isDragging && 'transition-all duration-100'
-                  )}
-                  onClick={(e) => handleClipClick(e, item)}
-                  onMouseDown={(e) => {
-                    // Only start drag if not clicking on trim handles
-                    if (!(e.target as HTMLElement).closest('.trim-handle')) {
-                      handleDragStart(e, item);
-                    }
-                  }}
+            >
+              {timeMarkers.map((ms) => (
+                <div
+                  key={ms}
+                  className="absolute top-0 h-full flex flex-col justify-end pointer-events-none"
+                  style={{ left: `${msToPixels(ms)}px` }}
                 >
-                  {/* Clip label */}
-                  <div className="absolute top-0 left-1 right-1 z-10">
-                    <p className="text-[9px] font-medium text-accent-foreground truncate">
-                      {item.profile_name}
-                    </p>
-                  </div>
-                  {/* Waveform */}
-                  <div className="absolute inset-0 top-3">
-                    <ClipWaveform 
-                      generationId={item.generation_id} 
-                      width={clipWidth}
-                      trimStartMs={displayTrimStart}
-                      trimEndMs={displayTrimEnd}
-                      duration={item.duration}
-                    />
-                  </div>
-                </button>
-                
-                {/* Trim handles */}
-                {isSelected && (
-                  <>
-                    {/* Left trim handle */}
-                    <button
-                      type="button"
-                      className="trim-handle absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-l"
-                      onMouseDown={(e) => handleTrimStart(e, item, 'start')}
-                      aria-label="Trim start"
-                    />
-                    {/* Right trim handle */}
-                    <button
-                      type="button"
-                      className="trim-handle absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-r"
-                      onMouseDown={(e) => handleTrimStart(e, item, 'end')}
-                      aria-label="Trim end"
-                    />
-                  </>
-                )}
-              </div>
-            );
-          })}
+                  <div className="h-2 w-px bg-border" />
+                  <span className="text-[10px] text-muted-foreground ml-1 select-none">
+                    {formatTime(ms)}
+                  </span>
+                </div>
+              ))}
+            </button>
 
-          {/* Playhead - always visible */}
-          <div
-            className="absolute top-0 bottom-0 w-1 bg-accent z-30 pointer-events-none rounded-full"
-            style={{ left: `${playheadLeft}px` }}
-          >
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full" />
+            {/* Tracks area */}
+            <div
+              className="relative"
+              style={{ width: `${timelineWidth}px`, height: `${tracksAreaHeight}px` }}
+            >
+              {/* Track backgrounds - pointer-events-none to allow clicks to pass through */}
+              {tracks.map((trackNumber, index) => (
+                <div
+                  key={trackNumber}
+                  className={cn(
+                    'absolute left-0 right-0 border-b pointer-events-none',
+                    index % 2 === 0 ? 'bg-background' : 'bg-muted/10',
+                  )}
+                  style={{
+                    top: `${index * TRACK_HEIGHT}px`,
+                    height: `${TRACK_HEIGHT}px`,
+                  }}
+                />
+              ))}
+
+              {/* Click area for seeking - z-index lower than clips */}
+              <button
+                type="button"
+                className="absolute inset-0 z-0 cursor-pointer"
+                onClick={handleTimelineClick}
+                aria-label="Seek timeline"
+              />
+
+              {/* Audio clips */}
+              {items.map((item) => {
+                const isDragging = draggingItem === item.id;
+                const isSelected = selectedClipId === item.id;
+                const isTrimming = trimmingItem === item.id;
+
+                // Use temporary trim values during trimming for visual feedback
+                const displayTrimStart =
+                  isTrimming && tempTrimValues
+                    ? tempTrimValues.trim_start_ms
+                    : item.trim_start_ms || 0;
+                const displayTrimEnd =
+                  isTrimming && tempTrimValues ? tempTrimValues.trim_end_ms : item.trim_end_ms || 0;
+                const effectiveDuration = item.duration * 1000 - displayTrimStart - displayTrimEnd;
+
+                const style = getClipStyle({
+                  ...item,
+                  trim_start_ms: displayTrimStart,
+                  trim_end_ms: displayTrimEnd,
+                });
+                const clipWidth = msToPixels(effectiveDuration);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'absolute rounded select-none overflow-visible z-10',
+                      isSelected && 'ring-2 ring-primary ring-offset-1',
+                      isTrimming && 'ring-2 ring-accent',
+                    )}
+                    style={style}
+                  >
+                    <button
+                      type="button"
+                      className={cn(
+                        'w-full h-full rounded cursor-move overflow-hidden',
+                        'bg-accent/80 hover:bg-accent border border-accent-foreground/20',
+                        'flex flex-col justify-center',
+                        isDragging && 'opacity-80 shadow-lg z-20',
+                        !isDragging && 'transition-all duration-100',
+                      )}
+                      onClick={(e) => handleClipClick(e, item)}
+                      onMouseDown={(e) => {
+                        // Only start drag if not clicking on trim handles
+                        if (!(e.target as HTMLElement).closest('.trim-handle')) {
+                          handleDragStart(e, item);
+                        }
+                      }}
+                    >
+                      {/* Clip label */}
+                      <div className="absolute top-0 left-1 right-1 z-10">
+                        <p className="text-[9px] font-medium text-accent-foreground truncate">
+                          {item.profile_name}
+                        </p>
+                      </div>
+                      {/* Waveform */}
+                      <div className="absolute inset-0 top-3">
+                        <ClipWaveform
+                          generationId={item.generation_id}
+                          width={clipWidth}
+                          trimStartMs={displayTrimStart}
+                          trimEndMs={displayTrimEnd}
+                          duration={item.duration}
+                        />
+                      </div>
+                    </button>
+
+                    {/* Trim handles */}
+                    {isSelected && (
+                      <>
+                        {/* Left trim handle */}
+                        <button
+                          type="button"
+                          className="trim-handle absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-l"
+                          onMouseDown={(e) => handleTrimStart(e, item, 'start')}
+                          aria-label="Trim start"
+                        />
+                        {/* Right trim handle */}
+                        <button
+                          type="button"
+                          className="trim-handle absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-primary/30 bg-primary/20 z-30 rounded-r"
+                          onMouseDown={(e) => handleTrimStart(e, item, 'end')}
+                          aria-label="Trim end"
+                        />
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Playhead - always visible */}
+              <div
+                className="absolute top-0 bottom-0 w-1 bg-accent z-30 pointer-events-none rounded-full"
+                style={{ left: `${playheadLeft}px` }}
+              >
+                <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full" />
+              </div>
+            </div>
           </div>
         </div>
-        </div>
-      </div>
       </div>
     </div>
   );

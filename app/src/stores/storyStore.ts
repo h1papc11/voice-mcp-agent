@@ -58,14 +58,11 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
     // Calculate total duration from items
     const maxEndTimeMs = Math.max(
       ...items.map((item) => item.start_time_ms + item.duration * 1000),
-      0
+      0,
     );
 
     // Find the minimum start time (first item)
-    const minStartTimeMs = Math.min(
-      ...items.map((item) => item.start_time_ms),
-      0
-    );
+    const minStartTimeMs = Math.min(...items.map((item) => item.start_time_ms), 0);
 
     // If resuming the same story, keep position; otherwise start at first item
     const currentState = get();
@@ -75,7 +72,11 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
     console.log('[StoryStore] Play called:', {
       storyId,
       itemCount: items.length,
-      items: items.map(i => ({ id: i.generation_id, start: i.start_time_ms, duration: i.duration })),
+      items: items.map((i) => ({
+        id: i.generation_id,
+        start: i.start_time_ms,
+        duration: i.duration,
+      })),
       maxEndTimeMs,
       minStartTimeMs,
       startTimeMs,
@@ -92,7 +93,7 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   },
 
   pause: () => {
-    set({ 
+    set({
       isPlaying: false,
       // Keep timing anchors so we can resume from same position
     });
@@ -113,7 +114,7 @@ export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   seek: (timeMs) => {
     const state = get();
     const clampedTime = Math.max(0, Math.min(timeMs, state.totalDurationMs));
-    set({ 
+    set({
       currentTimeMs: clampedTime,
       // Reset timing anchors - will be set by hook when playback resumes
       playbackStartContextTime: null,
