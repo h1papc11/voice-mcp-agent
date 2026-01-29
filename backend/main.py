@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+import asyncio
 import uvicorn
 import argparse
 import torch
@@ -451,6 +452,36 @@ async def generate_speech(
         tts_model = tts.get_tts_model()
         # Load the requested model size if different from current (async to not block)
         model_size = data.model_size or "1.7B"
+
+        # Check if model needs to be downloaded first
+        model_path = tts_model._get_model_path(model_size)
+        if model_path.startswith("Qwen/"):
+            # Model not cached - check if it exists remotely or needs download
+            from huggingface_hub import constants as hf_constants
+            repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
+            if not repo_cache.exists():
+                # Start download in background
+                model_name = f"qwen-tts-{model_size}"
+
+                async def download_model_background():
+                    try:
+                        await tts_model.load_model_async(model_size)
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_model_background())
+
+                # Return 202 Accepted with download info
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True
+                    }
+                )
+
         await tts_model.load_model_async(model_size)
         audio, sample_rate = await tts_model.generate(
             data.text,
@@ -684,6 +715,37 @@ async def transcribe_audio(
         
         # Transcribe
         whisper_model = transcribe.get_whisper_model()
+
+        # Check if Whisper model is downloaded (uses default size "base")
+        model_size = whisper_model.model_size
+        model_name = f"openai/whisper-{model_size}"
+
+        # Check if model is cached
+        from huggingface_hub import constants as hf_constants
+        repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
+        if not repo_cache.exists():
+            # Start download in background
+            progress_model_name = f"whisper-{model_size}"
+
+            async def download_whisper_background():
+                try:
+                    await whisper_model.load_model_async(model_size)
+                except Exception as e:
+                    get_task_manager().error_download(progress_model_name, str(e))
+
+            get_task_manager().start_download(progress_model_name)
+            asyncio.create_task(download_whisper_background())
+
+            # Return 202 Accepted
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "message": f"Whisper model {model_size} is being downloaded. Please wait and try again.",
+                    "model_name": progress_model_name,
+                    "downloading": True
+                }
+            )
+
         text = await whisper_model.transcribe(tmp_path, language)
         
         return models.TranscriptionResponse(
