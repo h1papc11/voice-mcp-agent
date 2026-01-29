@@ -1,11 +1,59 @@
-import { GripHorizontal, Minus, Plus } from 'lucide-react';
+import { GripHorizontal, Minus, Pause, Play, Plus, Square } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api/client';
 import { useMoveStoryItem } from '@/lib/hooks/useStories';
 import { useStoryStore } from '@/stores/storyStore';
 import type { StoryItemDetail } from '@/lib/api/types';
 import { cn } from '@/lib/utils/cn';
+
+// Clip waveform component
+function ClipWaveform({ generationId, width }: { generationId: string; width: number }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wavesurferRef = useRef<WaveSurfer | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || width < 20) return;
+
+    // Get CSS colors
+    const root = document.documentElement;
+    const getCSSVar = (varName: string) => {
+      const value = getComputedStyle(root).getPropertyValue(varName).trim();
+      return value ? `hsl(${value})` : '';
+    };
+
+    const waveColor = getCSSVar('--accent-foreground');
+
+    const wavesurfer = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor,
+      progressColor: waveColor,
+      cursorWidth: 0,
+      barWidth: 1,
+      barRadius: 1,
+      barGap: 1,
+      height: 28,
+      normalize: true,
+      interact: false,
+    });
+
+    wavesurferRef.current = wavesurfer;
+
+    const audioUrl = apiClient.getAudioUrl(generationId);
+    wavesurfer.load(audioUrl).catch(() => {
+      // Ignore load errors
+    });
+
+    return () => {
+      wavesurfer.destroy();
+      wavesurferRef.current = null;
+    };
+  }, [generationId, width]);
+
+  return <div ref={containerRef} className="w-full h-full opacity-60" />;
+}
 
 interface StoryTrackEditorProps {
   storyId: string;
@@ -39,11 +87,34 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const setEditorHeight = useStoryStore((state) => state.setTrackEditorHeight);
 
   // Playback state
+  const isPlaying = useStoryStore((state) => state.isPlaying);
   const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
+  const storeTotalDurationMs = useStoryStore((state) => state.totalDurationMs);
   const playbackStoryId = useStoryStore((state) => state.playbackStoryId);
+  const play = useStoryStore((state) => state.play);
+  const pause = useStoryStore((state) => state.pause);
+  const stop = useStoryStore((state) => state.stop);
   const seek = useStoryStore((state) => state.seek);
 
   const isActiveStory = playbackStoryId === storyId;
+  const isCurrentlyPlaying = isPlaying && isActiveStory;
+
+  // Sort items by start time for play
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => a.start_time_ms - b.start_time_ms);
+  }, [items]);
+
+  const handlePlayPause = () => {
+    if (isCurrentlyPlaying) {
+      pause();
+    } else {
+      play(storyId, sortedItems);
+    }
+  };
+
+  const handleStop = () => {
+    stop();
+  };
 
   // Calculate unique tracks from items, always showing at least 3 default tracks
   const tracks = useMemo(() => {
@@ -286,84 +357,122 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
       </button>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30 mt-2">
-        <span className="text-xs text-muted-foreground">Zoom:</span>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut}>
-          <Minus className="h-3 w-3" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn}>
-          <Plus className="h-3 w-3" />
-        </Button>
-        <span className="text-xs text-muted-foreground ml-2">
-          {Math.round(pixelsPerSecond)}px/s
-        </span>
-      </div>
-
-      {/* Timeline container - drag handlers are intentional for drag-and-drop UX */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: Container handles drag events for child clips */}
-      <div
-        ref={tracksRef}
-        className="overflow-auto relative"
-        style={{ height: `${timelineContainerHeight}px` }}
-        onMouseMove={draggingItem ? handleDragMove : undefined}
-        onMouseUp={draggingItem ? handleDragEnd : undefined}
-        onMouseLeave={draggingItem ? handleDragEnd : undefined}
-      >
-        {/* Time ruler */}
-        <div
-          className="h-6 border-b bg-muted/20 sticky top-0 z-10"
-          style={{ width: `${timelineWidth}px` }}
-        >
-          {timeMarkers.map((ms) => (
-            <div
-              key={ms}
-              className="absolute top-0 h-full flex flex-col justify-end"
-              style={{ left: `${msToPixels(ms)}px` }}
-            >
-              <div className="h-2 w-px bg-border" />
-              <span className="text-[10px] text-muted-foreground ml-1 select-none">
-                {formatTime(ms)}
-              </span>
-            </div>
-          ))}
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 mt-2">
+        {/* Play controls - left side */}
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handlePlayPause}>
+            {isCurrentlyPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleStop} disabled={!isActiveStory}>
+            <Square className="h-3 w-3" />
+          </Button>
+          <span className="text-xs text-muted-foreground tabular-nums ml-2">
+            {formatTime(isActiveStory ? currentTimeMs : 0)} / {formatTime(isActiveStory ? storeTotalDurationMs : 0)}
+          </span>
         </div>
 
-        {/* Tracks area */}
-        <div
-          className="relative"
-          style={{ width: `${timelineWidth}px`, height: `${tracksAreaHeight}px` }}
-        >
-          {/* Track backgrounds */}
-          {tracks.map((trackNumber, index) => (
-            <div
-              key={trackNumber}
-              className={cn(
-                'absolute left-0 right-0 border-b',
-                index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
-              )}
-              style={{
-                top: `${index * TRACK_HEIGHT}px`,
-                height: `${TRACK_HEIGHT}px`,
-              }}
-            >
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground select-none">
-                Track {trackNumber}
-              </span>
-            </div>
-          ))}
+        {/* Zoom controls - right side */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Zoom:</span>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomOut}>
+            <Minus className="h-3 w-3" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleZoomIn}>
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
 
-          {/* Click area for seeking - z-index lower than clips */}
-          <button
-            type="button"
-            className="absolute inset-0 z-0 cursor-pointer"
-            onClick={handleTimelineClick}
-            aria-label="Seek timeline"
-          />
+      {/* Timeline container with track labels sidebar */}
+      <div className="flex" style={{ height: `${timelineContainerHeight}px` }}>
+        {/* Track labels sidebar - fixed width */}
+        <div className="w-16 shrink-0 border-r bg-muted/20 overflow-hidden">
+          {/* Spacer for time ruler */}
+          <div className="h-6 border-b bg-muted/30" />
+          {/* Track labels */}
+          <div style={{ height: `${tracksAreaHeight}px` }}>
+            {tracks.map((trackNumber, index) => (
+              <div
+                key={trackNumber}
+                className={cn(
+                  'border-b flex items-center justify-center',
+                  index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
+                )}
+                style={{ height: `${TRACK_HEIGHT}px` }}
+              >
+                <span className="text-[10px] text-muted-foreground select-none">
+                  {trackNumber}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable timeline area */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: Container handles drag events for child clips */}
+        <div
+          ref={tracksRef}
+          className="overflow-auto relative flex-1"
+          onMouseMove={draggingItem ? handleDragMove : undefined}
+          onMouseUp={draggingItem ? handleDragEnd : undefined}
+          onMouseLeave={draggingItem ? handleDragEnd : undefined}
+        >
+          {/* Time ruler */}
+          <div
+            className="h-6 border-b bg-muted/20 sticky top-0 z-10"
+            style={{ width: `${timelineWidth}px` }}
+          >
+            {timeMarkers.map((ms) => (
+              <div
+                key={ms}
+                className="absolute top-0 h-full flex flex-col justify-end"
+                style={{ left: `${msToPixels(ms)}px` }}
+              >
+                <div className="h-2 w-px bg-border" />
+                <span className="text-[10px] text-muted-foreground ml-1 select-none">
+                  {formatTime(ms)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Tracks area */}
+          <div
+            className="relative"
+            style={{ width: `${timelineWidth}px`, height: `${tracksAreaHeight}px` }}
+          >
+            {/* Track backgrounds */}
+            {tracks.map((trackNumber, index) => (
+              <div
+                key={trackNumber}
+                className={cn(
+                  'absolute left-0 right-0 border-b',
+                  index % 2 === 0 ? 'bg-background' : 'bg-muted/10'
+                )}
+                style={{
+                  top: `${index * TRACK_HEIGHT}px`,
+                  height: `${TRACK_HEIGHT}px`,
+                }}
+              />
+            ))}
+
+            {/* Click area for seeking - z-index lower than clips */}
+            <button
+              type="button"
+              className="absolute inset-0 z-0 cursor-pointer"
+              onClick={handleTimelineClick}
+              aria-label="Seek timeline"
+            />
 
           {/* Audio clips */}
           {items.map((item) => {
             const isDragging = draggingItem === item.generation_id;
             const style = getClipStyle(item);
+            const clipWidth = msToPixels(item.duration * 1000);
 
             return (
               <button
@@ -372,20 +481,22 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
                 className={cn(
                   'absolute rounded cursor-move select-none overflow-hidden z-10',
                   'bg-accent/80 hover:bg-accent border border-accent-foreground/20',
-                  'flex items-center px-2 text-left',
+                  'flex flex-col justify-center',
                   isDragging && 'opacity-80 shadow-lg z-20',
                   !isDragging && 'transition-all duration-100'
                 )}
                 style={style}
                 onMouseDown={(e) => handleDragStart(e, item)}
               >
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-medium text-accent-foreground truncate">
+                {/* Clip label */}
+                <div className="absolute top-0 left-1 right-1 z-10">
+                  <p className="text-[9px] font-medium text-accent-foreground truncate">
                     {item.profile_name}
                   </p>
-                  <p className="text-[9px] text-accent-foreground/70 truncate">
-                    {item.text.substring(0, 30)}...
-                  </p>
+                </div>
+                {/* Waveform */}
+                <div className="absolute inset-0 top-3">
+                  <ClipWaveform generationId={item.generation_id} width={clipWidth} />
                 </div>
               </button>
             );
@@ -394,12 +505,13 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
           {/* Playhead */}
           {isActiveStory && (
             <div
-              className="absolute top-0 bottom-0 w-px bg-primary z-30 pointer-events-none"
+              className="absolute top-0 bottom-0 w-1 bg-accent z-30 pointer-events-none rounded-full"
               style={{ left: `${playheadLeft}px` }}
             >
-              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-primary" />
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-accent rounded-full" />
             </div>
           )}
+        </div>
         </div>
       </div>
       </div>

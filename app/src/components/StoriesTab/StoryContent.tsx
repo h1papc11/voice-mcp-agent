@@ -1,11 +1,11 @@
 import {
-  DndContext,
   closestCenter,
+  DndContext,
+  type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -13,16 +13,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Download, Pause, Play } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
 import {
-  useStory,
-  useRemoveStoryItem,
   useExportStoryAudio,
+  useRemoveStoryItem,
   useReorderStoryItems,
+  useStory,
 } from '@/lib/hooks/useStories';
 import { useStoryPlayback } from '@/lib/hooks/useStoryPlayback';
 import { useStoryStore } from '@/stores/storyStore';
@@ -61,15 +60,10 @@ export function StoryContent() {
     }),
   );
 
-  // Playback state
+  // Playback state (for auto-scroll and item highlighting)
   const isPlaying = useStoryStore((state) => state.isPlaying);
   const currentTimeMs = useStoryStore((state) => state.currentTimeMs);
-  const totalDurationMs = useStoryStore((state) => state.totalDurationMs);
   const playbackStoryId = useStoryStore((state) => state.playbackStoryId);
-  const play = useStoryStore((state) => state.play);
-  const pause = useStoryStore((state) => state.pause);
-  const stop = useStoryStore((state) => state.stop);
-  const seek = useStoryStore((state) => state.seek);
 
   // Refs for auto-scrolling to playing item
   const itemRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -169,32 +163,6 @@ export function StoryContent() {
     );
   };
 
-  const handlePlayPause = () => {
-    if (!story || story.items.length === 0) return;
-
-    if (isPlaying && playbackStoryId === story.id) {
-      pause();
-    } else {
-      play(story.id, sortedItems);
-    }
-  };
-
-  const handleStop = () => {
-    stop();
-  };
-
-  const handleSeek = (value: number[]) => {
-    seek(value[0]);
-  };
-
-  const formatTime = (ms: number): string => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    const milliseconds = Math.floor((ms % 1000) / 100);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds}`;
-  };
-
   const handleExportAudio = () => {
     if (!story) return;
 
@@ -248,67 +216,23 @@ export function StoryContent() {
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 mb-4 px-1">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">{story.name}</h2>
-            {story.description && (
-              <p className="text-sm text-muted-foreground mt-1">{story.description}</p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {story.items.length > 0 && (
-              <>
-                <Button variant="outline" size="sm" onClick={handlePlayPause}>
-                  {isPlaying && playbackStoryId === story.id ? (
-                    <>
-                      <Pause className="mr-2 h-4 w-4" />
-                      Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="mr-2 h-4 w-4" />
-                      Play
-                    </>
-                  )}
-                </Button>
-                {isPlaying && playbackStoryId === story.id && (
-                  <Button variant="outline" size="sm" onClick={handleStop}>
-                    Stop
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportAudio}
-                  disabled={exportAudio.isPending}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Audio
-                </Button>
-              </>
-            )}
-          </div>
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div>
+          <h2 className="text-2xl font-bold">{story.name}</h2>
+          {story.description && (
+            <p className="text-sm text-muted-foreground mt-1">{story.description}</p>
+          )}
         </div>
-
-        {/* Playback Controls */}
         {story.items.length > 0 && (
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-muted-foreground tabular-nums min-w-16">
-              {formatTime(currentTimeMs)}
-            </span>
-            <Slider
-              value={[currentTimeMs]}
-              max={totalDurationMs || 1}
-              step={10}
-              onValueChange={handleSeek}
-              className="flex-1"
-              disabled={!isPlaying && playbackStoryId !== story.id}
-            />
-            <span className="text-xs text-muted-foreground tabular-nums min-w-16">
-              {formatTime(totalDurationMs)}
-            </span>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportAudio}
+            disabled={exportAudio.isPending}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export Audio
+          </Button>
         )}
       </div>
 

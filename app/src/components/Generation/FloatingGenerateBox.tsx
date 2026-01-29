@@ -110,7 +110,8 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
       className={cn(
         'fixed right-auto',
         isStoriesRoute
-          ? 'left-[calc(5rem+2rem+((100%-5rem-4rem)/2)+1.5rem)] w-[calc((100%-5rem-4rem)/2-1rem)]'
+          // Position aligned with story list: after sidebar + padding, width 360px
+          ? 'left-[calc(5rem+2rem)] w-[360px]'
           : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
       )}
       style={{

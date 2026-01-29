@@ -28,7 +28,7 @@ interface StoryPlaybackState {
   setPlaybackTiming: (contextTime: number, storyTime: number) => void; // Set timing anchors for Web Audio API
 }
 
-const DEFAULT_TRACK_EDITOR_HEIGHT = 200;
+const DEFAULT_TRACK_EDITOR_HEIGHT = 250;
 
 export const useStoryStore = create<StoryPlaybackState>((set, get) => ({
   // Selection

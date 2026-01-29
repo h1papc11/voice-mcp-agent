@@ -88,24 +88,12 @@ export function StoryChatItem({
             {formatTime(itemStartMs)}
           </span>
         </div>
-        <button
-          type="button"
-          className="w-full text-left cursor-pointer"
-          onClick={(e) => {
-            // Don't trigger play if clicking on textarea or if text is selected
-            const target = e.target as HTMLElement;
-            if (target.closest('textarea') || window.getSelection()?.toString()) {
-              return;
-            }
-            handlePlay();
-          }}
-        >
-          <Textarea
-            value={item.text}
-            className="flex-1 resize-none text-sm text-muted-foreground select-text pointer-events-none bg-card"
-            readOnly
-          />
-        </button>
+        <Textarea
+          value={item.text}
+          className="flex-1 resize-none text-sm text-muted-foreground select-text bg-card cursor-text"
+          readOnly
+          onDoubleClick={handlePlay}
+        />
       </div>
 
       {/* Actions */}
