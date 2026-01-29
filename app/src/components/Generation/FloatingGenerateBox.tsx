@@ -222,28 +222,30 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
               >
                 <div className="flex items-center gap-2">
                   {showVoiceSelector && (
-                    <Select
-                      value={selectedProfileId || ''}
-                      onValueChange={(value) => setSelectedProfileId(value || null)}
-                    >
-                      <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all flex-1">
-                        <SelectValue placeholder="Select a voice..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {profiles?.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id} className="text-xs">
-                            {profile.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex-1">
+                      <Select
+                        value={selectedProfileId || ''}
+                        onValueChange={(value) => setSelectedProfileId(value || null)}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all w-full">
+                          <SelectValue placeholder="Select a voice..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {profiles?.map((profile) => (
+                            <SelectItem key={profile.id} value={profile.id} className="text-xs">
+                              {profile.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
 
                   <FormField
                     control={form.control}
                     name="language"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem className="flex-1 space-y-0">
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
@@ -267,7 +269,7 @@ export function FloatingGenerateBox({ isPlayerOpen = false, showVoiceSelector = 
                     control={form.control}
                     name="modelSize"
                     render={({ field }) => (
-                      <FormItem className="flex-1">
+                      <FormItem className="flex-1 space-y-0">
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl>
                             <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">

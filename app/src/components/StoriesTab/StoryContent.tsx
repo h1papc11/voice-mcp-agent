@@ -13,11 +13,15 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Download } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { Download, Plus } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
+import { useHistory } from '@/lib/hooks/useHistory';
 import {
+  useAddStoryItem,
   useExportStoryAudio,
   useRemoveStoryItem,
   useReorderStoryItems,
@@ -36,8 +40,27 @@ export function StoryContent() {
   const removeItem = useRemoveStoryItem();
   const reorderItems = useReorderStoryItems();
   const exportAudio = useExportStoryAudio();
+  const addStoryItem = useAddStoryItem();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Add generation popover state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const { data: historyData } = useHistory();
+
+  // Filter generations not in story and matching search
+  const availableGenerations = useMemo(() => {
+    if (!historyData?.items || !story) return [];
+    const storyGenerationIds = new Set(story.items.map((i) => i.generation_id));
+    const query = searchQuery.toLowerCase();
+    return historyData.items.filter(
+      (gen) =>
+        !storyGenerationIds.has(gen.id) &&
+        (gen.text.toLowerCase().includes(query) ||
+          gen.profile_name.toLowerCase().includes(query)),
+    );
+  }, [historyData, story, searchQuery]);
 
   // Get track editor height from store for dynamic padding
   const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
@@ -183,6 +206,30 @@ export function StoryContent() {
     );
   };
 
+  const handleAddGeneration = (generationId: string) => {
+    if (!story) return;
+
+    addStoryItem.mutate(
+      {
+        storyId: story.id,
+        data: { generation_id: generationId },
+      },
+      {
+        onSuccess: () => {
+          setIsAddOpen(false);
+          setSearchQuery('');
+        },
+        onError: (error) => {
+          toast({
+            title: 'Failed to add generation',
+            description: error.message,
+            variant: 'destructive',
+          });
+        },
+      },
+    );
+  };
+
   if (!selectedStoryId) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -223,17 +270,60 @@ export function StoryContent() {
             <p className="text-sm text-muted-foreground mt-1">{story.description}</p>
           )}
         </div>
-        {story.items.length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportAudio}
-            disabled={exportAudio.isPending}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export Audio
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Popover open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="end">
+              <div className="p-2 border-b">
+                <Input
+                  placeholder="Search by name or transcript..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-60 overflow-y-auto">
+                {availableGenerations.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    {searchQuery
+                      ? 'No matching generations found'
+                      : 'No available generations'}
+                  </div>
+                ) : (
+                  availableGenerations.map((gen) => (
+                    <button
+                      key={gen.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted transition-colors border-b last:border-b-0"
+                      onClick={() => handleAddGeneration(gen.id)}
+                    >
+                      <div className="font-medium text-sm">{gen.profile_name}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {gen.text.length > 50 ? `${gen.text.substring(0, 50)}...` : gen.text}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+          {story.items.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportAudio}
+              disabled={exportAudio.isPending}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export Audio
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Content */}
