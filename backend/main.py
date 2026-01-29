@@ -79,6 +79,12 @@ async def health():
     has_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
     gpu_available = has_cuda or has_mps
 
+    gpu_type = None
+    if has_cuda:
+        gpu_type = f"CUDA ({torch.cuda.get_device_name(0)})"
+    elif has_mps:
+        gpu_type = "MPS (Apple Silicon)"
+
     vram_used = None
     if has_cuda:
         vram_used = torch.cuda.memory_allocated() / 1024 / 1024  # MB
@@ -136,6 +142,7 @@ async def health():
         model_downloaded=model_downloaded,
         model_size=model_size,
         gpu_available=gpu_available,
+        gpu_type=gpu_type,
         vram_used_mb=vram_used,
     )
 
