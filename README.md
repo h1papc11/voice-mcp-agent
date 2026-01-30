@@ -180,8 +180,9 @@ Full API documentation available at `http://localhost:8000/docs` when running.
 | Frontend | React, TypeScript, Tailwind CSS |
 | State | Zustand, React Query |
 | Backend | FastAPI (Python) |
-| Voice Model | Qwen3-TTS |
-| Transcription | Whisper |
+| Voice Model | Qwen3-TTS (PyTorch or MLX) |
+| Transcription | Whisper (PyTorch or MLX) |
+| Inference Engine | MLX (Apple Silicon) / PyTorch (Windows/Linux/Intel) |
 | Database | SQLite |
 | Audio | WaveSurfer.js, librosa |
 
@@ -257,7 +258,11 @@ cd backend && pip install -r requirements.txt && cd ..
 bun run dev
 ```
 
-**Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org). CUDA-capable GPU recommended (CPU inference supported but slower).
+**Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org). 
+
+**Performance:** 
+- **Apple Silicon (M1/M2/M3)**: Uses MLX backend with native Metal acceleration for 4-5x faster inference
+- **Windows/Linux/Intel Mac**: Uses PyTorch backend (CUDA GPU recommended, CPU supported but slower)
 
 ### Project Structure
 

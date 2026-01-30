@@ -66,18 +66,17 @@ Thank you for your interest in contributing to Voicebox! This document provides 
    # Install Python dependencies
    pip install -r requirements.txt
    
+   # Install MLX dependencies (Apple Silicon only - for faster inference)
+   # On Apple Silicon, this enables native Metal acceleration
+   if [[ $(uname -m) == "arm64" ]]; then
+     pip install -r requirements-mlx.txt
+   fi
+   
    # Install Qwen3-TTS (required for voice synthesis)
    pip install git+https://github.com/QwenLM/Qwen3-TTS.git
    ```
 
-4. **Initialize database**
-   ```bash
-   cd backend
-   python -c "from database import init_db; init_db()"
-   ```
-   This creates the SQLite database at `data/voicebox.db`.
-
-5. **Start development servers**
+4. **Start development servers**
 
    Development requires two terminals: one for the Python backend, one for the Tauri app.
 
@@ -120,8 +119,22 @@ First-time usage will be slower due to model downloads, but subsequent runs will
 
 ### Building
 
-**Build Python server binary:**
+**Build everything (recommended):**
 ```bash
+bun run build
+```
+This automatically:
+1. Builds the Python server binary (`./scripts/build-server.sh`)
+2. Builds the Tauri desktop app (`cd tauri && bun run tauri build`)
+
+Creates platform-specific installers (`.dmg`, `.msi`, `.AppImage`) in `tauri/src-tauri/target/release/bundle/`.
+
+**Note:** The build process detects your platform and includes the appropriate backend (MLX for Apple Silicon, PyTorch for others).
+
+**Build server binary only:**
+```bash
+bun run build:server
+# or
 ./scripts/build-server.sh
 ```
 Creates platform-specific binary in `tauri/src-tauri/binaries/`
@@ -132,17 +145,10 @@ If you're actively developing or modifying the Qwen3-TTS library, set the `QWEN_
 
 ```bash
 export QWEN_TTS_PATH=~/path/to/your/Qwen3-TTS
-./scripts/build-server.sh
+bun run build:server
 ```
 
 This makes PyInstaller use your local qwen-tts version instead of the pip-installed package. Useful when testing changes to the TTS library before they're published to PyPI or when using an editable install (`pip install -e`).
-
-**Build Tauri desktop app:**
-```bash
-cd tauri
-bun run tauri build
-```
-Creates platform-specific installers (`.dmg`, `.msi`, `.AppImage`)
 
 **Build web app:**
 ```bash

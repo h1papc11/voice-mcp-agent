@@ -635,13 +635,6 @@ pub fn run() {
                 }
             }
 
-            // Get all windows and open devtools on the first one
-            if let Some((_, window)) = app.webview_windows().iter().next() {
-                window.open_devtools();
-                println!("Dev tools opened");
-            } else {
-                println!("No window found to open dev tools");
-            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

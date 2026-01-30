@@ -80,18 +80,15 @@ venv\Scripts\activate  # Windows
 # Install Python dependencies
 pip install -r requirements.txt
 
+# Install MLX dependencies (Apple Silicon only - for faster inference)
+# On Apple Silicon, this enables native Metal acceleration
+if [[ $(uname -m) == "arm64" ]]; then
+  pip install -r requirements-mlx.txt
+fi
+
 # Install Qwen3-TTS
 pip install git+https://github.com/QwenLM/Qwen3-TTS.git
 ```
-
-### 3. Initialize Database
-
-```bash
-cd backend
-python -c "from database import init_db; init_db()"
-```
-
-This creates the SQLite database at `data/voicebox.db`.
 
 ## Running in Development
 

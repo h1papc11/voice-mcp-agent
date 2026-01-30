@@ -19,8 +19,13 @@ Production-quality FastAPI backend for Qwen3-TTS voice cloning.
 backend/
 ├── main.py              # FastAPI app with all routes
 ├── models.py            # Pydantic request/response models
-├── tts.py              # Qwen3-TTS inference
-├── transcribe.py       # Whisper ASR
+├── platform_detect.py   # Platform detection for backend selection
+├── tts.py              # TTS backend abstraction (delegates to MLX or PyTorch)
+├── transcribe.py       # STT backend abstraction (delegates to MLX or PyTorch)
+├── backends/           # Backend implementations
+│   ├── __init__.py     # Backend factory and protocols
+│   ├── mlx_backend.py  # MLX backend (Apple Silicon)
+│   └── pytorch_backend.py  # PyTorch backend (Windows/Linux/Intel)
 ├── profiles.py         # Voice profile CRUD
 ├── history.py          # Generation history
 ├── studio.py           # Audio editing (TODO)
@@ -30,6 +35,15 @@ backend/
     ├── cache.py        # Voice prompt caching
     └── validation.py   # Input validation
 ```
+
+### Backend Selection
+
+Voicebox automatically selects the best backend based on platform:
+
+- **Apple Silicon (M1/M2/M3)**: Uses MLX backend with native Metal acceleration (4-5x faster)
+- **Windows/Linux/Intel Mac**: Uses PyTorch backend (CUDA GPU if available, CPU fallback)
+
+The backend is detected at runtime via `platform_detect.py`. Both backends implement the same interface, so the API remains consistent across platforms.
 
 ## API Endpoints
 
@@ -47,11 +61,19 @@ Health check with model status.
   "status": "healthy",
   "model_loaded": true,
   "gpu_available": true,
-  "vram_used_mb": 1024.5
+  "gpu_type": "Metal (Apple Silicon via MLX)",
+  "backend_type": "mlx",
+  "vram_used_mb": null
 }
 ```
 
+**Backend Types:**
+- `"mlx"` - MLX backend (Apple Silicon with Metal acceleration)
+- `"pytorch"` - PyTorch backend (Windows/Linux/Intel Mac)
+
 ### Voice Profiles
+
+**Note:** The database is automatically initialized when the server starts. No manual setup required.
 
 #### `POST /profiles`
 Create a new voice profile.
@@ -266,13 +288,12 @@ data/
 pip install -r requirements.txt
 ```
 
-### 2. Initialize Database
-
+**Note:** On Apple Silicon, also install MLX dependencies for faster inference:
 ```bash
-python -c "from database import init_db; init_db()"
+pip install -r requirements-mlx.txt
 ```
 
-### 3. Download Models (Automatic)
+### 2. Download Models (Automatic)
 
 The Qwen3-TTS models are automatically downloaded from HuggingFace Hub on first use, similar to how Whisper models work.
 

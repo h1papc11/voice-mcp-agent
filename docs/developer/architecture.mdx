@@ -121,8 +121,12 @@ bun run dev
 ### Production
 
 ```bash
+# Build everything (server binary + Tauri app)
+bun run build
+
+# Or build separately:
 # 1. Build server binary (PyInstaller)
-./scripts/build-server.sh
+bun run build:server
 
 # 2. Build Tauri app (includes server)
 cd tauri && bun run tauri build

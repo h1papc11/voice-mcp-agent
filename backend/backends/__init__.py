@@ -8,7 +8,7 @@ from typing import Protocol, Optional, Tuple, List
 from typing_extensions import runtime_checkable
 import numpy as np
 
-from ..platform import get_backend_type
+from ..platform_detect import get_backend_type
 
 
 @runtime_checkable

@@ -90,6 +90,26 @@ chmod +x voicebox-*.AppImage
    - Slower but works without GPU
    - Backend automatically falls back to CPU
 
+### MLX "Failed to load the default metallib" error (Apple Silicon)
+
+**Symptoms:** Generation fails with "library not found" or "metallib" errors
+
+**Solutions:**
+1. **Rebuild server binary**
+   ```bash
+   bun run build:server
+   ```
+   The build script should automatically include MLX Metal shader libraries.
+
+2. **Check MLX installation**
+   ```bash
+   pip install -r backend/requirements-mlx.txt
+   ```
+
+3. **Verify backend detection**
+   - Check server logs for "Backend: MLX"
+   - If showing "Backend: PYTORCH", MLX may not be installed correctly
+
 ### Audio playback issues
 
 **Symptoms:** Generated audio won't play
@@ -111,19 +131,27 @@ chmod +x voicebox-*.AppImage
 **Symptoms:** Generation takes >30 seconds
 
 **Solutions:**
-1. **Use GPU** (if available)
+1. **Check backend type** (Apple Silicon)
+   - Check Settings → Server Status
+   - Should show "Backend: MLX" on Apple Silicon
+   - If showing "Backend: PYTORCH", install MLX: `pip install -r backend/requirements-mlx.txt`
+   - MLX provides 4-5x faster inference on Apple Silicon
+
+2. **Use GPU** (if available)
    - Check Settings → Server Status
    - Should show "GPU available: true"
+   - Apple Silicon: Should show "Metal (Apple Silicon via MLX)"
+   - Windows/Linux: Should show "CUDA" if GPU available
 
-2. **Enable caching**
+3. **Enable caching**
    - Voice prompts are cached automatically
    - Second generation with same voice should be faster
 
-3. **Use smaller model**
+4. **Use smaller model**
    - 0.6B model is faster than 1.7B
    - Quality difference is minimal for most voices
 
-4. **Check system resources**
+5. **Check system resources**
    - Close other CPU/GPU intensive apps
    - Ensure adequate RAM (8GB+ recommended)
 

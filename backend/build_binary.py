@@ -41,7 +41,7 @@ def build_server():
         '--hidden-import', 'backend.history',
         '--hidden-import', 'backend.tts',
         '--hidden-import', 'backend.transcribe',
-        '--hidden-import', 'backend.platform',
+        '--hidden-import', 'backend.platform_detect',
         '--hidden-import', 'backend.backends',
         '--hidden-import', 'backend.backends.pytorch_backend',
         '--hidden-import', 'backend.utils.audio',
@@ -83,6 +83,9 @@ def build_server():
             '--hidden-import', 'mlx_audio.asr',
             '--collect-submodules', 'mlx',
             '--collect-submodules', 'mlx_audio',
+            # Collect MLX data files including Metal shader libraries (.metallib)
+            '--collect-data', 'mlx',
+            '--collect-data', 'mlx_audio',
         ])
     else:
         print("Building for non-Apple Silicon platform - PyTorch only")

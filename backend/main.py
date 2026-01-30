@@ -27,7 +27,7 @@ from . import database, models, profiles, history, tts, transcribe, config, expo
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
-from .platform import get_backend_type
+from .platform_detect import get_backend_type
 
 app = FastAPI(
     title="voicebox API",

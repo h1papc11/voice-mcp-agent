@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Device, Host, SampleFormat, Stream, StreamConfig};
+use cpal::{Device, Host, SampleFormat, StreamConfig};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -280,9 +280,6 @@ impl AudioOutputState {
         eprintln!("play_to_device: Interleaving channels from {} to {} channels", channels, device_channels);
         let interleaved = self.interleave_channels(&resampled, channels, device_channels);
         eprintln!("play_to_device: Interleaved to {} samples", interleaved.len());
-
-        // Calculate duration before moving interleaved
-        let duration_secs = (interleaved.len() as f64 / (device_sample_rate as f64 * device_channels as f64)).ceil() as u64 + 1;
 
         // Create shared buffer for playback
         let buffer: Arc<Mutex<Vec<f32>>> = Arc::new(Mutex::new(interleaved));

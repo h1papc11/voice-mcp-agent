@@ -48,6 +48,11 @@ setup-python: $(VENV)/bin/activate ## Set up Python virtual environment and depe
 	@echo -e "$(BLUE)Installing Python dependencies...$(NC)"
 	$(PIP) install --upgrade pip
 	$(PIP) install -r $(BACKEND_DIR)/requirements.txt
+	@if [ "$$(uname -m)" = "arm64" ] && [ "$$(uname)" = "Darwin" ]; then \
+		echo -e "$(BLUE)Detected Apple Silicon - installing MLX dependencies...$(NC)"; \
+		$(PIP) install -r $(BACKEND_DIR)/requirements-mlx.txt; \
+		echo -e "$(GREEN)✓ MLX backend enabled (native Metal acceleration)$(NC)"; \
+	fi
 	$(PIP) install git+https://github.com/QwenLM/Qwen3-TTS.git
 	@echo -e "$(GREEN)✓ Python environment ready$(NC)"
 
