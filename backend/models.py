@@ -126,6 +126,7 @@ class HealthResponse(BaseModel):
     gpu_available: bool
     gpu_type: Optional[str] = None  # GPU type (CUDA, MPS, or None)
     vram_used_mb: Optional[float] = None
+    backend_type: Optional[str] = None  # Backend type (mlx or pytorch)
 
 
 class ModelStatus(BaseModel):

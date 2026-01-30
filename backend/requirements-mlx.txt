@@ -1,0 +1,5 @@
+# MLX-specific dependencies (Apple Silicon only)
+# These should only be installed on aarch64-apple-darwin platforms
+
+mlx>=0.30.0
+mlx-audio>=0.3.1

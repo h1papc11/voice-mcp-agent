@@ -27,6 +27,7 @@ from . import database, models, profiles, history, tts, transcribe, config, expo
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
+from .platform import get_backend_type
 
 app = FastAPI(
     title="voicebox API",
@@ -73,6 +74,7 @@ async def health():
     import os
 
     tts_model = tts.get_tts_model()
+    backend_type = get_backend_type()
 
     # Check for GPU availability (CUDA or MPS)
     has_cuda = torch.cuda.is_available()
@@ -84,6 +86,8 @@ async def health():
         gpu_type = f"CUDA ({torch.cuda.get_device_name(0)})"
     elif has_mps:
         gpu_type = "MPS (Apple Silicon)"
+    elif backend_type == "mlx":
+        gpu_type = "Metal (Apple Silicon via MLX)"
 
     vram_used = None
     if has_cuda:
@@ -111,7 +115,11 @@ async def health():
     model_downloaded = None
     try:
         # Check if the default model (1.7B) is cached
-        default_model_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+        # Use different model IDs based on backend
+        if backend_type == "mlx":
+            default_model_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
+        else:
+            default_model_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
         
         # Method 1: Try scan_cache_dir if available
         try:
@@ -130,7 +138,8 @@ async def health():
                     any(repo_cache.rglob("*.bin")) or
                     any(repo_cache.rglob("*.safetensors")) or
                     any(repo_cache.rglob("*.pt")) or
-                    any(repo_cache.rglob("*.pth"))
+                    any(repo_cache.rglob("*.pth")) or
+                    any(repo_cache.rglob("*.npz"))  # MLX models may use npz
                 )
                 model_downloaded = has_model_files
     except Exception:
@@ -144,6 +153,7 @@ async def health():
         gpu_available=gpu_available,
         gpu_type=gpu_type,
         vram_used_mb=vram_used,
+        backend_type=backend_type,
     )
 
 
@@ -1149,6 +1159,8 @@ async def get_model_status():
     from pathlib import Path
     import os
     
+    backend_type = get_backend_type()
+    
     # Try to import scan_cache_dir (might not be available in older versions)
     try:
         from huggingface_hub import scan_cache_dir
@@ -1160,7 +1172,7 @@ async def get_model_status():
         """Check if TTS model is loaded with specific size."""
         try:
             tts_model = tts.get_tts_model()
-            return tts_model.is_loaded() and tts_model.model_size == model_size
+            return tts_model.is_loaded() and getattr(tts_model, 'model_size', None) == model_size
         except Exception:
             return False
     
@@ -1168,50 +1180,66 @@ async def get_model_status():
         """Check if Whisper model is loaded with specific size."""
         try:
             whisper_model = transcribe.get_whisper_model()
-            return whisper_model.is_loaded() and whisper_model.model_size == model_size
+            return whisper_model.is_loaded() and getattr(whisper_model, 'model_size', None) == model_size
         except Exception:
             return False
+    
+    # Use backend-specific model IDs
+    if backend_type == "mlx":
+        tts_1_7b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
+        tts_0_6b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"  # Fallback to 1.7B
+        whisper_base_id = "mlx-community/whisper-base"
+        whisper_small_id = "mlx-community/whisper-small"
+        whisper_medium_id = "mlx-community/whisper-medium"
+        whisper_large_id = "mlx-community/whisper-large"
+    else:
+        tts_1_7b_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+        tts_0_6b_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+        whisper_base_id = "openai/whisper-base"
+        whisper_small_id = "openai/whisper-small"
+        whisper_medium_id = "openai/whisper-medium"
+        whisper_large_id = "openai/whisper-large"
     
     model_configs = [
         {
             "model_name": "qwen-tts-1.7B",
             "display_name": "Qwen TTS 1.7B",
-            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+            "hf_repo_id": tts_1_7b_id,
             "model_size": "1.7B",
             "check_loaded": lambda: check_tts_loaded("1.7B"),
         },
         {
             "model_name": "qwen-tts-0.6B",
             "display_name": "Qwen TTS 0.6B",
-            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+            "hf_repo_id": tts_0_6b_id,
             "model_size": "0.6B",
             "check_loaded": lambda: check_tts_loaded("0.6B"),
         },
         {
             "model_name": "whisper-base",
             "display_name": "Whisper Base",
-            "hf_repo_id": "openai/whisper-base",
+            "hf_repo_id": whisper_base_id,
             "model_size": "base",
             "check_loaded": lambda: check_whisper_loaded("base"),
         },
         {
             "model_name": "whisper-small",
             "display_name": "Whisper Small",
-            "hf_repo_id": "openai/whisper-small",
+            "hf_repo_id": whisper_small_id,
             "model_size": "small",
             "check_loaded": lambda: check_whisper_loaded("small"),
         },
         {
             "model_name": "whisper-medium",
             "display_name": "Whisper Medium",
-            "hf_repo_id": "openai/whisper-medium",
+            "hf_repo_id": whisper_medium_id,
             "model_size": "medium",
             "check_loaded": lambda: check_whisper_loaded("medium"),
         },
         {
             "model_name": "whisper-large",
             "display_name": "Whisper Large",
-            "hf_repo_id": "openai/whisper-large",
+            "hf_repo_id": whisper_large_id,
             "model_size": "large",
             "check_loaded": lambda: check_whisper_loaded("large"),
         },
@@ -1256,11 +1284,13 @@ async def get_model_status():
                     
                     if repo_cache.exists():
                         # Check for model files (bin, safetensors, or other common model files)
+                        # MLX models may use .npz or .safetensors
                         has_model_files = (
                             any(repo_cache.rglob("*.bin")) or
                             any(repo_cache.rglob("*.safetensors")) or
                             any(repo_cache.rglob("*.pt")) or
                             any(repo_cache.rglob("*.pth")) or
+                            any(repo_cache.rglob("*.npz")) or
                             any(repo_cache.rglob("model.safetensors.index.json")) or
                             any(repo_cache.rglob("pytorch_model.bin.index.json"))
                         )
@@ -1533,10 +1563,13 @@ async def get_active_tasks():
 
 def _get_gpu_status() -> str:
     """Get GPU availability status."""
+    backend_type = get_backend_type()
     if torch.cuda.is_available():
         return f"CUDA ({torch.cuda.get_device_name(0)})"
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         return "MPS (Apple Silicon)"
+    elif backend_type == "mlx":
+        return "Metal (Apple Silicon via MLX)"
     return "None (CPU only)"
 
 
@@ -1546,6 +1579,8 @@ async def startup_event():
     print("voicebox API starting up...")
     database.init_db()
     print(f"Database initialized at {database._db_path}")
+    backend_type = get_backend_type()
+    print(f"Backend: {backend_type.upper()}")
     print(f"GPU available: {_get_gpu_status()}")
 
     # Initialize progress manager with main event loop for thread-safe operations

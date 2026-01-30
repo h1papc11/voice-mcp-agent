@@ -17,15 +17,19 @@ jobs:
           - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
             python-version: '3.12'
+            backend: 'mlx'
           - platform: 'macos-15-intel'
             args: '--target x86_64-apple-darwin'
             python-version: '3.12'
+            backend: 'pytorch'
           # - platform: 'ubuntu-22.04'
           #   args: ''
           #   python-version: '3.12'
+          #   backend: 'pytorch'
           - platform: 'windows-latest'
             args: ''
             python-version: '3.12'
+            backend: 'pytorch'
 
     runs-on: ${{ matrix.platform }}
 
@@ -56,6 +60,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r backend/requirements.txt
+
+      - name: Install MLX dependencies (Apple Silicon only)
+        if: matrix.backend == 'mlx'
+        run: |
+          pip install -r backend/requirements-mlx.txt
 
       - name: Build Python server (Linux/macOS)
         if: matrix.platform != 'windows-latest'
@@ -133,7 +142,8 @@ jobs:
             See the assets below to download and install this version.
 
             ### Installation
-            - **macOS**: Download the `.dmg` file
+            - **macOS (Apple Silicon)**: Download the `aarch64.dmg` file - uses MLX for fast native inference
+            - **macOS (Intel)**: Download the `x64.dmg` file - uses PyTorch
             - **Windows**: Download the `.msi` installer
             - **Linux**: Download the `.AppImage` or `.deb` package
 
