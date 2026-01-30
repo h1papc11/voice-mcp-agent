@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { StoryCreate, StoryItemCreate, StoryItemBatchUpdate, StoryItemReorder, StoryItemMove, StoryItemTrim, StoryItemSplit } from '@/lib/api/types';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 
 export function useStories() {
   return useQuery({
@@ -158,6 +158,8 @@ export function useDuplicateStoryItem() {
 }
 
 export function useExportStoryAudio() {
+  const platform = usePlatform();
+
   return useMutation({
     mutationFn: async ({ storyId, storyName }: { storyId: string; storyName: string }) => {
       const blob = await apiClient.exportStoryAudio(storyId);
@@ -166,49 +168,12 @@ export function useExportStoryAudio() {
       const safeName = storyName.substring(0, 50).replace(/[^a-z0-9]/gi, '-').toLowerCase();
       const filename = `${safeName || 'story'}.wav`;
 
-      if (isTauri()) {
-        // Use Tauri's native save dialog
-        try {
-          const { save } = await import('@tauri-apps/plugin-dialog');
-          const filePath = await save({
-            defaultPath: filename,
-            filters: [
-              {
-                name: 'Audio File',
-                extensions: ['wav'],
-              },
-            ],
-          });
-
-          if (filePath) {
-            // Write file using Tauri's filesystem API
-            const { writeBinaryFile } = await import('@tauri-apps/plugin-fs');
-            const arrayBuffer = await blob.arrayBuffer();
-            await writeBinaryFile(filePath, new Uint8Array(arrayBuffer));
-          }
-        } catch (error) {
-          console.error('Failed to use Tauri dialog, falling back to browser download:', error);
-          // Fall back to browser download if Tauri dialog fails
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }
-      } else {
-        // Browser: trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
+      await platform.filesystem.saveFile(filename, blob, [
+        {
+          name: 'Audio File',
+          extensions: ['wav'],
+        },
+      ]);
 
       return blob;
     },

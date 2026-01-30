@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { useServerStore } from '@/stores/serverStore';
-import { setKeepServerRunning } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 
 const connectionSchema = z.object({
   serverUrl: z.string().url('Please enter a valid URL'),
@@ -26,6 +26,7 @@ const connectionSchema = z.object({
 type ConnectionFormValues = z.infer<typeof connectionSchema>;
 
 export function ConnectionForm() {
+  const platform = usePlatform();
   const serverUrl = useServerStore((state) => state.serverUrl);
   const setServerUrl = useServerStore((state) => state.setServerUrl);
   const keepServerRunningOnClose = useServerStore((state) => state.keepServerRunningOnClose);
@@ -89,7 +90,7 @@ export function ConnectionForm() {
               checked={keepServerRunningOnClose}
               onCheckedChange={(checked: boolean) => {
                 setKeepServerRunningOnClose(checked);
-                setKeepServerRunning(checked).catch((error) => {
+                platform.lifecycle.setKeepServerRunning(checked).catch((error) => {
                   console.error('Failed to sync setting to Rust:', error);
                 });
                 toast({

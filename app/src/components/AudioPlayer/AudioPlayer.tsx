@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/core';
 import { Pause, Play, Repeat, Volume2, VolumeX, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { apiClient } from '@/lib/api/client';
-import { isTauri } from '@/lib/tauri';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { debug } from '@/lib/utils/debug';
 import { usePlayerStore } from '@/stores/playerStore';
+import { usePlatform } from '@/platform/PlatformContext';
 
 export function AudioPlayer() {
+  const platform = usePlatform();
   const {
     audioUrl,
     audioId,
@@ -39,7 +39,7 @@ export function AudioPlayer() {
       if (!profileId) return { channel_ids: [] };
       return apiClient.getProfileChannels(profileId);
     },
-    enabled: !!profileId && isTauri(),
+    enabled: !!profileId && platform.metadata.isTauri,
   });
 
   const { data: channels } = useQuery({
@@ -50,7 +50,7 @@ export function AudioPlayer() {
 
   // Determine if we should use native playback
   const useNativePlayback = useMemo(() => {
-    if (!isTauri() || !profileChannels || !channels) {
+    if (!platform.metadata.isTauri || !profileChannels || !channels) {
       return false;
     }
 
@@ -195,7 +195,7 @@ export function AudioPlayer() {
         let runtimeProfileChannels = null;
         let runtimeChannels = null;
 
-        if (isTauri() && currentProfileId) {
+        if (platform.metadata.isTauri && currentProfileId) {
           try {
             runtimeProfileChannels = await apiClient.getProfileChannels(currentProfileId);
             debug.log('Runtime profileChannels:', runtimeProfileChannels);
@@ -210,7 +210,7 @@ export function AudioPlayer() {
         }
 
         debug.log('Auto-play check:', {
-          isTauri: isTauri(),
+          isTauri: platform.metadata.isTauri,
           currentAudioUrl,
           currentProfileId,
           hasProfileChannels: !!runtimeProfileChannels,
@@ -218,7 +218,7 @@ export function AudioPlayer() {
         });
 
         if (
-          isTauri() &&
+          platform.metadata.isTauri &&
           currentAudioUrl &&
           currentProfileId &&
           runtimeProfileChannels &&
@@ -229,7 +229,7 @@ export function AudioPlayer() {
           // Stop any existing native playback first
           if (isUsingNativePlaybackRef.current) {
             try {
-              await invoke('stop_audio_playback');
+              platform.audio.stopPlayback();
               debug.log('Stopped existing native playback before starting new one');
             } catch (error) {
               debug.error('Failed to stop existing playback:', error);
@@ -279,11 +279,8 @@ export function AudioPlayer() {
                 // Play via native audio
                 debug.log('Invoking play_audio_to_devices...');
                 try {
-                  const result = await invoke('play_audio_to_devices', {
-                    audioData: Array.from(audioData),
-                    deviceIds: deviceIds,
-                  });
-                  debug.log('play_audio_to_devices completed successfully, result:', result);
+                  await platform.audio.playToDevices(audioData, deviceIds);
+                  debug.log('play_audio_to_devices completed successfully');
 
                   // Mark that we're using native playback
                   isUsingNativePlaybackRef.current = true;
@@ -516,15 +513,13 @@ export function AudioPlayer() {
     }
 
     // Stop native playback if it was active
-    if (isUsingNativePlaybackRef.current && isTauri()) {
-      (async () => {
-        try {
-          await invoke('stop_audio_playback');
-          debug.log('Stopped native audio playback');
-        } catch (error) {
-          debug.error('Failed to stop native playback:', error);
-        }
-      })();
+    if (isUsingNativePlaybackRef.current && platform.metadata.isTauri) {
+      try {
+        platform.audio.stopPlayback();
+        debug.log('Stopped native audio playback');
+      } catch (error) {
+        debug.error('Failed to stop native playback:', error);
+      }
     }
 
     // Reset native playback flag when loading new audio
@@ -711,7 +706,7 @@ export function AudioPlayer() {
       if (isPlaying) {
         // Pause: stop native playback and pause WaveSurfer visualization
         try {
-          await invoke('stop_audio_playback');
+          platform.audio.stopPlayback();
           debug.log('Stopped native audio playback');
         } catch (error) {
           debug.error('Failed to stop native playback:', error);
@@ -724,7 +719,7 @@ export function AudioPlayer() {
       try {
         // Stop any existing native playback first
         try {
-          await invoke('stop_audio_playback');
+          platform.audio.stopPlayback();
         } catch (_error) {
           // Ignore errors when stopping (might not be playing)
           debug.log('No existing playback to stop');
@@ -742,10 +737,7 @@ export function AudioPlayer() {
           const audioData = new Uint8Array(await response.arrayBuffer());
 
           // Play via native audio
-          await invoke('play_audio_to_devices', {
-            audioData: Array.from(audioData),
-            deviceIds: deviceIds,
-          });
+          await platform.audio.playToDevices(audioData, deviceIds);
 
           // Mark that we're using native playback
           isUsingNativePlaybackRef.current = true;
@@ -806,10 +798,12 @@ export function AudioPlayer() {
 
   const handleClose = () => {
     // Stop any native playback
-    if (isUsingNativePlaybackRef.current && isTauri()) {
-      invoke('stop_audio_playback').catch((error) => {
+    if (isUsingNativePlaybackRef.current && platform.metadata.isTauri) {
+      try {
+        platform.audio.stopPlayback();
+      } catch (error) {
         debug.error('Failed to stop native playback:', error);
-      });
+      }
     }
     // Stop WaveSurfer
     if (wavesurferRef.current) {

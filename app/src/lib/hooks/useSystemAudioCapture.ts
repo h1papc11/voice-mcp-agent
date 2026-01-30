@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 
 interface UseSystemAudioCaptureOptions {
   maxDurationSeconds?: number;
@@ -15,6 +14,7 @@ export function useSystemAudioCapture({
   maxDurationSeconds = 29,
   onRecordingComplete,
 }: UseSystemAudioCaptureOptions = {}) {
+  const platform = usePlatform();
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -26,22 +26,12 @@ export function useSystemAudioCapture({
 
   // Check if system audio capture is supported
   useEffect(() => {
-    if (!isTauri()) {
-      setIsSupported(false);
-      return;
-    }
-
-    invoke<boolean>('is_system_audio_supported')
-      .then((supported) => {
-        setIsSupported(supported);
-      })
-      .catch(() => {
-        setIsSupported(false);
-      });
-  }, []);
+    const supported = platform.audio.isSystemAudioSupported();
+    setIsSupported(supported);
+  }, [platform]);
 
   const startRecording = useCallback(async () => {
-    if (!isTauri()) {
+    if (!platform.metadata.isTauri) {
       const errorMsg = 'System audio capture is only available in the desktop app.';
       setError(errorMsg);
       return;
@@ -58,9 +48,7 @@ export function useSystemAudioCapture({
       setDuration(0);
 
       // Start native capture
-      await invoke('start_system_audio_capture', {
-        maxDurationSecs: maxDurationSeconds,
-      });
+      await platform.audio.startSystemAudioCapture(maxDurationSeconds);
 
       setIsRecording(true);
       isRecordingRef.current = true;
@@ -86,10 +74,10 @@ export function useSystemAudioCapture({
       setError(errorMessage);
       setIsRecording(false);
     }
-  }, [maxDurationSeconds, isSupported]);
+  }, [maxDurationSeconds, isSupported, platform]);
 
   const stopRecording = useCallback(async () => {
-    if (!isRecording || !isTauri()) {
+    if (!isRecording || !platform.metadata.isTauri) {
       return;
     }
 
@@ -102,17 +90,9 @@ export function useSystemAudioCapture({
         timerRef.current = null;
       }
 
-      // Stop capture and get base64 WAV data
-      const base64Data = await invoke<string>('stop_system_audio_capture');
+      // Stop capture and get Blob
+      const blob = await platform.audio.stopSystemAudioCapture();
 
-      // Convert base64 to Blob
-      const binaryString = atob(base64Data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const blob = new Blob([bytes], { type: 'audio/wav' });
       // Pass the actual recorded duration
       const recordedDuration = startTimeRef.current 
         ? (Date.now() - startTimeRef.current) / 1000 
@@ -125,7 +105,7 @@ export function useSystemAudioCapture({
           : 'Failed to stop system audio capture.';
       setError(errorMessage);
     }
-  }, [isRecording, onRecordingComplete]);
+  }, [isRecording, onRecordingComplete, platform]);
 
   // Store stopRecording in ref for use in timer
   useEffect(() => {
@@ -155,15 +135,15 @@ export function useSystemAudioCapture({
         timerRef.current = null;
       }
       // Cancel recording on unmount if still recording
-      if (isRecordingRef.current && isTauri()) {
+      if (isRecordingRef.current && platform.metadata.isTauri) {
         // Call stop directly without the callback to avoid stale closure
-        invoke('stop_system_audio_capture').catch((err) => {
+        platform.audio.stopSystemAudioCapture().catch((err) => {
           console.error('Error stopping audio capture on unmount:', err);
         });
       }
     };
     // biome-ignore lint/correctness/useExhaustiveDependencies: Only run on unmount
-  }, []);
+  }, [platform]);
 
   return {
     isRecording,

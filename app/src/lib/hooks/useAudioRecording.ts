@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 import { convertToWav } from '@/lib/utils/audio';
 
 interface UseAudioRecordingOptions {
@@ -11,6 +11,7 @@ export function useAudioRecording({
   maxDurationSeconds = 29,
   onRecordingComplete,
 }: UseAudioRecordingOptions = {}) {
+  const platform = usePlatform();
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -40,15 +41,14 @@ export function useAudioRecording({
         await new Promise((resolve) => setTimeout(resolve, 100));
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          const isTauriEnv = isTauri();
           console.error('MediaDevices check:', {
             hasNavigator: typeof navigator !== 'undefined',
             hasMediaDevices: !!navigator?.mediaDevices,
             hasGetUserMedia: !!navigator?.mediaDevices?.getUserMedia,
-            isTauri: isTauriEnv,
+            isTauri: platform.metadata.isTauri,
           });
 
-          const errorMsg = isTauriEnv
+          const errorMsg = platform.metadata.isTauri
             ? 'Microphone access is not available. Please ensure:\n1. The app has microphone permissions in System Settings (macOS: System Settings > Privacy & Security > Microphone)\n2. You restart the app after granting permissions\n3. You are using Tauri v2 with a webview that supports getUserMedia'
             : 'Microphone access is not available. Please ensure you are using a secure context (HTTPS or localhost) and that your browser has microphone permissions enabled.';
           setError(errorMsg);

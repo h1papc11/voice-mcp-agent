@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { invoke } from '@tauri-apps/api/core';
 import { Check, CheckCircle2, Edit, Plus, Speaker, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -23,9 +22,9 @@ import {
 } from '@/components/ui/select';
 import { apiClient } from '@/lib/api/client';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
-import { isTauri } from '@/lib/tauri';
 import { cn } from '@/lib/utils/cn';
 import { usePlayerStore } from '@/stores/playerStore';
+import { usePlatform } from '@/platform/PlatformContext';
 
 interface AudioDevice {
   id: string;
@@ -34,6 +33,7 @@ interface AudioDevice {
 }
 
 export function AudioTab() {
+  const platform = usePlatform();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<string | null>(null);
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
@@ -49,18 +49,17 @@ export function AudioTab() {
   const { data: devices, isLoading: devicesLoading } = useQuery({
     queryKey: ['audio-devices'],
     queryFn: async () => {
-      if (!isTauri()) {
+      if (!platform.metadata.isTauri) {
         return [];
       }
       try {
-        const result = await invoke<AudioDevice[]>('list_audio_output_devices');
-        return result;
+        return await platform.audio.listOutputDevices();
       } catch (error) {
         console.error('Failed to list audio devices:', error);
         return [];
       }
     },
-    enabled: isTauri(),
+    enabled: platform.metadata.isTauri,
   });
 
   const { data: profiles } = useQuery({
@@ -342,7 +341,7 @@ export function AudioTab() {
             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted rounded-md">
               <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">
-                {isTauri() ? 'No audio devices found' : 'Audio device selection requires Tauri'}
+                {platform.metadata.isTauri ? 'No audio devices found' : 'Audio device selection requires Tauri'}
               </p>
             </div>
           )}

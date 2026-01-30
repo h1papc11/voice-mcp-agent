@@ -1,4 +1,3 @@
-import { getVersion } from '@tauri-apps/api/app';
 import { AlertCircle, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -6,16 +5,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useAutoUpdater } from '@/hooks/useAutoUpdater';
+import { usePlatform } from '@/platform/PlatformContext';
 
 export function UpdateStatus() {
+  const platform = usePlatform();
   const { status, checkForUpdates, downloadAndInstall, restartAndInstall } = useAutoUpdater(false);
   const [currentVersion, setCurrentVersion] = useState<string>('');
 
   useEffect(() => {
-    getVersion()
+    platform.metadata.getVersion()
       .then(setCurrentVersion)
       .catch(() => setCurrentVersion('0.1.0'));
-  }, []);
+  }, [platform]);
 
   return (
     <Card>

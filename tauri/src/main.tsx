@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from '@/App';
 // Import CSS from app directory using alias so Tailwind can scan the source files
 import '@/index.css';
+import { PlatformProvider } from '@/platform/PlatformContext';
+import { tauriPlatform } from './platform';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,8 +22,10 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
-      {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      <PlatformProvider platform={tauriPlatform}>
+        <App />
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      </PlatformProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 );
