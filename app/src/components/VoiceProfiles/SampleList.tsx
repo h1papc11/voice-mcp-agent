@@ -1,6 +1,7 @@
-import { Plus, Trash2, Play, Pencil, Check, X, Volume2, Pause } from 'lucide-react';
+import { Plus, Trash2, Play, Edit, Check, X, Volume2, Pause } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { CircleButton } from '@/components/ui/circle-button';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
@@ -212,7 +213,7 @@ export function SampleList({ profileId }: SampleListProps) {
                   /* Edit Mode */
                   <div className="p-4 space-y-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                      <Pencil className="h-3 w-3" />
+                      <Edit className="h-3 w-3" />
                       <span>Editing transcription</span>
                     </div>
                     <Textarea
@@ -256,28 +257,18 @@ export function SampleList({ profileId }: SampleListProps) {
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
+                      <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CircleButton
+                          icon={Edit}
                           title="Edit transcription"
                           onClick={() => handleStartEdit(sample.id, sample.reference_text)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
+                        />
+                        <CircleButton
+                          icon={Trash2}
                           title="Delete sample"
                           onClick={() => handleDelete(sample.id)}
                           disabled={deleteSample.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        />
                       </div>
 
                       {/* Sample Number Badge */}

@@ -810,7 +810,7 @@ export function ProfileForm() {
                                   type="button"
                                   onClick={handleRemoveAvatar}
                                   disabled={deleteAvatar.isPending}
-                                  className="absolute bottom-0 right-0 h-6 w-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90 transition-colors shadow-sm"
+                                  className="absolute bottom-0 right-0 h-6 w-6 rounded-full bg-background/60 backdrop-blur-sm text-muted-foreground flex items-center justify-center hover:bg-background/80 hover:text-foreground transition-colors shadow-sm border border-border/50"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
