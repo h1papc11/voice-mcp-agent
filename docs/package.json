@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "mintlify dev",
+    "build": "mintlify build",
+    "start": "mintlify serve",
     "install:mintlify": "bun add -g mintlify"
   },
   "devDependencies": {

@@ -228,6 +228,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Description Section */}
+      <section className="py-12 sm:py-16 md:py-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center mb-6 sm:mb-8">
+            What is Voicebox?
+          </h2>
+          <div className="space-y-6 text-lg text-foreground/80 text-center">
+            <p>
+              Voicebox is a <strong>local-first voice cloning studio</strong> with DAW-like features
+              for professional voice synthesis. Think of it as the <strong>Ollama for voice</strong>{' '}
+              — download models, clone voices, and generate speech entirely on your machine.
+            </p>
+            <p>
+              Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives
+              you complete privacy, professional tools, and native performance. Download a voice
+              model, clone any voice from a few seconds of audio, and compose multi-voice projects
+              with studio-grade editing tools.
+            </p>
+            <p className="text-foreground/60">No Python install required.</p>
+          </div>
+        </div>
+      </section>
+
       {/* Demo Video Section */}
       <section className="py-12 sm:py-16 md:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
