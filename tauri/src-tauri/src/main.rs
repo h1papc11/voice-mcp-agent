@@ -178,14 +178,41 @@ async fn start_server(
     println!("Data directory: {:?}", data_dir);
     println!("Remote mode: {}", remote.unwrap_or(false));
 
-    let mut sidecar = app
-        .shell()
-        .sidecar("voicebox-server")
-        .map_err(|e| {
+    let sidecar_result = app.shell().sidecar("voicebox-server");
+
+    let mut sidecar = match sidecar_result {
+        Ok(s) => s,
+        Err(e) => {
             eprintln!("Failed to get sidecar: {}", e);
-            eprintln!("This usually means the binary is not bundled correctly or doesn't have execute permissions");
-            format!("Failed to get sidecar: {}", e)
-        })?;
+
+            // In dev mode, check if the server is already running (started manually)
+            #[cfg(debug_assertions)]
+            {
+                eprintln!("Dev mode: Checking if server is already running on port {}...", SERVER_PORT);
+
+                // Try to connect to the server port
+                use std::net::TcpStream;
+                if TcpStream::connect_timeout(
+                    &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
+                    std::time::Duration::from_secs(1),
+                ).is_ok() {
+                    println!("Found server already running on port {}", SERVER_PORT);
+                    return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                }
+
+                eprintln!("");
+                eprintln!("=================================================================");
+                eprintln!("DEV MODE: No server found on port {}", SERVER_PORT);
+                eprintln!("");
+                eprintln!("Start the Python server in a separate terminal:");
+                eprintln!("  bun run dev:server");
+                eprintln!("=================================================================");
+                eprintln!("");
+            }
+
+            return Err(format!("Failed to start server. In dev mode, run 'bun run dev:server' in a separate terminal."));
+        }
+    };
 
     println!("Sidecar command created successfully");
 
@@ -204,17 +231,47 @@ async fn start_server(
     }
 
     println!("Spawning server process...");
-    let (mut rx, child) = sidecar
-        .spawn()
-        .map_err(|e| {
+    let spawn_result = sidecar.spawn();
+
+    let (mut rx, child) = match spawn_result {
+        Ok(result) => result,
+        Err(e) => {
             eprintln!("Failed to spawn server process: {}", e);
-            eprintln!("This could be due to:");
-            eprintln!("  - Missing or corrupted binary");
-            eprintln!("  - Missing execute permissions");
-            eprintln!("  - Code signing issues on macOS");
-            eprintln!("  - Missing dependencies");
-            format!("Failed to spawn: {}", e)
-        })?;
+
+            // In dev mode, check if a manually-started server is available
+            #[cfg(debug_assertions)]
+            {
+                use std::net::TcpStream;
+                if TcpStream::connect_timeout(
+                    &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
+                    std::time::Duration::from_secs(1),
+                ).is_ok() {
+                    println!("Found manually-started server on port {}", SERVER_PORT);
+                    return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                }
+
+                eprintln!("");
+                eprintln!("=================================================================");
+                eprintln!("DEV MODE: Server binary failed to start");
+                eprintln!("");
+                eprintln!("Start the Python server in a separate terminal:");
+                eprintln!("  bun run dev:server");
+                eprintln!("=================================================================");
+                eprintln!("");
+                return Err("Dev mode: Start server manually with 'bun run dev:server'".to_string());
+            }
+
+            #[cfg(not(debug_assertions))]
+            {
+                eprintln!("This could be due to:");
+                eprintln!("  - Missing or corrupted binary");
+                eprintln!("  - Missing execute permissions");
+                eprintln!("  - Code signing issues on macOS");
+                eprintln!("  - Missing dependencies");
+                return Err(format!("Failed to spawn: {}", e));
+            }
+        }
+    };
 
     println!("Server process spawned, waiting for ready signal...");
     println!("=================================================================");
@@ -239,6 +296,22 @@ async fn start_server(
                     eprintln!("  {}", line);
                 }
             }
+
+            // In dev mode, check if a manual server came up during the wait
+            #[cfg(debug_assertions)]
+            {
+                use std::net::TcpStream;
+                if TcpStream::connect_timeout(
+                    &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
+                    std::time::Duration::from_secs(1),
+                ).is_ok() {
+                    // Kill the placeholder process
+                    let _ = state.child.lock().unwrap().take();
+                    println!("Found manually-started server on port {}", SERVER_PORT);
+                    return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                }
+            }
+
             return Err("Server startup timeout - check Console.app for detailed logs".to_string());
         }
 
@@ -273,10 +346,42 @@ async fn start_server(
                 }
             }
             Ok(None) => {
-                eprintln!("Server process ended unexpectedly during startup!");
-                eprintln!("The server binary may have crashed or exited with an error.");
-                eprintln!("Check Console.app logs for more details (search for 'voicebox')");
-                return Err("Server process ended unexpectedly".to_string());
+                // In dev mode, this is expected when using the placeholder binary
+                #[cfg(debug_assertions)]
+                {
+                    use std::net::TcpStream;
+                    eprintln!("Server process ended (dev mode placeholder detected)");
+
+                    // Check if a manually-started server is available
+                    if TcpStream::connect_timeout(
+                        &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
+                        std::time::Duration::from_secs(1),
+                    ).is_ok() {
+                        // Clean up state
+                        let _ = state.child.lock().unwrap().take();
+                        let _ = state.server_pid.lock().unwrap().take();
+                        println!("Found manually-started server on port {}", SERVER_PORT);
+                        return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+                    }
+
+                    eprintln!("");
+                    eprintln!("=================================================================");
+                    eprintln!("DEV MODE: No bundled server binary available");
+                    eprintln!("");
+                    eprintln!("Start the Python server in a separate terminal:");
+                    eprintln!("  bun run dev:server");
+                    eprintln!("=================================================================");
+                    eprintln!("");
+                    return Err("Dev mode: Start server manually with 'bun run dev:server'".to_string());
+                }
+
+                #[cfg(not(debug_assertions))]
+                {
+                    eprintln!("Server process ended unexpectedly during startup!");
+                    eprintln!("The server binary may have crashed or exited with an error.");
+                    eprintln!("Check Console.app logs for more details (search for 'voicebox')");
+                    return Err("Server process ended unexpectedly".to_string());
+                }
             }
             Err(_) => {
                 // Timeout on this recv, continue loop
