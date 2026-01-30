@@ -280,28 +280,11 @@ Based on mlx-audio benchmarks and community reports:
 
 These are estimates. Actual benchmarks will be in `docs/overview/performance.md` after Phase 6.
 
-## Risks & Mitigations
-
-### Risk: MLX stability issues
-**Mitigation:** Keep PyTorch backend, allow manual override to force PyTorch on Apple Silicon.
-
-### Risk: Model compatibility issues
-**Mitigation:** Phase 6 testing validates both backends produce similar outputs. Pin mlx-audio version.
-
-### Risk: mlx-audio development stalls
-**Mitigation:** Project is actively maintained by Blaizzy with frequent updates. If it dies, we keep PyTorch and remove MLX in a later release.
-
-### Risk: Users download wrong installer
-**Mitigation:** Auto-detect architecture on download page. Show big warning if mismatch detected.
-
-### Risk: Increased maintenance burden
-**Mitigation:** Backend abstraction keeps shared logic common. Test suite validates both backends. Most work is one-time (setup), not ongoing.
-
 ## Open Questions
 
-- **Should we support Qwen3-ASR (MLX-only) in addition to Whisper?** Adds another model option but increases complexity. Probably phase 8+.
-- **Should we backport streaming to PyTorch?** Would require chunking and callback-based generation. Probably not worth it given mlx-audio already has it.
-- **What's the auto-update UX for migrating PyTorch→MLX users?** Needs design. Don't want to force reinstall, but also want to make upgrade obvious.
+- **Should we support Qwen3-ASR (MLX-only) in addition to Whisper?** Adds another model option but increases complexity. Probably phase 8+. - Sure
+- **Should we backport streaming to PyTorch?** Would require chunking and callback-based generation. Probably not worth it given mlx-audio already has it. - No
+- **What's the auto-update UX for migrating PyTorch→MLX users?** Needs design. Don't want to force reinstall, but also want to make upgrade obvious. - it just updates, users see nothing
 - **Do we expose backend selection in settings or hide it?** Leaning toward auto-detect only, with env var override for power users.
 
 ## Success Metrics
