@@ -47,7 +47,7 @@ export function useExportGeneration() {
             filters: [
               {
                 name: 'Voicebox Generation',
-                extensions: ['voicebox.zip', 'zip'],
+                extensions: ['zip'],
               },
             ],
           });

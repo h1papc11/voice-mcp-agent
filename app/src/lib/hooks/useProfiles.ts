@@ -135,7 +135,7 @@ export function useExportProfile() {
             filters: [
               {
                 name: 'Voicebox Profile',
-                extensions: ['voicebox.zip', 'zip'],
+                extensions: ['zip'],
               },
             ],
           });
