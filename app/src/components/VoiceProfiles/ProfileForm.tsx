@@ -43,8 +43,8 @@ import {
 } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
-import { usePlatform } from '@/platform/PlatformContext';
 import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
+import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
 import { type ProfileFormDraft, useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
