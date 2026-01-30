@@ -1,6 +1,5 @@
 import { Download, Edit, Mic, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { useServerStore } from '@/stores/serverStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +15,7 @@ import {
 import type { VoiceProfileResponse } from '@/lib/api/types';
 import { useDeleteProfile, useExportProfile } from '@/lib/hooks/useProfiles';
 import { cn } from '@/lib/utils/cn';
+import { useServerStore } from '@/stores/serverStore';
 import { useUIStore } from '@/stores/uiStore';
 
 interface ProfileCardProps {
@@ -35,9 +35,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
 
   const isSelected = selectedProfileId === profile.id;
 
-  const avatarUrl = profile.avatar_path
-    ? `${serverUrl}/profiles/${profile.id}/avatar`
-    : null;
+  const avatarUrl = profile.avatar_path ? `${serverUrl}/profiles/${profile.id}/avatar` : null;
 
   const handleSelect = () => {
     setSelectedProfileId(isSelected ? null : profile.id);
@@ -81,7 +79,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
                   alt={`${profile.name} avatar`}
                   className={cn(
                     'h-full w-full object-cover transition-all duration-200',
-                    !isSelected && 'grayscale'
+                    !isSelected && 'grayscale',
                   )}
                   onError={() => setAvatarError(true)}
                 />

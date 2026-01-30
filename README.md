@@ -68,6 +68,7 @@ Unlike cloud services that lock your voice data behind subscriptions, Voicebox g
 - **Model flexibility** — currently powered by Qwen3-TTS, with support for XTTS, Bark, and other models coming soon
 - **API-first** — use the desktop app or integrate voice synthesis into your own projects
 - **Native performance** — built with Tauri (Rust), not Electron
+- **Super fast on Mac** — MLX backend with native Metal acceleration for 4-5x faster inference on Apple Silicon
 
 Download a voice model, clone any voice from a few seconds of audio, and compose multi-voice projects with studio-grade editing tools. No Python install required, no cloud dependency, no limits.
 
@@ -97,6 +98,7 @@ Powered by Alibaba's **Qwen3-TTS** — a breakthrough model that achieves near-p
 - **Instant cloning** — Upload a sample, get a voice profile
 - **High fidelity** — Natural prosody, emotion, and cadence
 - **Multi-language** — English, Chinese, and more coming
+- **Lightning fast on Mac** — MLX backend leverages Apple Silicon's Neural Engine for super fast generation
 
 ### Voice Profile Management
 

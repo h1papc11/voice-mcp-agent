@@ -424,34 +424,35 @@ class MLXSTTBackend:
     ) -> str:
         """
         Transcribe audio to text.
-        
+
         Args:
             audio_path: Path to audio file
             language: Optional language hint (en or zh)
-            
+
         Returns:
             Transcribed text
         """
         await self.load_model_async(None)
-        
+
         def _transcribe_sync():
             """Run synchronous transcription in thread pool."""
-            # Load audio
-            audio, sr = load_audio(audio_path, sample_rate=16000)
-            
-            # MLX Whisper transcription
-            # The API may vary - check mlx-audio documentation
-            # For now, assuming similar API to PyTorch Whisper
-            result = self.model.transcribe(audio, language=language)
-            
-            # Extract text from result (format may vary)
+            # MLX Whisper transcription using generate method
+            # The generate method accepts audio path directly
+            decode_options = {}
+            if language:
+                decode_options["language"] = language
+
+            result = self.model.generate(str(audio_path), **decode_options)
+
+            # Extract text from result
             if isinstance(result, str):
                 return result.strip()
             elif isinstance(result, dict):
                 return result.get("text", "").strip()
+            elif hasattr(result, "text"):
+                return result.text.strip()
             else:
-                # Try to get text attribute
                 return str(result).strip()
-        
+
         # Run blocking transcription in thread pool
         return await asyncio.to_thread(_transcribe_sync)

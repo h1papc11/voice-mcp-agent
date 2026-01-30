@@ -45,8 +45,8 @@ import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
 import { isTauri } from '@/lib/tauri';
 import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
-import { type ProfileFormDraft, useUIStore } from '@/stores/uiStore';
 import { useServerStore } from '@/stores/serverStore';
+import { type ProfileFormDraft, useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
@@ -427,7 +427,8 @@ export function ProfileForm() {
           } catch (avatarError) {
             toast({
               title: 'Avatar upload failed',
-              description: avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
+              description:
+                avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
               variant: 'destructive',
             });
           }
@@ -520,7 +521,8 @@ export function ProfileForm() {
             } catch (avatarError) {
               toast({
                 title: 'Avatar upload failed',
-                description: avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
+                description:
+                  avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
                 variant: 'destructive',
               });
             }

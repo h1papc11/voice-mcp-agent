@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/PlatformIcons';
 import { Button } from '@/components/ui/button';
-import { Section, SectionTitle } from '@/components/ui/section';
+import { Section } from '@/components/ui/section';
 import { DOWNLOAD_LINKS, GITHUB_REPO } from '@/lib/constants';
 import type { DownloadLinks } from '@/lib/releases';
 import { FeatureCard } from '../components/ui/feature-card';
@@ -40,16 +40,18 @@ export default function Home() {
       icon: <Zap className="h-6 w-6" />,
     },
     {
+      title: 'Stories Editor',
+      description:
+        'Create multi-voice narratives with a timeline-based editor. Arrange tracks, trim clips, and mix conversations.',
+      icon: <Code className="h-6 w-6" />,
+    },
+    {
       title: 'Multi-Sample Support',
       description:
         'Combine multiple voice samples for higher quality and more natural-sounding results.',
       icon: <Code className="h-6 w-6" />,
     },
-    {
-      title: 'Smart Caching',
-      description: 'Instant re-generation with voice prompt caching. No need to reprocess samples.',
-      icon: <Zap className="h-6 w-6" />,
-    },
+
     {
       title: 'Local or Remote',
       description:
@@ -246,6 +248,10 @@ export default function Home() {
               model, clone any voice from a few seconds of audio, and compose multi-voice projects
               with studio-grade editing tools.
             </p>
+            <p>
+              Optimized for performance with <strong>Metal acceleration on Mac</strong> and{' '}
+              <strong>CUDA acceleration on Windows/Linux</strong> for fast, local inference.
+            </p>
             <p className="text-foreground/60">No Python install required.</p>
           </div>
         </div>
@@ -281,10 +287,6 @@ export default function Home() {
 
       {/* Features Section */}
       <Section id="features">
-        <SectionTitle className="mb-4 text-center">Features</SectionTitle>
-        <p className="text-sm text-muted-foreground mb-8 text-center max-w-2xl mx-auto">
-          Everything you need for professional voice cloning in a desktop app.
-        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {features.map((feature) => (
             <FeatureCard
