@@ -122,9 +122,9 @@ async def health():
                     model_downloaded = True
                     break
         except (ImportError, Exception):
-            # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
-            cache_dir = hf_constants.HF_HUB_CACHE
-            repo_cache = Path(cache_dir) / "models--" + default_model_id.replace("/", "--")
+                # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
+                cache_dir = hf_constants.HF_HUB_CACHE
+                repo_cache = Path(cache_dir) / ("models--" + default_model_id.replace("/", "--"))
             if repo_cache.exists():
                 has_model_files = (
                     any(repo_cache.rglob("*.bin")) or
@@ -1197,7 +1197,7 @@ async def get_model_status():
             if not downloaded:
                 try:
                     cache_dir = hf_constants.HF_HUB_CACHE
-                    repo_cache = Path(cache_dir) / "models--" + config["hf_repo_id"].replace("/", "--")
+                    repo_cache = Path(cache_dir) / ("models--" + config["hf_repo_id"].replace("/", "--"))
                     
                     if repo_cache.exists():
                         # Check for model files (bin, safetensors, or other common model files)
@@ -1492,6 +1492,14 @@ async def startup_event():
     database.init_db()
     print(f"Database initialized at {database._db_path}")
     print(f"GPU available: {_get_gpu_status()}")
+
+    # Initialize progress manager with main event loop for thread-safe operations
+    try:
+        progress_manager = get_progress_manager()
+        progress_manager._set_main_loop(asyncio.get_running_loop())
+        print("Progress manager initialized with event loop")
+    except Exception as e:
+        print(f"Warning: Could not initialize progress manager event loop: {e}")
 
     # Ensure HuggingFace cache directory exists
     try:
