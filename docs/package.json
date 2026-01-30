@@ -1,0 +1,15 @@
+{
+  "name": "voicebox-docs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "mintlify dev",
+    "install:mintlify": "bun add -g mintlify"
+  },
+  "devDependencies": {
+    "mintlify": "latest"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}

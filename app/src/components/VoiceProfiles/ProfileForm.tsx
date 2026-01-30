@@ -110,7 +110,7 @@ export function ProfileForm() {
   const addSample = useAddSample();
   const transcribe = useTranscription();
   const { toast } = useToast();
-  const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('upload');
+  const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('record');
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [isValidatingAudio, setIsValidatingAudio] = useState(false);
   const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
@@ -282,7 +282,7 @@ export function ProfileForm() {
         sampleFile: undefined,
         referenceText: undefined,
       });
-      setSampleMode('upload');
+      setSampleMode('record');
     }
   }, [editingProfile, profileFormDraft, open, form]);
 
@@ -488,9 +488,10 @@ export function ProfileForm() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{editingProfileId ? 'Edit Voice' : 'Create Voice Profile'}</DialogTitle>
+      <DialogContent className="max-w-none w-screen h-screen left-0 top-0 translate-x-0 translate-y-0 rounded-none p-6 overflow-y-auto">
+        <div className="max-w-5xl max-h-[85vh] mx-auto my-auto w-full flex flex-col">
+          <DialogHeader>
+          <DialogTitle className="text-2xl">{editingProfileId ? 'Edit Voice' : 'Clone voice'}</DialogTitle>
           <DialogDescription>
             {editingProfileId
               ? 'Update your voice profile details and manage samples.'
@@ -513,7 +514,7 @@ export function ProfileForm() {
                     sampleFile: undefined,
                     referenceText: '',
                   });
-                  setSampleMode('upload');
+                  setSampleMode('record');
                 }}
               >
                 <X className="h-3 w-3 mr-1" />
@@ -524,76 +525,14 @@ export function ProfileForm() {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="grid gap-6 grid-cols-2">
-              {/* Left column: Profile info */}
-              <div className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="My Voice" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Describe this voice..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="language"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Language</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {LANGUAGE_OPTIONS.map((lang) => (
-                            <SelectItem key={lang.value} value={lang.value}>
-                              {lang.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Right column: Sample management */}
-              <div className="space-y-4 border-l pl-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
+            <div className="grid gap-6 grid-cols-2 flex-1 overflow-y-auto min-h-0">
+              {/* Left column: Sample management */}
+              <div className="space-y-4 border-r pr-6">
                 {isCreating ? (
                   <>
-                    <div>
-                      <h3 className="text-sm font-medium mb-2">Add Sample</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Provide an audio sample to clone the voice. You can add more samples later.
-                      </p>
-                    </div>
-
                     <Tabs
+                      className="pt-4"
                       value={sampleMode}
                       onValueChange={(v) => {
                         const newMode = v as 'upload' | 'record' | 'system';
@@ -720,6 +659,62 @@ export function ProfileForm() {
                   )
                 )}
               </div>
+
+              {/* Right column: Profile info */}
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="My Voice" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Describe this voice..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="language"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Language</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {LANGUAGE_OPTIONS.map((lang) => (
+                            <SelectItem key={lang.value} value={lang.value}>
+                              {lang.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end mt-6 pt-4 border-t">
@@ -739,6 +734,7 @@ export function ProfileForm() {
             </div>
           </form>
         </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 import { Mic, Pause, Play, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
 
 interface AudioSampleUploadProps {
   file: File | null | undefined;
@@ -31,7 +31,6 @@ export function AudioSampleUpload({
 
   return (
     <FormItem>
-      <FormLabel>Audio File</FormLabel>
       <FormControl>
         <div className="flex flex-col gap-2">
           <input

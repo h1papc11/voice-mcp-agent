@@ -1,6 +1,6 @@
 import { Mic, Monitor, Pause, Play, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
 import { formatAudioDuration } from '@/lib/utils/audio';
 
 interface AudioSampleSystemProps {
@@ -30,7 +30,6 @@ export function AudioSampleSystem({
 }: AudioSampleSystemProps) {
   return (
     <FormItem>
-      <FormLabel>Capture System Audio</FormLabel>
       <FormControl>
         <div className="space-y-4">
           {!isRecording && !file && (

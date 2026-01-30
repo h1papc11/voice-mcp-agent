@@ -22,6 +22,7 @@
     "generate:keys": "cd tauri && bun tauri signer generate -w ~/.tauri/voicebox.key",
     "build:server": "./scripts/build-server.sh",
     "update:icons": "./scripts/update-icons.sh",
+    "convert:assets": "./scripts/convert-assets.sh",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
@@ -35,5 +36,9 @@
     "@types/node": "^20.0.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.6.0"
-  }
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "packageManager": "bun@1.0.0"
 }

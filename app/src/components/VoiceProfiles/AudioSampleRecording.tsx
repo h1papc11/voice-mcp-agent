@@ -1,7 +1,30 @@
 import { Mic, Pause, Play, Square } from 'lucide-react';
+import { memo, useEffect, useState } from 'react';
+import { Visualizer } from 'react-sound-visualizer';
 import { Button } from '@/components/ui/button';
-import { FormControl, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
 import { formatAudioDuration } from '@/lib/utils/audio';
+
+const MemoizedWaveform = memo(function MemoizedWaveform({
+  audioStream,
+}: {
+  audioStream: MediaStream;
+}) {
+  return (
+    <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
+      <Visualizer audio={audioStream} autoStart strokeColor="#b39a3d">
+        {({ canvasRef }) => (
+          <canvas
+            ref={canvasRef}
+            width={500}
+            height={150}
+            className="w-full h-full"
+          />
+        )}
+      </Visualizer>
+    </div>
+  );
+});
 
 interface AudioSampleRecordingProps {
   file: File | null | undefined;
@@ -14,6 +37,7 @@ interface AudioSampleRecordingProps {
   onPlayPause: () => void;
   isPlaying: boolean;
   isTranscribing?: boolean;
+  showWaveform?: boolean;
 }
 
 export function AudioSampleRecording({
@@ -27,29 +51,67 @@ export function AudioSampleRecording({
   onPlayPause,
   isPlaying,
   isTranscribing = false,
+  showWaveform = true,
 }: AudioSampleRecordingProps) {
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+
+  // Request microphone access when component mounts
+  useEffect(() => {
+    if (!showWaveform) return;
+
+    let stream: MediaStream | null = null;
+
+    navigator.mediaDevices
+      .getUserMedia({ audio: true, video: false })
+      .then((s) => {
+        stream = s;
+        setAudioStream(s);
+      })
+      .catch((err) => {
+        console.warn('Could not access microphone for visualization:', err);
+      });
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+      }
+    };
+  }, [showWaveform]);
+
   return (
     <FormItem>
-      <FormLabel>Record Audio</FormLabel>
       <FormControl>
         <div className="space-y-4">
           {!isRecording && !file && (
-            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
-              <Button type="button" onClick={onStart} size="lg" className="flex items-center gap-2">
+            <div className="relative flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px] overflow-hidden">
+              {showWaveform && audioStream && (
+                <MemoizedWaveform audioStream={audioStream} />
+              )}
+              <Button
+                type="button"
+                onClick={onStart}
+                size="lg"
+                className="relative z-10 flex items-center gap-2"
+              >
                 <Mic className="h-5 w-5" />
                 Start Recording
               </Button>
-              <p className="text-sm text-muted-foreground text-center">
+              <p className="relative z-10 text-sm text-muted-foreground text-center">
                 Click to start recording. Maximum duration: 30 seconds.
               </p>
             </div>
           )}
 
           {isRecording && (
-            <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-destructive rounded-lg bg-destructive/5 min-h-[180px]">
-              <div className="flex items-center gap-4">
+            <div className="relative flex flex-col items-center justify-center gap-4 p-4 border-2 border-accent rounded-lg bg-accent/5 min-h-[180px] overflow-hidden">
+              {showWaveform && audioStream && (
+                <MemoizedWaveform audioStream={audioStream} />
+              )}
+              <div className="relative z-10 flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
+                  <div className="h-3 w-3 rounded-full bg-accent animate-pulse" />
                   <span className="text-lg font-mono font-semibold">
                     {formatAudioDuration(duration)}
                   </span>
@@ -58,13 +120,12 @@ export function AudioSampleRecording({
               <Button
                 type="button"
                 onClick={onStop}
-                variant="destructive"
-                className="flex items-center gap-2"
+                className="relative z-10 flex items-center gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 <Square className="h-4 w-4" />
                 Stop Recording
               </Button>
-              <p className="text-sm text-muted-foreground text-center">
+              <p className="relative z-10 text-sm text-muted-foreground text-center">
                 {formatAudioDuration(30 - duration)} remaining
               </p>
             </div>

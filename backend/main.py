@@ -122,9 +122,9 @@ async def health():
                     model_downloaded = True
                     break
         except (ImportError, Exception):
-                # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
-                cache_dir = hf_constants.HF_HUB_CACHE
-                repo_cache = Path(cache_dir) / ("models--" + default_model_id.replace("/", "--"))
+            # Method 2: Check cache directory (using HuggingFace's OS-specific cache location)
+            cache_dir = hf_constants.HF_HUB_CACHE
+            repo_cache = Path(cache_dir) / ("models--" + default_model_id.replace("/", "--"))
             if repo_cache.exists():
                 has_model_files = (
                     any(repo_cache.rglob("*.bin")) or

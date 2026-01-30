@@ -159,6 +159,26 @@ After starting the backend server:
 ```
 This downloads the OpenAPI schema and generates the TypeScript client in `app/src/lib/api/`
 
+### Convert Assets to Web Formats
+
+To optimize images and videos for the web, run:
+```bash
+bun run convert:assets
+```
+
+This script:
+- Converts PNG → WebP (better compression, same quality)
+- Converts MOV → WebM (VP9 codec, smaller file size)
+- Processes files in `landing/public/` and `docs/public/`
+- **Deletes original files** after successful conversion
+
+**Requirements:** Install `webp` and `ffmpeg`:
+```bash
+brew install webp ffmpeg
+```
+
+> **Note:** Run this before committing new images or videos to keep the repository size small.
+
 ## Development Workflow
 
 ### 1. Create a Branch
