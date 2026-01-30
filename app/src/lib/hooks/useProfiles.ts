@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { VoiceProfileCreate } from '@/lib/api/types';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 
 export function useProfiles() {
   return useQuery({
@@ -117,59 +117,24 @@ export function useUpdateSample() {
 }
 
 export function useExportProfile() {
+  const platform = usePlatform();
+
   return useMutation({
     mutationFn: async (profileId: string) => {
       const blob = await apiClient.exportProfile(profileId);
-      
+
       // Get profile name for filename
       const profile = await apiClient.getProfile(profileId);
       const safeName = profile.name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
       const filename = `profile-${safeName}.voicebox.zip`;
-      
-      if (isTauri()) {
-        // Use Tauri's native save dialog
-        try {
-          const { save } = await import('@tauri-apps/plugin-dialog');
-          const filePath = await save({
-            defaultPath: filename,
-            filters: [
-              {
-                name: 'Voicebox Profile',
-                extensions: ['voicebox.zip', 'zip'],
-              },
-            ],
-          });
-          
-          if (filePath) {
-            // Write file using Tauri's filesystem API
-            const { writeBinaryFile } = await import('@tauri-apps/plugin-fs');
-            const arrayBuffer = await blob.arrayBuffer();
-            await writeBinaryFile(filePath, new Uint8Array(arrayBuffer));
-          }
-        } catch (error) {
-          console.error('Failed to use Tauri dialog, falling back to browser download:', error);
-          // Fall back to browser download if Tauri dialog fails
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }
-      } else {
-        // Browser: trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-      
+
+      await platform.filesystem.saveFile(filename, blob, [
+        {
+          name: 'Voicebox Profile',
+          extensions: ['zip'],
+        },
+      ]);
+
       return blob;
     },
   });

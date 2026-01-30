@@ -27,7 +27,7 @@ import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
 import { useAddSample, useProfile } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 import { AudioSampleRecording } from './AudioSampleRecording';
 import { AudioSampleSystem } from './AudioSampleSystem';
 import { AudioSampleUpload } from './AudioSampleUpload';
@@ -49,6 +49,7 @@ interface SampleUploadProps {
 }
 
 export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProps) {
+  const platform = usePlatform();
   const addSample = useAddSample();
   const transcribe = useTranscription();
   const { data: profile } = useProfile(profileId);
@@ -232,7 +233,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs value={mode} onValueChange={(v) => setMode(v as 'upload' | 'record' | 'system')}>
               <TabsList
-                className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                className={`grid w-full ${platform.metadata.isTauri && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
               >
                 <TabsTrigger value="upload" className="flex items-center gap-2">
                   <Upload className="h-4 w-4 shrink-0" />
@@ -242,7 +243,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                   <Mic className="h-4 w-4 shrink-0" />
                   Record
                 </TabsTrigger>
-                {isTauri() && isSystemAudioSupported && (
+                {platform.metadata.isTauri && isSystemAudioSupported && (
                   <TabsTrigger value="system" className="flex items-center gap-2">
                     <Monitor className="h-4 w-4 shrink-0" />
                     System Audio
@@ -289,7 +290,7 @@ export function SampleUpload({ profileId, open, onOpenChange }: SampleUploadProp
                 />
               </TabsContent>
 
-              {isTauri() && isSystemAudioSupported && (
+              {platform.metadata.isTauri && isSystemAudioSupported && (
                 <TabsContent value="system" className="space-y-4">
                   <FormField
                     control={form.control}

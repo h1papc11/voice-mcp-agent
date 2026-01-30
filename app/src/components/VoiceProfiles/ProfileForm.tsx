@@ -43,8 +43,8 @@ import {
 } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
-import { isTauri } from '@/lib/tauri';
 import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
+import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
 import { type ProfileFormDraft, useUIStore } from '@/stores/uiStore';
 import { AudioSampleRecording } from './AudioSampleRecording';
@@ -102,6 +102,7 @@ function base64ToFile(base64: string, fileName: string, fileType: string): File 
 }
 
 export function ProfileForm() {
+  const platform = usePlatform();
   const open = useUIStore((state) => state.profileDialogOpen);
   const setOpen = useUIStore((state) => state.setProfileDialogOpen);
   const editingProfileId = useUIStore((state) => state.editingProfileId);
@@ -664,7 +665,7 @@ export function ProfileForm() {
                         }}
                       >
                         <TabsList
-                          className={`grid w-full ${isTauri() && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                          className={`grid w-full ${platform.metadata.isTauri && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
                         >
                           <TabsTrigger value="upload" className="flex items-center gap-2">
                             <Upload className="h-4 w-4 shrink-0" />
@@ -674,7 +675,7 @@ export function ProfileForm() {
                             <Mic className="h-4 w-4 shrink-0" />
                             Record
                           </TabsTrigger>
-                          {isTauri() && isSystemAudioSupported && (
+                          {platform.metadata.isTauri && isSystemAudioSupported && (
                             <TabsTrigger value="system" className="flex items-center gap-2">
                               <Monitor className="h-4 w-4 shrink-0" />
                               System Audio
@@ -726,7 +727,7 @@ export function ProfileForm() {
                           />
                         </TabsContent>
 
-                        {isTauri() && isSystemAudioSupported && (
+                        {platform.metadata.isTauri && isSystemAudioSupported && (
                           <TabsContent value="system" className="space-y-4">
                             <FormField
                               control={form.control}

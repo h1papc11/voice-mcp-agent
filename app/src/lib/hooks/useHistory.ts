@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { HistoryQuery } from '@/lib/api/types';
-import { isTauri } from '@/lib/tauri';
+import { usePlatform } from '@/platform/PlatformContext';
 
 export function useHistory(query?: HistoryQuery) {
   return useQuery({
@@ -30,116 +30,52 @@ export function useDeleteGeneration() {
 }
 
 export function useExportGeneration() {
+  const platform = usePlatform();
+
   return useMutation({
     mutationFn: async ({ generationId, text }: { generationId: string; text: string }) => {
       const blob = await apiClient.exportGeneration(generationId);
-      
+
       // Create safe filename from text
-      const safeText = text.substring(0, 30).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const safeText = text
+        .substring(0, 30)
+        .replace(/[^a-z0-9]/gi, '-')
+        .toLowerCase();
       const filename = `generation-${safeText}.voicebox.zip`;
-      
-      if (isTauri()) {
-        // Use Tauri's native save dialog
-        try {
-          const { save } = await import('@tauri-apps/plugin-dialog');
-          const filePath = await save({
-            defaultPath: filename,
-            filters: [
-              {
-                name: 'Voicebox Generation',
-                extensions: ['voicebox.zip', 'zip'],
-              },
-            ],
-          });
-          
-          if (filePath) {
-            // Write file using Tauri's filesystem API
-            const { writeBinaryFile } = await import('@tauri-apps/plugin-fs');
-            const arrayBuffer = await blob.arrayBuffer();
-            await writeBinaryFile(filePath, new Uint8Array(arrayBuffer));
-          }
-        } catch (error) {
-          console.error('Failed to use Tauri dialog, falling back to browser download:', error);
-          // Fall back to browser download if Tauri dialog fails
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }
-      } else {
-        // Browser: trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-      
+
+      await platform.filesystem.saveFile(filename, blob, [
+        {
+          name: 'Voicebox Generation',
+          extensions: ['zip'],
+        },
+      ]);
+
       return blob;
     },
   });
 }
 
 export function useExportGenerationAudio() {
+  const platform = usePlatform();
+
   return useMutation({
     mutationFn: async ({ generationId, text }: { generationId: string; text: string }) => {
       const blob = await apiClient.exportGenerationAudio(generationId);
-      
+
       // Create safe filename from text
-      const safeText = text.substring(0, 30).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      const safeText = text
+        .substring(0, 30)
+        .replace(/[^a-z0-9]/gi, '-')
+        .toLowerCase();
       const filename = `${safeText}.wav`;
-      
-      if (isTauri()) {
-        // Use Tauri's native save dialog
-        try {
-          const { save } = await import('@tauri-apps/plugin-dialog');
-          const filePath = await save({
-            defaultPath: filename,
-            filters: [
-              {
-                name: 'Audio File',
-                extensions: ['wav'],
-              },
-            ],
-          });
-          
-          if (filePath) {
-            // Write file using Tauri's filesystem API
-            const { writeBinaryFile } = await import('@tauri-apps/plugin-fs');
-            const arrayBuffer = await blob.arrayBuffer();
-            await writeBinaryFile(filePath, new Uint8Array(arrayBuffer));
-          }
-        } catch (error) {
-          console.error('Failed to use Tauri dialog, falling back to browser download:', error);
-          // Fall back to browser download if Tauri dialog fails
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        }
-      } else {
-        // Browser: trigger download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }
-      
+
+      await platform.filesystem.saveFile(filename, blob, [
+        {
+          name: 'Audio File',
+          extensions: ['wav'],
+        },
+      ]);
+
       return blob;
     },
   });
