@@ -11,6 +11,21 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/jamiepine/voicebox/releases">
+    <img src="https://img.shields.io/github/downloads/jamiepine/voicebox/total?style=flat&color=blue" alt="Downloads" />
+  </a>
+  <a href="https://github.com/jamiepine/voicebox/releases/latest">
+    <img src="https://img.shields.io/github/v/release/jamiepine/voicebox?style=flat" alt="Release" />
+  </a>
+  <a href="https://github.com/jamiepine/voicebox/stargazers">
+    <img src="https://img.shields.io/github/stars/jamiepine/voicebox?style=flat" alt="Stars" />
+  </a>
+  <a href="https://github.com/jamiepine/voicebox/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/jamiepine/voicebox?style=flat" alt="License" />
+  </a>
+</p>
+
+<p align="center">
   <a href="https://voicebox.sh">voicebox.sh</a> •
   <a href="#download">Download</a> •
   <a href="#features">Features</a> •
