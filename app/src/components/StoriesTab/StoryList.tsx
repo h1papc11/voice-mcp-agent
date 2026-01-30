@@ -186,7 +186,7 @@ export function StoryList() {
       {/* Story List */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
         {storyList.length === 0 ? (
-          <div className="text-center py-12 px-5 border-2 border-dashed border-muted rounded-md text-muted-foreground">
+          <div className="text-center py-12 px-5 border-2 border-dashed border-muted rounded-2xl text-muted-foreground">
             <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">No stories yet</p>
             <p className="text-xs mt-2">Create your first story to get started</p>
@@ -196,7 +196,7 @@ export function StoryList() {
             <div
               key={story.id}
               className={cn(
-                'h-24 p-4 border rounded-md transition-colors group flex items-center',
+                'h-24 p-4 border rounded-2xl transition-colors group flex items-center',
                 selectedStoryId === story.id && 'bg-muted border-primary',
               )}
             >
