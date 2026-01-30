@@ -147,17 +147,17 @@ Voicebox exposes a full REST API, so you can integrate voice synthesis into your
 
 ```bash
 # Generate speech
-curl -X POST http://localhost:8000/api/generate \
+curl -X POST http://localhost:8000/generate \
   -H "Content-Type: application/json" \
-  -d '{"text": "Hello world", "profile_id": "abc123"}'
+  -d '{"text": "Hello world", "profile_id": "abc123", "language": "en"}'
 
 # List voice profiles
-curl http://localhost:8000/api/profiles
+curl http://localhost:8000/profiles
 
-# Create a profile from audio
-curl -X POST http://localhost:8000/api/profiles \
-  -F "audio=@voice-sample.wav" \
-  -F "name=My Voice"
+# Create a profile
+curl -X POST http://localhost:8000/profiles \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Voice", "language": "en"}'
 ```
 
 **Use cases:**
