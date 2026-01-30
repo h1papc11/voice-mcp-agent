@@ -53,6 +53,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Makefile** - Comprehensive development workflow automation with commands for setup, development, building, testing, and code quality checks
+  - Includes Python version detection and compatibility warnings
+  - Self-documenting help system with `make help`
+  - Colored output for better readability
+  - Supports parallel development server execution
+
+### Changed
+- **README** - Added Makefile reference and updated Quick Start with Makefile-based setup instructions alongside manual setup
+
+---
+
+## [Unreleased - Planned]
+
 ### Planned
 - Real-time streaming synthesis
 - Conversation mode with multiple speakers

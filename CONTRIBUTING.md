@@ -32,6 +32,10 @@ Thank you for your interest in contributing to Voicebox! This document provides 
 
 ### Development Setup
 
+**Using the Makefile (recommended for macOS/Linux):** Run `make setup` to install all dependencies, then `make dev` to start development servers. See `make help` for all available commands.
+
+**Manual setup (required for Windows):**
+
 1. **Fork and clone the repository**
    ```bash
    git clone https://github.com/YOUR_USERNAME/voicebox.git
