@@ -1,0 +1,310 @@
+---
+title: "Audio Channels"
+description: "How audio output routing works in Voicebox"
+---
+
+## Overview
+
+Audio channels allow routing voice output to different audio devices. This is useful for multi-output setups where different voices should play through different speakers or applications.
+
+## Architecture
+
+**Channel:** A named audio bus that can be assigned to output devices.
+
+**Device Mapping:** Links channels to OS audio device identifiers.
+
+**Profile Mapping:** Links voice profiles to channels (many-to-many).
+
+## Data Model
+
+### AudioChannel Table
+
+```python
+class AudioChannel(Base):
+    __tablename__ = "audio_channels"
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime)
+```
+
+### ChannelDeviceMapping Table
+
+```python
+class ChannelDeviceMapping(Base):
+    __tablename__ = "channel_device_mappings"
+    
+    id = Column(String, primary_key=True)
+    channel_id = Column(String, ForeignKey("audio_channels.id"))
+    device_id = Column(String)  # OS device identifier
+```
+
+### ProfileChannelMapping Table
+
+```python
+class ProfileChannelMapping(Base):
+    __tablename__ = "profile_channel_mappings"
+    
+    profile_id = Column(String, ForeignKey("profiles.id"), primary_key=True)
+    channel_id = Column(String, ForeignKey("audio_channels.id"), primary_key=True)
+```
+
+## Default Channel
+
+A default channel is created on database initialization:
+
+```python
+def init_db():
+    # Create default channel if it doesn't exist
+    default_channel = db.query(AudioChannel).filter(
+        AudioChannel.is_default == True
+    ).first()
+    
+    if not default_channel:
+        default_channel = AudioChannel(
+            id=str(uuid.uuid4()),
+            name="Default",
+            is_default=True
+        )
+        db.add(default_channel)
+        
+        # Assign all existing profiles to default channel
+        profiles = db.query(VoiceProfile).all()
+        for profile in profiles:
+            mapping = ProfileChannelMapping(
+                profile_id=profile.id,
+                channel_id=default_channel.id
+            )
+            db.add(mapping)
+```
+
+## Core Operations
+
+### Creating a Channel
+
+```python
+async def create_channel(
+    data: AudioChannelCreate,
+    db: Session,
+) -> AudioChannelResponse:
+    # Check name uniqueness
+    existing = db.query(DBAudioChannel).filter_by(name=data.name).first()
+    if existing:
+        raise ValueError(f"Channel with name '{data.name}' already exists")
+    
+    # Create channel
+    channel = DBAudioChannel(
+        id=str(uuid.uuid4()),
+        name=data.name,
+        is_default=False,
+    )
+    db.add(channel)
+    
+    # Add device mappings
+    for device_id in data.device_ids:
+        mapping = DBChannelDeviceMapping(
+            id=str(uuid.uuid4()),
+            channel_id=channel.id,
+            device_id=device_id,
+        )
+        db.add(mapping)
+    
+    db.commit()
+```
+
+### Updating a Channel
+
+```python
+async def update_channel(
+    channel_id: str,
+    data: AudioChannelUpdate,
+    db: Session,
+) -> AudioChannelResponse:
+    channel = db.query(DBAudioChannel).filter_by(id=channel_id).first()
+    
+    # Cannot modify default channel
+    if channel.is_default:
+        raise ValueError("Cannot modify the default channel")
+    
+    # Update name
+    if data.name is not None:
+        channel.name = data.name
+    
+    # Update device mappings
+    if data.device_ids is not None:
+        # Delete existing
+        db.query(DBChannelDeviceMapping).filter_by(channel_id=channel_id).delete()
+        
+        # Add new
+        for device_id in data.device_ids:
+            mapping = DBChannelDeviceMapping(
+                channel_id=channel.id,
+                device_id=device_id,
+            )
+            db.add(mapping)
+    
+    db.commit()
+```
+
+### Deleting a Channel
+
+```python
+async def delete_channel(channel_id: str, db: Session) -> bool:
+    channel = db.query(DBAudioChannel).filter_by(id=channel_id).first()
+    
+    # Cannot delete default channel
+    if channel.is_default:
+        raise ValueError("Cannot delete the default channel")
+    
+    # Delete device mappings
+    db.query(DBChannelDeviceMapping).filter_by(channel_id=channel_id).delete()
+    
+    # Delete profile-channel mappings
+    db.query(DBProfileChannelMapping).filter_by(channel_id=channel_id).delete()
+    
+    # Delete channel
+    db.delete(channel)
+    db.commit()
+```
+
+## Voice Assignment
+
+### Assigning Voices to Channel
+
+```python
+async def set_channel_voices(
+    channel_id: str,
+    data: ChannelVoiceAssignment,
+    db: Session,
+) -> None:
+    # Verify channel exists
+    channel = db.query(DBAudioChannel).filter_by(id=channel_id).first()
+    if not channel:
+        raise ValueError(f"Channel {channel_id} not found")
+    
+    # Verify all profiles exist
+    for profile_id in data.profile_ids:
+        profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
+        if not profile:
+            raise ValueError(f"Profile {profile_id} not found")
+    
+    # Delete existing mappings
+    db.query(DBProfileChannelMapping).filter_by(channel_id=channel_id).delete()
+    
+    # Add new mappings
+    for profile_id in data.profile_ids:
+        mapping = DBProfileChannelMapping(
+            profile_id=profile_id,
+            channel_id=channel_id,
+        )
+        db.add(mapping)
+    
+    db.commit()
+```
+
+### Assigning Channels to Voice
+
+```python
+async def set_profile_channels(
+    profile_id: str,
+    data: ProfileChannelAssignment,
+    db: Session,
+) -> None:
+    # Verify profile exists
+    profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
+    if not profile:
+        raise ValueError(f"Profile {profile_id} not found")
+    
+    # Delete existing mappings
+    db.query(DBProfileChannelMapping).filter_by(profile_id=profile_id).delete()
+    
+    # Add new mappings
+    for channel_id in data.channel_ids:
+        mapping = DBProfileChannelMapping(
+            profile_id=profile_id,
+            channel_id=channel_id,
+        )
+        db.add(mapping)
+    
+    db.commit()
+```
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/channels` | List all channels |
+| POST | `/channels` | Create a channel |
+| GET | `/channels/{id}` | Get channel by ID |
+| PUT | `/channels/{id}` | Update channel |
+| DELETE | `/channels/{id}` | Delete channel |
+| GET | `/channels/{id}/voices` | Get assigned voices |
+| PUT | `/channels/{id}/voices` | Set assigned voices |
+| GET | `/profiles/{id}/channels` | Get profile's channels |
+| PUT | `/profiles/{id}/channels` | Set profile's channels |
+
+## Request/Response Schemas
+
+### AudioChannelCreate
+
+```json
+{
+  "name": "Speakers",
+  "device_ids": ["device_uuid_1", "device_uuid_2"]
+}
+```
+
+### AudioChannelResponse
+
+```json
+{
+  "id": "channel_uuid",
+  "name": "Speakers",
+  "is_default": false,
+  "device_ids": ["device_uuid_1", "device_uuid_2"],
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+### ChannelVoiceAssignment
+
+```json
+{
+  "profile_ids": ["profile_1", "profile_2"]
+}
+```
+
+## Use Cases
+
+### Multi-Output Setup
+
+**Scenario:** Stream with different voice characters
+
+1. Create "Stream" channel → OBS virtual audio
+2. Create "Monitor" channel → Headphones
+3. Assign "Narrator" profile → Both channels
+4. Assign "Character 1" profile → Stream only
+
+### Virtual Audio Cables
+
+Common device IDs for virtual audio:
+- VB-Audio Virtual Cable
+- BlackHole (macOS)
+- Soundflower (macOS)
+
+## Frontend Integration
+
+The frontend needs to:
+
+1. **Enumerate devices** using Web Audio API or Tauri
+2. **Display channel list** with device assignments
+3. **Allow profile assignment** via drag/drop or dropdown
+4. **Route playback** to correct device based on profile's channel
+
+## Limitations
+
+- Device IDs are OS-specific
+- Hot-plugging may invalidate device IDs
+- Default channel cannot be modified/deleted
+- Frontend handles actual audio routing (backend just stores config)

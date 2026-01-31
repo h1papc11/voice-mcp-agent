@@ -1,0 +1,10 @@
+{
+  "title": "API Reference",
+  "pages": [
+    "overview",
+    "authentication",
+    "voice-profiles",
+    "generation",
+    "recordings"
+  ]
+}
