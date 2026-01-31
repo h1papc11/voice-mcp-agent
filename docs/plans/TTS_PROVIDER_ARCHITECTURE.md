@@ -16,7 +16,7 @@ Split the monolithic backend into modular components:
 This architecture solves:
 
 - ✅ GitHub 2GB release artifact limit
-- ✅ Frequent app updates without re-downloading large ML models
+- ✅ Frequent app updates without re-downloading large python binaries
 - ✅ User choice of compute backend (CPU/GPU/Cloud)
 - ✅ External provider support (OpenAI, custom servers)
 - ✅ Future extensibility
