@@ -54,20 +54,43 @@ class MLXTTSBackend:
     
     def _is_model_cached(self, model_size: str) -> bool:
         """
-        Check if the model is already cached locally.
+        Check if the model is already cached locally AND fully downloaded.
         
         Args:
             model_size: Model size to check
             
         Returns:
-            True if model is cached, False otherwise
+            True if model is fully cached, False if missing or incomplete
         """
         try:
             from huggingface_hub import constants as hf_constants
             model_path = self._get_model_path(model_size)
             repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
-            return repo_cache.exists()
-        except Exception:
+            
+            if not repo_cache.exists():
+                return False
+            
+            # Check for .incomplete files - if any exist, download is still in progress
+            blobs_dir = repo_cache / "blobs"
+            if blobs_dir.exists() and any(blobs_dir.glob("*.incomplete")):
+                print(f"[_is_model_cached] Found .incomplete files for {model_size}, treating as not cached")
+                return False
+            
+            # Check that actual model weight files exist in snapshots
+            snapshots_dir = repo_cache / "snapshots"
+            if snapshots_dir.exists():
+                has_weights = (
+                    any(snapshots_dir.rglob("*.safetensors")) or
+                    any(snapshots_dir.rglob("*.bin")) or
+                    any(snapshots_dir.rglob("*.npz"))
+                )
+                if not has_weights:
+                    print(f"[_is_model_cached] No model weights found for {model_size}, treating as not cached")
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"[_is_model_cached] Error checking cache for {model_size}: {e}")
             return False
     
     async def load_model_async(self, model_size: Optional[str] = None):
@@ -121,9 +144,15 @@ class MLXTTSBackend:
                 # Start tracking download task
                 task_manager.start_download(model_name)
                 
-                # Note: Don't initialize progress here with fake total=1
-                # Let the actual tqdm callbacks set the real values
-                # This avoids crazy percentages when current > 1 but total is still 1
+                # Initialize progress state so SSE endpoint has initial data to send
+                # This provides immediate feedback while HuggingFace fetches metadata
+                progress_manager.update_progress(
+                    model_name=model_name,
+                    current=0,
+                    total=0,  # Will be updated once actual total is known
+                    filename="Connecting to HuggingFace...",
+                    status="downloading",
+                )
             
             # IMPORTANT: Patch tqdm BEFORE importing mlx_audio
             # Otherwise mlx_audio caches reference to original tqdm
@@ -363,20 +392,43 @@ class MLXSTTBackend:
     
     def _is_model_cached(self, model_size: str) -> bool:
         """
-        Check if the Whisper model is already cached locally.
+        Check if the Whisper model is already cached locally AND fully downloaded.
         
         Args:
             model_size: Model size to check
             
         Returns:
-            True if model is cached, False otherwise
+            True if model is fully cached, False if missing or incomplete
         """
         try:
             from huggingface_hub import constants as hf_constants
             model_name = f"openai/whisper-{model_size}"
             repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
-            return repo_cache.exists()
-        except Exception:
+            
+            if not repo_cache.exists():
+                return False
+            
+            # Check for .incomplete files - if any exist, download is still in progress
+            blobs_dir = repo_cache / "blobs"
+            if blobs_dir.exists() and any(blobs_dir.glob("*.incomplete")):
+                print(f"[_is_model_cached] Found .incomplete files for whisper-{model_size}, treating as not cached")
+                return False
+            
+            # Check that actual model weight files exist in snapshots
+            snapshots_dir = repo_cache / "snapshots"
+            if snapshots_dir.exists():
+                has_weights = (
+                    any(snapshots_dir.rglob("*.safetensors")) or
+                    any(snapshots_dir.rglob("*.bin")) or
+                    any(snapshots_dir.rglob("*.npz"))
+                )
+                if not has_weights:
+                    print(f"[_is_model_cached] No model weights found for whisper-{model_size}, treating as not cached")
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"[_is_model_cached] Error checking cache for whisper-{model_size}: {e}")
             return False
     
     async def load_model_async(self, model_size: Optional[str] = None):
@@ -431,8 +483,14 @@ class MLXSTTBackend:
                 # Start tracking download task
                 task_manager.start_download(progress_model_name)
                 
-                # Note: Don't initialize progress here with fake total=1
-                # Let the actual tqdm callbacks set the real values
+                # Initialize progress state so SSE endpoint has initial data to send
+                progress_manager.update_progress(
+                    model_name=progress_model_name,
+                    current=0,
+                    total=0,
+                    filename="Connecting to HuggingFace...",
+                    status="downloading",
+                )
 
             # Load the model (tqdm is patched, but filters out non-download progress)
             try:

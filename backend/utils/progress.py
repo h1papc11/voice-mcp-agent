@@ -89,7 +89,14 @@ class ProgressManager:
         import time
         logger = logging.getLogger(__name__)
 
-        progress_pct = (current / total * 100) if total > 0 else 0
+        # Calculate progress percentage, clamped to 0-100 range
+        # This prevents crazy percentages from edge cases like:
+        # - current > total temporarily during aggregation
+        # - mixing file-count progress with byte-count progress
+        if total > 0:
+            progress_pct = min(100.0, max(0.0, (current / total * 100)))
+        else:
+            progress_pct = 0
 
         progress_data = {
             "model_name": model_name,
