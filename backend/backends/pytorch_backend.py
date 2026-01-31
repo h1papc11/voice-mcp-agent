@@ -60,20 +60,42 @@ class PyTorchTTSBackend:
     
     def _is_model_cached(self, model_size: str) -> bool:
         """
-        Check if the model is already cached locally.
+        Check if the model is already cached locally AND fully downloaded.
         
         Args:
             model_size: Model size to check
             
         Returns:
-            True if model is cached, False otherwise
+            True if model is fully cached, False if missing or incomplete
         """
         try:
             from huggingface_hub import constants as hf_constants
             model_path = self._get_model_path(model_size)
             repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
-            return repo_cache.exists()
-        except Exception:
+            
+            if not repo_cache.exists():
+                return False
+            
+            # Check for .incomplete files - if any exist, download is still in progress
+            blobs_dir = repo_cache / "blobs"
+            if blobs_dir.exists() and any(blobs_dir.glob("*.incomplete")):
+                print(f"[_is_model_cached] Found .incomplete files for {model_size}, treating as not cached")
+                return False
+            
+            # Check that actual model weight files exist in snapshots
+            snapshots_dir = repo_cache / "snapshots"
+            if snapshots_dir.exists():
+                has_weights = (
+                    any(snapshots_dir.rglob("*.safetensors")) or
+                    any(snapshots_dir.rglob("*.bin"))
+                )
+                if not has_weights:
+                    print(f"[_is_model_cached] No model weights found for {model_size}, treating as not cached")
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"[_is_model_cached] Error checking cache for {model_size}: {e}")
             return False
     
     async def load_model_async(self, model_size: Optional[str] = None):
@@ -133,12 +155,12 @@ class PyTorchTTSBackend:
                 # Start tracking download task
                 task_manager.start_download(model_name)
 
-                # Initialize progress state to show download has started
+                # Initialize progress state so SSE endpoint has initial data to send
                 progress_manager.update_progress(
                     model_name=model_name,
                     current=0,
-                    total=1,  # Set to 1 initially, will be updated by callback
-                    filename="",
+                    total=0,  # Will be updated once actual total is known
+                    filename="Connecting to HuggingFace...",
                     status="downloading",
                 )
 
@@ -347,20 +369,42 @@ class PyTorchSTTBackend:
     
     def _is_model_cached(self, model_size: str) -> bool:
         """
-        Check if the Whisper model is already cached locally.
+        Check if the Whisper model is already cached locally AND fully downloaded.
         
         Args:
             model_size: Model size to check
             
         Returns:
-            True if model is cached, False otherwise
+            True if model is fully cached, False if missing or incomplete
         """
         try:
             from huggingface_hub import constants as hf_constants
             model_name = f"openai/whisper-{model_size}"
             repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
-            return repo_cache.exists()
-        except Exception:
+            
+            if not repo_cache.exists():
+                return False
+            
+            # Check for .incomplete files - if any exist, download is still in progress
+            blobs_dir = repo_cache / "blobs"
+            if blobs_dir.exists() and any(blobs_dir.glob("*.incomplete")):
+                print(f"[_is_model_cached] Found .incomplete files for whisper-{model_size}, treating as not cached")
+                return False
+            
+            # Check that actual model weight files exist in snapshots
+            snapshots_dir = repo_cache / "snapshots"
+            if snapshots_dir.exists():
+                has_weights = (
+                    any(snapshots_dir.rglob("*.safetensors")) or
+                    any(snapshots_dir.rglob("*.bin"))
+                )
+                if not has_weights:
+                    print(f"[_is_model_cached] No model weights found for whisper-{model_size}, treating as not cached")
+                    return False
+            
+            return True
+        except Exception as e:
+            print(f"[_is_model_cached] Error checking cache for whisper-{model_size}: {e}")
             return False
     
     async def load_model_async(self, model_size: Optional[str] = None):
@@ -422,18 +466,15 @@ class PyTorchSTTBackend:
             if not is_cached:
                 # Start tracking download task
                 task_manager.start_download(progress_model_name)
-                print(f"[DEBUG] Task manager started download")
 
-                # Initialize progress state to show download has started
-                print(f"[DEBUG] Calling update_progress...")
+                # Initialize progress state so SSE endpoint has initial data to send
                 progress_manager.update_progress(
                     model_name=progress_model_name,
                     current=0,
-                    total=1,  # Set to 1 initially, will be updated by callback
-                    filename="",
+                    total=0,  # Will be updated once actual total is known
+                    filename="Connecting to HuggingFace...",
                     status="downloading",
                 )
-                print(f"[DEBUG] update_progress called, listeners: {len(progress_manager._listeners.get(progress_model_name, []))}")
 
             # Load models (tqdm is patched, but filters out non-download progress)
             try:
