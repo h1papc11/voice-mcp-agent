@@ -175,7 +175,13 @@ class MLXTTSBackend:
             if cached_prompt is not None:
                 # Return cached prompt (should be dict format)
                 if isinstance(cached_prompt, dict):
-                    return cached_prompt, True
+                    # Validate that the cached audio file still exists
+                    cached_audio_path = cached_prompt.get("ref_audio") or cached_prompt.get("ref_audio_path")
+                    if cached_audio_path and Path(cached_audio_path).exists():
+                        return cached_prompt, True
+                    else:
+                        # Cached file no longer exists, invalidate cache
+                        print(f"Cached audio file not found: {cached_audio_path}, regenerating prompt")
         
         # MLX voice prompt format - store audio path and text
         # The model will process this during generation
@@ -262,6 +268,13 @@ class MLXTTSBackend:
             # Extract voice prompt info
             ref_audio = voice_prompt.get("ref_audio") or voice_prompt.get("ref_audio_path")
             ref_text = voice_prompt.get("ref_text", "")
+            
+            # Validate that the audio file exists
+            if ref_audio and not Path(ref_audio).exists():
+                print(f"Warning: Audio file not found: {ref_audio}")
+                print("This may be due to a cached voice prompt referencing a deleted temp file.")
+                print("Regenerating without voice prompt.")
+                ref_audio = None
             
             # Check if model supports voice cloning via generate method
             # MLX API may support ref_audio parameter directly

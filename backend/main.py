@@ -27,6 +27,7 @@ from . import database, models, profiles, history, tts, transcribe, config, expo
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
+from .utils.cache import clear_voice_prompt_cache
 from .platform_detect import get_backend_type
 
 app = FastAPI(
@@ -1493,6 +1494,19 @@ async def delete_model(model_name: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete model: {str(e)}")
+
+
+@app.post("/cache/clear")
+async def clear_cache():
+    """Clear all voice prompt caches (memory and disk)."""
+    try:
+        deleted_count = clear_voice_prompt_cache()
+        return {
+            "message": f"Voice prompt cache cleared successfully",
+            "files_deleted": deleted_count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
 
 # ============================================

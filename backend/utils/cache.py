@@ -88,3 +88,28 @@ def cache_voice_prompt(
     # Store on disk (torch.save can handle both dicts and tensors)
     cache_file = _get_cache_dir() / f"{cache_key}.prompt"
     torch.save(voice_prompt, cache_file)
+
+
+def clear_voice_prompt_cache() -> int:
+    """
+    Clear all voice prompt caches (memory and disk).
+    
+    Returns:
+        Number of cache files deleted
+    """
+    # Clear memory cache
+    _memory_cache.clear()
+    
+    # Clear disk cache
+    cache_dir = _get_cache_dir()
+    deleted_count = 0
+    
+    if cache_dir.exists():
+        for cache_file in cache_dir.glob("*.prompt"):
+            try:
+                cache_file.unlink()
+                deleted_count += 1
+            except Exception as e:
+                print(f"Failed to delete cache file {cache_file}: {e}")
+    
+    return deleted_count

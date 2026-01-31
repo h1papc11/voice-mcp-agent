@@ -22,6 +22,7 @@ from .database import (
 )
 from .utils.audio import validate_reference_audio, load_audio, save_audio
 from .utils.images import validate_image, process_avatar
+from .utils.cache import _get_cache_dir
 from .tts import get_tts_model
 from . import config
 
@@ -345,23 +346,27 @@ async def create_voice_prompt_for_profile(
             reference_texts,
         )
 
-        # Save combined audio temporarily
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            save_audio(combined_audio, tmp.name, 24000)
-            tmp_path = tmp.name
+        # Save combined audio to cache directory (persistent)
+        # Create a hash of sample IDs to identify this specific combination
+        import hashlib
+        sample_ids_str = "-".join(sorted([s.id for s in samples]))
+        combination_hash = hashlib.md5(sample_ids_str.encode()).hexdigest()[:12]
+        
+        # Store in cache directory
+        cache_dir = _get_cache_dir()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        combined_path = cache_dir / f"combined_{profile_id}_{combination_hash}.wav"
+        
+        # Save combined audio
+        save_audio(combined_audio, str(combined_path), 24000)
 
-        try:
-            # Create prompt from combined audio
-            voice_prompt, _ = await tts_model.create_voice_prompt(
-                tmp_path,
-                combined_text,
-                use_cache=use_cache,
-            )
-            return voice_prompt
-        finally:
-            # Clean up temp file
-            Path(tmp_path).unlink(missing_ok=True)
+        # Create prompt from combined audio
+        voice_prompt, _ = await tts_model.create_voice_prompt(
+            str(combined_path),
+            combined_text,
+            use_cache=use_cache,
+        )
+        return voice_prompt
 
 
 async def upload_avatar(
