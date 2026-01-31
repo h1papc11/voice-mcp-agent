@@ -6,10 +6,11 @@ export interface CircleButtonProps extends React.ButtonHTMLAttributes<HTMLButton
 }
 
 const CircleButton = React.forwardRef<HTMLButtonElement, CircleButtonProps>(
-  ({ className, icon: Icon, ...props }, ref) => {
+  ({ className, icon: Icon, type = 'button', ...props }, ref) => {
     return (
       <button
         ref={ref}
+        type={type}
         className={cn(
           'h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0',
           'hover:bg-muted transition-colors',
