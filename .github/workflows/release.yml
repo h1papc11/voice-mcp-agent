@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
@@ -14,22 +14,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-            python-version: '3.12'
-            backend: 'mlx'
-          - platform: 'macos-15-intel'
-            args: '--target x86_64-apple-darwin'
-            python-version: '3.12'
-            backend: 'pytorch'
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            python-version: "3.12"
+            backend: "mlx"
+          - platform: "macos-15-intel"
+            args: "--target x86_64-apple-darwin"
+            python-version: "3.12"
+            backend: "pytorch"
           # - platform: 'ubuntu-22.04'
           #   args: ''
           #   python-version: '3.12'
           #   backend: 'pytorch'
-          - platform: 'windows-latest'
-            args: ''
-            python-version: '3.12'
-            backend: 'pytorch'
+          - platform: "windows-latest"
+            args: ""
+            python-version: "3.12"
+            backend: "pytorch"
 
     runs-on: ${{ matrix.platform }}
 
@@ -53,7 +53,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
+          cache: "pip"
 
       - name: Install Python dependencies
         run: |
@@ -66,11 +66,11 @@ jobs:
         run: |
           pip install -r backend/requirements-mlx.txt
 
-      - name: Install PyTorch with CUDA (Windows only)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          pip install torch --index-url https://download.pytorch.org/whl/cu121 --force-reinstall --no-deps
-          pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+      # - name: Install PyTorch with CUDA (Windows only)
+      #   if: matrix.platform == 'windows-latest'
+      #   run: |
+      #     pip install torch --index-url https://download.pytorch.org/whl/cu121 --force-reinstall --no-deps
+      #     pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build Python server (Linux/macOS)
         if: matrix.platform != 'windows-latest'
@@ -106,7 +106,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './tauri/src-tauri -> target'
+          workspaces: "./tauri/src-tauri -> target"
 
       - name: Install dependencies
         run: bun install
@@ -142,7 +142,7 @@ jobs:
         with:
           projectPath: tauri
           tagName: v__VERSION__
-          releaseName: 'voicebox v__VERSION__'
+          releaseName: "voicebox v__VERSION__"
           releaseBody: |
             ## What's Changed
             See the assets below to download and install this version.
