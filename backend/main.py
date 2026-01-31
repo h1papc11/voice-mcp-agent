@@ -1189,10 +1189,11 @@ async def get_model_status():
     if backend_type == "mlx":
         tts_1_7b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
         tts_0_6b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"  # Fallback to 1.7B
-        whisper_base_id = "mlx-community/whisper-base"
-        whisper_small_id = "mlx-community/whisper-small"
-        whisper_medium_id = "mlx-community/whisper-medium"
-        whisper_large_id = "mlx-community/whisper-large"
+        # MLX backend uses openai/whisper-* models, not mlx-community
+        whisper_base_id = "openai/whisper-base"
+        whisper_small_id = "openai/whisper-small"
+        whisper_medium_id = "openai/whisper-medium"
+        whisper_large_id = "openai/whisper-large"
     else:
         tts_1_7b_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
         tts_0_6b_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
