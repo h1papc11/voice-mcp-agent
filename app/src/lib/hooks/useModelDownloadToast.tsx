@@ -1,9 +1,9 @@
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
-import { useToast } from '@/components/ui/use-toast';
-import { useServerStore } from '@/stores/serverStore';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import type { ModelProgress } from '@/lib/api/types';
+import { useServerStore } from '@/stores/serverStore';
 
 interface UseModelDownloadToastOptions {
   modelName: string;
@@ -36,19 +36,24 @@ export function useModelDownloadToast({
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
   }, []);
 
   useEffect(() => {
-    console.log('[useModelDownloadToast] useEffect triggered', { enabled, serverUrl, modelName, displayName });
-    
+    console.log('[useModelDownloadToast] useEffect triggered', {
+      enabled,
+      serverUrl,
+      modelName,
+      displayName,
+    });
+
     if (!enabled || !serverUrl || !modelName) {
       console.log('[useModelDownloadToast] Not enabled, skipping');
       return;
     }
 
     console.log('[useModelDownloadToast] Creating toast and EventSource for:', modelName);
-    
+
     // Create initial toast
     const toastResult = toast({
       title: displayName,
@@ -131,30 +136,40 @@ export function useModelDownloadToast({
           });
 
           // Close connection and dismiss toast on completion or error
-          if (progress.status === 'complete' || progress.status === 'error') {
+          // Also treat progress >= 100% as complete
+          const isComplete = progress.status === 'complete' || progress.progress >= 100;
+          const isError = progress.status === 'error';
+
+          if (isComplete || isError) {
+            console.log('[useModelDownloadToast] Download finished:', {
+              isComplete,
+              isError,
+              progress: progress.progress,
+            });
             eventSource.close();
             eventSourceRef.current = null;
 
-            // Call callbacks
-            if (progress.status === 'complete' && onComplete) {
-              console.log('[useModelDownloadToast] Download complete, calling onComplete callback');
-              onComplete();
-            } else if (progress.status === 'error' && onError) {
-              console.log('[useModelDownloadToast] Download error, calling onError callback');
-              onError();
+            // Update toast to show completion state before callbacks
+            if (isComplete && toastUpdateRef.current) {
+              toastUpdateRef.current({
+                title: (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>{displayName}</span>
+                  </div>
+                ),
+                description: 'Download complete',
+                duration: 3000,
+              });
             }
 
-            // Auto-dismiss on completion after delay
-            if (progress.status === 'complete') {
-              setTimeout(() => {
-                if (toastIdRef.current && toastUpdateRef.current) {
-                  toastUpdateRef.current({
-                    open: false,
-                  });
-                  toastIdRef.current = null;
-                  toastUpdateRef.current = null;
-                }
-              }, 5000);
+            // Call callbacks
+            if (isComplete && onComplete) {
+              console.log('[useModelDownloadToast] Download complete, calling onComplete callback');
+              onComplete();
+            } else if (isError && onError) {
+              console.log('[useModelDownloadToast] Download error, calling onError callback');
+              onError();
             }
           }
         }

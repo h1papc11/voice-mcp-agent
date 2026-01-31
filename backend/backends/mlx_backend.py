@@ -97,9 +97,7 @@ class MLXTTSBackend:
     def _load_model_sync(self, model_size: str):
         """Synchronous model loading."""
         try:
-            from mlx_audio.tts import load
-            
-            # Get model path
+            # Get model path BEFORE importing mlx_audio
             model_path = self._get_model_path(model_size)
             
             # Set up progress tracking
@@ -123,19 +121,24 @@ class MLXTTSBackend:
                 # Start tracking download task
                 task_manager.start_download(model_name)
                 
-                # Initialize progress state
-                progress_manager.update_progress(
-                    model_name=model_name,
-                    current=0,
-                    total=1,
-                    filename="",
-                    status="downloading",
-                )
+                # Note: Don't initialize progress here with fake total=1
+                # Let the actual tqdm callbacks set the real values
+                # This avoids crazy percentages when current > 1 but total is still 1
             
-            # Use progress tracker (tqdm is patched, but filters out non-download progress)
-            with tracker.patch_download():
-                # Load MLX model (downloads automatically)
+            # IMPORTANT: Patch tqdm BEFORE importing mlx_audio
+            # Otherwise mlx_audio caches reference to original tqdm
+            tracker_context = tracker.patch_download()
+            tracker_context.__enter__()
+            
+            # Import mlx_audio AFTER patching tqdm
+            from mlx_audio.tts import load
+            
+            # Load MLX model (downloads automatically)
+            try:
                 self.model = load(model_path)
+            finally:
+                # Exit the patch context
+                tracker_context.__exit__(None, None, None)
             
             # Only mark download as complete if we were tracking it
             if not is_cached:
@@ -412,10 +415,8 @@ class MLXSTTBackend:
             tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
 
             # Patch tqdm BEFORE importing mlx_audio
-            print("[DEBUG] Starting tqdm patch BEFORE mlx_audio import")
             tracker_context = tracker.patch_download()
             tracker_context.__enter__()
-            print("[DEBUG] tqdm patched")
 
             # Import mlx_audio
             from mlx_audio.stt import load
@@ -429,15 +430,9 @@ class MLXSTTBackend:
             if not is_cached:
                 # Start tracking download task
                 task_manager.start_download(progress_model_name)
-
-                # Initialize progress state
-                progress_manager.update_progress(
-                    model_name=progress_model_name,
-                    current=0,
-                    total=1,
-                    filename="",
-                    status="downloading",
-                )
+                
+                # Note: Don't initialize progress here with fake total=1
+                # Let the actual tqdm callbacks set the real values
 
             # Load the model (tqdm is patched, but filters out non-download progress)
             try:
