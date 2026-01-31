@@ -115,7 +115,7 @@ This architecture solves:
 #### 2. TTS Provider: PyTorch CPU
 
 **Binary:** `tts-provider-pytorch-cpu.exe`
-**Size:** ~300MB
+**Size:** ~200MB
 
 **Includes:**
 
@@ -150,7 +150,7 @@ This architecture solves:
 #### 4. TTS Provider: MLX
 
 **Binary:** `tts-provider-mlx`
-**Size:** ~800MB
+**Size:** ~150MB
 
 **Includes:**
 
