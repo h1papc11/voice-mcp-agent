@@ -45,6 +45,8 @@ export function HistoryTable() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [generationToDelete, setGenerationToDelete] = useState<{ id: string; name: string } | null>(null);
   const limit = 20;
   const { toast } = useToast();
 
@@ -165,6 +167,19 @@ export function HistoryTable() {
         },
       },
     );
+  };
+
+  const handleDeleteClick = (generationId: string, profileName: string) => {
+    setGenerationToDelete({ id: generationId, name: profileName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (generationToDelete) {
+      deleteGeneration.mutate(generationToDelete.id);
+      setDeleteDialogOpen(false);
+      setGenerationToDelete(null);
+    }
   };
 
   const handleImportConfirm = () => {
@@ -307,7 +322,7 @@ export function HistoryTable() {
                           Export Package
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => deleteGeneration.mutate(gen.id)}
+                          onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
                           disabled={deleteGeneration.isPending}
                           className="text-destructive focus:text-destructive"
                         >
@@ -337,6 +352,35 @@ export function HistoryTable() {
           </div>
         </>
       )}
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Generation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this generation from "{generationToDelete?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setGenerationToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteGeneration.isPending}
+            >
+              {deleteGeneration.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent>

@@ -2,6 +2,14 @@ import { Check, Edit, Pause, Play, Plus, Trash2, Volume2, X } from 'lucide-react
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleButton } from '@/components/ui/circle-button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
@@ -140,10 +148,19 @@ export function SampleList({ profileId }: SampleListProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
   const [editedText, setEditedText] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sampleToDelete, setSampleToDelete] = useState<string | null>(null);
 
-  const handleDelete = (sampleId: string) => {
-    if (confirm('Are you sure you want to delete this sample?')) {
-      deleteSample.mutate(sampleId);
+  const handleDeleteClick = (sampleId: string) => {
+    setSampleToDelete(sampleId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (sampleToDelete) {
+      deleteSample.mutate(sampleToDelete);
+      setDeleteDialogOpen(false);
+      setSampleToDelete(null);
     }
   };
 
@@ -268,7 +285,7 @@ export function SampleList({ profileId }: SampleListProps) {
                         <CircleButton
                           icon={Trash2}
                           title="Delete sample"
-                          onClick={() => handleDelete(sample.id)}
+                          onClick={() => handleDeleteClick(sample.id)}
                           disabled={deleteSample.isPending}
                         />
                       </div>
@@ -306,6 +323,35 @@ export function SampleList({ profileId }: SampleListProps) {
       </p>
 
       <SampleUpload profileId={profileId} open={uploadOpen} onOpenChange={setUploadOpen} />
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sample</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this audio sample? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSampleToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteSample.isPending}
+            >
+              {deleteSample.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
