@@ -22,7 +22,7 @@ from .database import (
 )
 from .utils.audio import validate_reference_audio, load_audio, save_audio
 from .utils.images import validate_image, process_avatar
-from .utils.cache import _get_cache_dir
+from .utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
 from . import config
 
@@ -120,6 +120,10 @@ async def add_profile_sample(
     
     db.commit()
     db.refresh(db_sample)
+    
+    # Invalidate combined audio cache for this profile
+    # Since a new sample was added, any cached combined audio is now stale
+    clear_profile_cache(profile_id)
     
     return ProfileSampleResponse.model_validate(db_sample)
 
@@ -242,6 +246,9 @@ async def delete_profile(
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
     
+    # Clean up combined audio cache files for this profile
+    clear_profile_cache(profile_id)
+    
     return True
 
 
@@ -263,6 +270,9 @@ async def delete_profile_sample(
     if not sample:
         return False
     
+    # Store profile_id before deleting
+    profile_id = sample.profile_id
+    
     # Delete audio file
     audio_path = Path(sample.audio_path)
     if audio_path.exists():
@@ -271,6 +281,10 @@ async def delete_profile_sample(
     # Delete from database
     db.delete(sample)
     db.commit()
+    
+    # Invalidate combined audio cache for this profile
+    # Since the sample set changed, any cached combined audio is now stale
+    clear_profile_cache(profile_id)
     
     return True
 
@@ -295,9 +309,16 @@ async def update_profile_sample(
     if not sample:
         return None
     
+    # Store profile_id before updating
+    profile_id = sample.profile_id
+    
     sample.reference_text = reference_text
     db.commit()
     db.refresh(sample)
+    
+    # Invalidate combined audio cache for this profile
+    # Since the reference text changed, cache keys and combined text are now stale
+    clear_profile_cache(profile_id)
     
     return ProfileSampleResponse.model_validate(sample)
 
