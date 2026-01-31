@@ -52,6 +52,24 @@ class MLXTTSBackend:
         
         return hf_model_id
     
+    def _is_model_cached(self, model_size: str) -> bool:
+        """
+        Check if the model is already cached locally.
+        
+        Args:
+            model_size: Model size to check
+            
+        Returns:
+            True if model is cached, False otherwise
+        """
+        try:
+            from huggingface_hub import constants as hf_constants
+            model_path = self._get_model_path(model_size)
+            repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
+            return repo_cache.exists()
+        except Exception:
+            return False
+    
     async def load_model_async(self, model_size: Optional[str] = None):
         """
         Lazy load the MLX TTS model.
@@ -86,38 +104,46 @@ class MLXTTSBackend:
             
             # Set up progress tracking
             progress_manager = get_progress_manager()
+            task_manager = get_task_manager()
             model_name = f"qwen-tts-{model_size}"
             
-            # Start tracking download task
-            task_manager = get_task_manager()
-            task_manager.start_download(model_name)
+            # Check if model is already cached
+            is_cached = self._is_model_cached(model_size)
+            
+            # Set up progress callback
+            # If cached: filter out non-download progress
+            # If not cached: report all progress (we're actually downloading)
+            progress_callback = create_hf_progress_callback(model_name, progress_manager)
+            tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
             
             print(f"Loading MLX TTS model {model_size}...")
             
-            # Initialize progress state
-            progress_manager.update_progress(
-                model_name=model_name,
-                current=0,
-                total=1,
-                filename="",
-                status="downloading",
-            )
+            # Only track download progress if model is NOT cached
+            if not is_cached:
+                # Start tracking download task
+                task_manager.start_download(model_name)
+                
+                # Initialize progress state
+                progress_manager.update_progress(
+                    model_name=model_name,
+                    current=0,
+                    total=1,
+                    filename="",
+                    status="downloading",
+                )
             
-            # Set up progress callback
-            progress_callback = create_hf_progress_callback(model_name, progress_manager)
-            tracker = HFProgressTracker(progress_callback)
-            
-            # Use progress tracker during download
+            # Use progress tracker (tqdm is patched, but filters out non-download progress)
             with tracker.patch_download():
                 # Load MLX model (downloads automatically)
                 self.model = load(model_path)
             
+            # Only mark download as complete if we were tracking it
+            if not is_cached:
+                progress_manager.mark_complete(model_name)
+                task_manager.complete_download(model_name)
+            
             self._current_model_size = model_size
             self.model_size = model_size
-            
-            # Mark as complete
-            progress_manager.mark_complete(model_name)
-            task_manager.complete_download(model_name)
             
             print(f"MLX TTS model {model_size} loaded successfully")
             
@@ -332,6 +358,24 @@ class MLXSTTBackend:
         """Check if model is loaded."""
         return self.model is not None
     
+    def _is_model_cached(self, model_size: str) -> bool:
+        """
+        Check if the Whisper model is already cached locally.
+        
+        Args:
+            model_size: Model size to check
+            
+        Returns:
+            True if model is cached, False otherwise
+        """
+        try:
+            from huggingface_hub import constants as hf_constants
+            model_name = f"openai/whisper-{model_size}"
+            repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
+            return repo_cache.exists()
+        except Exception:
+            return False
+    
     async def load_model_async(self, model_size: Optional[str] = None):
         """
         Lazy load the MLX Whisper model.
@@ -354,55 +398,60 @@ class MLXSTTBackend:
     def _load_model_sync(self, model_size: str):
         """Synchronous model loading."""
         try:
-            # IMPORTANT: Set up progress tracking BEFORE importing mlx_audio
-            # This ensures tqdm is patched before any HuggingFace Hub imports
             progress_manager = get_progress_manager()
+            task_manager = get_task_manager()
             progress_model_name = f"whisper-{model_size}"
 
+            # Check if model is already cached
+            is_cached = self._is_model_cached(model_size)
+
             # Set up progress callback and tracker
+            # If cached: filter out non-download progress
+            # If not cached: report all progress (we're actually downloading)
             progress_callback = create_hf_progress_callback(progress_model_name, progress_manager)
-            tracker = HFProgressTracker(progress_callback)
+            tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
 
             # Patch tqdm BEFORE importing mlx_audio
-            # This is critical because mlx_audio imports huggingface_hub which imports tqdm
             print("[DEBUG] Starting tqdm patch BEFORE mlx_audio import")
             tracker_context = tracker.patch_download()
             tracker_context.__enter__()
-            print("[DEBUG] tqdm patched, now importing mlx_audio")
+            print("[DEBUG] tqdm patched")
 
-            # NOW import mlx_audio - it will use our patched tqdm
+            # Import mlx_audio
             from mlx_audio.stt import load
 
             # MLX Whisper uses the standard OpenAI models
             model_name = f"openai/whisper-{model_size}"
-            
-            # Start tracking download task
-            task_manager = get_task_manager()
-            task_manager.start_download(progress_model_name)
 
             print(f"Loading MLX Whisper model {model_size}...")
 
-            # Initialize progress state
-            progress_manager.update_progress(
-                model_name=progress_model_name,
-                current=0,
-                total=1,
-                filename="",
-                status="downloading",
-            )
+            # Only track download progress if model is NOT cached
+            if not is_cached:
+                # Start tracking download task
+                task_manager.start_download(progress_model_name)
 
-            # Load the model (tqdm is already patched from above)
+                # Initialize progress state
+                progress_manager.update_progress(
+                    model_name=progress_model_name,
+                    current=0,
+                    total=1,
+                    filename="",
+                    status="downloading",
+                )
+
+            # Load the model (tqdm is patched, but filters out non-download progress)
             try:
                 self.model = load(model_name)
             finally:
                 # Exit the patch context
                 tracker_context.__exit__(None, None, None)
             
-            self.model_size = model_size
+            # Only mark download as complete if we were tracking it
+            if not is_cached:
+                progress_manager.mark_complete(progress_model_name)
+                task_manager.complete_download(progress_model_name)
             
-            # Mark as complete
-            progress_manager.mark_complete(progress_model_name)
-            task_manager.complete_download(progress_model_name)
+            self.model_size = model_size
             
             print(f"MLX Whisper model {model_size} loaded successfully")
             

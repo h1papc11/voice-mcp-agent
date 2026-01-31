@@ -11,8 +11,9 @@ import sys
 class HFProgressTracker:
     """Tracks HuggingFace Hub download progress by intercepting tqdm."""
     
-    def __init__(self, progress_callback: Optional[Callable] = None):
+    def __init__(self, progress_callback: Optional[Callable] = None, filter_non_downloads: bool = False):
         self.progress_callback = progress_callback
+        self.filter_non_downloads = filter_non_downloads  # Only filter if True
         self._original_tqdm_class = None
         self._lock = threading.Lock()
         self._total_downloaded = 0
@@ -80,7 +81,7 @@ class HFProgressTracker:
                     }
             
             def update(self, n=1):
-                print(f"[DEBUG TrackedTqdm] update called with n={n}")
+                print(f"[DEBUG TrackedTqdm] update called with n={n}, filter_non_downloads={tracker.filter_non_downloads}")
                 result = super().update(n)
 
                 # Report progress
@@ -91,22 +92,57 @@ class HFProgressTracker:
                         total = getattr(self, "total", 0)
                         
                         if total and total > 0:
-                            # Update per-file tracking
-                            tracker._file_sizes[filename] = total
-                            tracker._file_downloaded[filename] = current
+                            # Determine if we should report this progress
+                            should_report = True
                             
-                            # Calculate totals across all files
-                            tracker._total_size = sum(tracker._file_sizes.values())
-                            tracker._total_downloaded = sum(tracker._file_downloaded.values())
+                            if tracker.filter_non_downloads:
+                                # Filter out non-download progress bars (e.g., "Segment 1/1" during generation)
+                                # Only report progress for actual file downloads from HuggingFace
+                                should_report = self._is_download_progress(filename)
                             
-                            # Call progress callback
-                            if tracker.progress_callback:
-                                tracker.progress_callback(
-                                    tracker._total_downloaded,
-                                    tracker._total_size,
-                                    filename
-                                )
+                            if should_report:
+                                # Update per-file tracking
+                                tracker._file_sizes[filename] = total
+                                tracker._file_downloaded[filename] = current
+                                
+                                # Calculate totals across all files
+                                tracker._total_size = sum(tracker._file_sizes.values())
+                                tracker._total_downloaded = sum(tracker._file_downloaded.values())
+                                
+                                # Call progress callback
+                                if tracker.progress_callback:
+                                    tracker.progress_callback(
+                                        tracker._total_downloaded,
+                                        tracker._total_size,
+                                        filename
+                                    )
                 
+                return result
+            
+            def _is_download_progress(self, filename: str) -> bool:
+                """Check if this is a real download progress bar vs internal processing."""
+                print(f"[DEBUG _is_download_progress] Checking filename: '{filename}'")
+                
+                if not filename or filename == "unknown":
+                    print(f"[DEBUG _is_download_progress] Rejected: empty/unknown filename")
+                    return False
+                
+                # Real downloads have file extensions
+                download_extensions = [
+                    '.safetensors', '.bin', '.pt', '.pth',  # Model weights
+                    '.json', '.txt', '.py',  # Config files
+                    '.msgpack', '.h5',  # Other formats
+                ]
+                
+                filename_lower = filename.lower()
+                has_extension = any(filename_lower.endswith(ext) for ext in download_extensions)
+                
+                # Skip internal progress indicators
+                skip_patterns = ['segment', 'processing', 'generating', 'loading']
+                has_skip_pattern = any(pattern in filename_lower for pattern in skip_patterns)
+                
+                result = has_extension and not has_skip_pattern
+                print(f"[DEBUG _is_download_progress] has_extension={has_extension}, has_skip_pattern={has_skip_pattern}, result={result}")
                 return result
             
             def close(self):
