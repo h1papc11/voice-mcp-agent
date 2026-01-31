@@ -1161,6 +1161,10 @@ async def get_model_status():
     import os
     
     backend_type = get_backend_type()
+    task_manager = get_task_manager()
+    
+    # Get set of currently downloading models
+    active_downloads = {task.model_name for task in task_manager.get_active_downloads()}
     
     # Try to import scan_cache_dir (might not be available in older versions)
     try:
@@ -1328,10 +1332,18 @@ async def get_model_status():
             except Exception:
                 loaded = False
             
+            # Check if this model is currently being downloaded
+            is_downloading = config["model_name"] in active_downloads
+            
+            # If downloading, don't report as downloaded (partial files exist)
+            if is_downloading:
+                downloaded = False
+            
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
                 downloaded=downloaded,
+                downloading=is_downloading,
                 size_mb=size_mb,
                 loaded=loaded,
             ))
@@ -1342,10 +1354,14 @@ async def get_model_status():
             except Exception:
                 loaded = False
             
+            # Check if this model is currently being downloaded
+            is_downloading = config["model_name"] in active_downloads
+            
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
                 downloaded=False,  # Assume not downloaded if check failed
+                downloading=is_downloading,
                 size_mb=None,
                 loaded=loaded,
             ))

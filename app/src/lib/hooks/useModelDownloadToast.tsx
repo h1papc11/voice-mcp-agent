@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { useServerStore } from '@/stores/serverStore';
 import { Progress } from '@/components/ui/progress';
@@ -9,6 +9,8 @@ interface UseModelDownloadToastOptions {
   modelName: string;
   displayName: string;
   enabled?: boolean;
+  onComplete?: () => void;
+  onError?: () => void;
 }
 
 /**
@@ -19,47 +21,59 @@ export function useModelDownloadToast({
   modelName,
   displayName,
   enabled = false,
+  onComplete,
+  onError,
 }: UseModelDownloadToastOptions) {
   const { toast } = useToast();
   const serverUrl = useServerStore((state) => state.serverUrl);
   const toastIdRef = useRef<string | null>(null);
-  const toastUpdateRef = useRef<
-    ((props: {
-      title?: React.ReactNode;
-      description?: React.ReactNode;
-      duration?: number;
-      variant?: 'default' | 'destructive';
-      open?: boolean;
-    }) => void) | null
-  >(null);
+  // biome-ignore lint: Using any for toast update ref to handle complex toast types
+  const toastUpdateRef = useRef<any>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const formatBytes = (bytes: number): string => {
+  const formatBytes = useCallback((bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-  };
+  }, []);
 
   useEffect(() => {
+    console.log('[useModelDownloadToast] useEffect triggered', { enabled, serverUrl, modelName, displayName });
+    
     if (!enabled || !serverUrl || !modelName) {
+      console.log('[useModelDownloadToast] Not enabled, skipping');
       return;
     }
 
+    console.log('[useModelDownloadToast] Creating toast and EventSource for:', modelName);
+    
     // Create initial toast
     const toastResult = toast({
       title: displayName,
-      description: 'Starting download...',
+      description: (
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Connecting to download...</span>
+        </div>
+      ),
       duration: Infinity, // Don't auto-dismiss, we'll handle it manually
     });
     toastIdRef.current = toastResult.id;
     toastUpdateRef.current = toastResult.update;
 
     // Subscribe to progress updates via Server-Sent Events
-    const eventSource = new EventSource(`${serverUrl}/models/progress/${modelName}`);
+    const eventSourceUrl = `${serverUrl}/models/progress/${modelName}`;
+    console.log('[useModelDownloadToast] Creating EventSource to:', eventSourceUrl);
+    const eventSource = new EventSource(eventSourceUrl);
+
+    eventSource.onopen = () => {
+      console.log('[useModelDownloadToast] EventSource connection opened for:', modelName);
+    };
 
     eventSource.onmessage = (event) => {
+      console.log('[useModelDownloadToast] Received SSE message:', event.data);
       try {
         const progress = JSON.parse(event.data) as ModelProgress;
 
@@ -86,7 +100,7 @@ export function useModelDownloadToast({
               break;
             case 'downloading':
               statusIcon = <Loader2 className="h-4 w-4 animate-spin" />;
-              statusText = progress.filename ? `Downloading ${progress.filename}...` : 'Downloading...';
+              statusText = progress.filename || 'Downloading...';
               break;
             case 'extracting':
               statusIcon = <Loader2 className="h-4 w-4 animate-spin" />;
@@ -121,6 +135,15 @@ export function useModelDownloadToast({
             eventSource.close();
             eventSourceRef.current = null;
 
+            // Call callbacks
+            if (progress.status === 'complete' && onComplete) {
+              console.log('[useModelDownloadToast] Download complete, calling onComplete callback');
+              onComplete();
+            } else if (progress.status === 'error' && onError) {
+              console.log('[useModelDownloadToast] Download error, calling onError callback');
+              onError();
+            }
+
             // Auto-dismiss on completion after delay
             if (progress.status === 'complete') {
               setTimeout(() => {
@@ -141,7 +164,8 @@ export function useModelDownloadToast({
     };
 
     eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
+      console.error('[useModelDownloadToast] SSE error for:', modelName, error);
+      console.log('[useModelDownloadToast] EventSource readyState:', eventSource.readyState);
       eventSource.close();
       eventSourceRef.current = null;
 
@@ -162,13 +186,14 @@ export function useModelDownloadToast({
 
     // Cleanup on unmount or when disabled
     return () => {
+      console.log('[useModelDownloadToast] Cleanup - closing EventSource for:', modelName);
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
       // Note: We don't dismiss the toast here as it might still be showing completion state
     };
-  }, [enabled, serverUrl, modelName, displayName, toast]);
+  }, [enabled, serverUrl, modelName, displayName, toast, formatBytes, onComplete, onError]);
 
   return {
     isTracking: enabled && eventSourceRef.current !== null,

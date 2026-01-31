@@ -44,19 +44,24 @@ export function useAutoUpdater(options: boolean | UseAutoUpdaterOptions = false)
       setStatus(newStatus);
     });
     return unsubscribe;
-  }, [platform]);
+    // Empty dependency array - platform is stable from context
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.updater.subscribe]);
 
   const checkForUpdates = useCallback(async () => {
     await platform.updater.checkForUpdates();
-  }, [platform]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.updater.checkForUpdates]);
 
   const downloadAndInstall = useCallback(async () => {
     await platform.updater.downloadAndInstall();
-  }, [platform]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.updater.downloadAndInstall]);
 
   const restartAndInstall = useCallback(async () => {
     await platform.updater.restartAndInstall();
-  }, [platform]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.updater.restartAndInstall]);
 
   // Check for updates on mount
   useEffect(() => {
@@ -66,7 +71,9 @@ export function useAutoUpdater(options: boolean | UseAutoUpdaterOptions = false)
         console.error('Auto update check failed:', error);
       });
     }
-  }, [checkOnMount, checkForUpdates, platform.metadata.isTauri]);
+    // Empty dependency array - only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.metadata.isTauricheckOnMountcheckForUpdates]);
 
   // Show toast when update is available
   useEffect(() => {
