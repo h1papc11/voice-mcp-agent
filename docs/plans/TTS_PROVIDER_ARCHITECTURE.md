@@ -1,6 +1,6 @@
 # TTS Provider Architecture
 
-**Status:** Planned for v0.2.0
+**Status:** Planned for v0.1.13
 **Created:** 2025-01-31
 **Problem:** GitHub 2GB release limit + poor UX for frequent updates requiring 2.4GB re-downloads
 
@@ -14,6 +14,7 @@ Split the monolithic backend into modular components:
 2. **TTS Providers** (downloadable plugins): Separate executables for model inference
 
 This architecture solves:
+
 - ✅ GitHub 2GB release artifact limit
 - ✅ Frequent app updates without re-downloading large ML models
 - ✅ User choice of compute backend (CPU/GPU/Cloud)
@@ -68,6 +69,7 @@ This architecture solves:
 ### Current Architecture Issues
 
 **Monolithic Binary:**
+
 - CPU version: ~295MB
 - CUDA version: ~2.37GB
 - GitHub releases: 2GB file size limit (BLOCKED)
@@ -75,6 +77,7 @@ This architecture solves:
 - Poor UX: update app → restart → download CUDA update → restart again
 
 **User Pain Points:**
+
 1. Cannot release CUDA version on GitHub (over 2GB)
 2. Every app update forces 2.4GB re-download for GPU users
 3. No flexibility (can't use OpenAI, remote servers, etc.)
@@ -91,6 +94,7 @@ This architecture solves:
 **Size:** ~150-200MB
 
 **Includes:**
+
 - Tauri runtime + React UI
 - FastAPI backend (pure Python, no PyTorch)
 - Whisper model (tiny, ~50MB)
@@ -99,6 +103,7 @@ This architecture solves:
 - Provider management system
 
 **Does NOT include:**
+
 - PyTorch (CPU or CUDA)
 - TTS models (Qwen3-TTS)
 - Heavy ML dependencies
@@ -113,6 +118,7 @@ This architecture solves:
 **Size:** ~300MB
 
 **Includes:**
+
 - PyTorch CPU build
 - Qwen3-TTS package
 - Transformers
@@ -129,6 +135,7 @@ This architecture solves:
 **Size:** ~2.4GB
 
 **Includes:**
+
 - PyTorch CUDA build (cu121)
 - Qwen3-TTS package
 - CUDA runtime, cuDNN, cuBLAS
@@ -146,6 +153,7 @@ This architecture solves:
 **Size:** ~800MB
 
 **Includes:**
+
 - MLX framework
 - MLX-optimized Qwen3-TTS
 - Metal acceleration
@@ -161,11 +169,13 @@ This architecture solves:
 **Size:** 0MB
 
 **How it works:**
+
 - User provides URL to their own TTS server
 - Backend proxies requests to that server
 - Implements API spec from `EXTERNAL_PROVIDERS.md`
 
 **Use cases:**
+
 - AMD GPU users running their own server
 - Team deployments with shared GPU server
 - Cloud hosting (Modal, RunPod, Replicate)
@@ -178,11 +188,13 @@ This architecture solves:
 **Size:** 0MB
 
 **How it works:**
+
 - User provides OpenAI API key
 - Backend wraps OpenAI Audio API
 - Voice profiles map to OpenAI voices
 
 **Benefits:**
+
 - Zero local compute
 - Pay-per-use
 - Instant setup
@@ -200,22 +212,26 @@ All TTS providers must implement these endpoints:
 Generate speech from text.
 
 **Request:**
+
 ```json
 {
-  "text": "Hello world!",
-  "voice_prompt": { /* voice prompt object */ },
-  "language": "en",
-  "seed": 12345,
-  "model_size": "1.7B"
+	"text": "Hello world!",
+	"voice_prompt": {
+		/* voice prompt object */
+	},
+	"language": "en",
+	"seed": 12345,
+	"model_size": "1.7B"
 }
 ```
 
 **Response:**
+
 ```json
 {
-  "audio": "base64-encoded-audio",
-  "sample_rate": 24000,
-  "duration": 2.5
+	"audio": "base64-encoded-audio",
+	"sample_rate": 24000,
+	"duration": 2.5
 }
 ```
 
@@ -224,13 +240,17 @@ Generate speech from text.
 Create voice prompt from reference audio.
 
 **Request:** (multipart/form-data)
+
 - `audio`: Audio file
 - `reference_text`: Transcript
 
 **Response:**
+
 ```json
 {
-  "voice_prompt": { /* serialized prompt */ }
+	"voice_prompt": {
+		/* serialized prompt */
+	}
 }
 ```
 
@@ -239,13 +259,14 @@ Create voice prompt from reference audio.
 Health check.
 
 **Response:**
+
 ```json
 {
-  "status": "healthy",
-  "provider": "pytorch-cuda",
-  "version": "1.0.0",
-  "model": "Qwen3-TTS-12Hz-1.7B-Base",
-  "device": "cuda:0"
+	"status": "healthy",
+	"provider": "pytorch-cuda",
+	"version": "1.0.0",
+	"model": "Qwen3-TTS-12Hz-1.7B-Base",
+	"device": "cuda:0"
 }
 ```
 
@@ -254,13 +275,14 @@ Health check.
 Model status.
 
 **Response:**
+
 ```json
 {
-  "model_loaded": true,
-  "model_size": "1.7B",
-  "available_sizes": ["0.6B", "1.7B"],
-  "gpu_available": true,
-  "vram_used_mb": 1234
+	"model_loaded": true,
+	"model_size": "1.7B",
+	"available_sizes": ["0.6B", "1.7B"],
+	"gpu_available": true,
+	"vram_used_mb": 1234
 }
 ```
 
@@ -434,6 +456,7 @@ class ProviderInstaller:
 ```
 
 **Provider Storage Location:**
+
 - Windows: `%APPDATA%/voicebox/providers/`
 - macOS: `~/Library/Application Support/voicebox/providers/`
 - Linux: `~/.local/share/voicebox/providers/`
@@ -448,133 +471,133 @@ class ProviderInstaller:
 
 ```tsx
 export function ProviderSettings() {
-  const [selectedProvider, setSelectedProvider] = useState<ProviderType>('auto');
-  const { data: installedProviders } = useQuery({
-    queryKey: ['providers', 'installed'],
-    queryFn: () => apiClient.getInstalledProviders()
-  });
+	const [selectedProvider, setSelectedProvider] =
+		useState<ProviderType>("auto");
+	const {data: installedProviders} = useQuery({
+		queryKey: ["providers", "installed"],
+		queryFn: () => apiClient.getInstalledProviders(),
+	});
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>TTS Provider</CardTitle>
-        <CardDescription>
-          Choose how Voicebox generates speech
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <RadioGroup value={selectedProvider} onValueChange={setSelectedProvider}>
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle>TTS Provider</CardTitle>
+				<CardDescription>Choose how Voicebox generates speech</CardDescription>
+			</CardHeader>
+			<CardContent>
+				<RadioGroup
+					value={selectedProvider}
+					onValueChange={setSelectedProvider}
+				>
+					{/* Auto-detect */}
+					<div className="flex items-center space-x-2">
+						<RadioGroupItem value="auto" id="auto" />
+						<Label htmlFor="auto">
+							<div className="font-medium">Auto-detect (Recommended)</div>
+							<div className="text-sm text-muted-foreground">
+								Automatically choose the best available provider
+							</div>
+						</Label>
+					</div>
 
-          {/* Auto-detect */}
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="auto" id="auto" />
-            <Label htmlFor="auto">
-              <div className="font-medium">Auto-detect (Recommended)</div>
-              <div className="text-sm text-muted-foreground">
-                Automatically choose the best available provider
-              </div>
-            </Label>
-          </div>
+					{/* PyTorch CUDA */}
+					<div className="flex items-center justify-between">
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem
+								value="pytorch-cuda"
+								id="cuda"
+								disabled={!gpuAvailable}
+							/>
+							<Label htmlFor="cuda">
+								<div className="font-medium">PyTorch CUDA (NVIDIA GPU)</div>
+								<div className="text-sm text-muted-foreground">
+									4-5x faster inference on NVIDIA GPUs
+								</div>
+							</Label>
+						</div>
+						{!installedProviders?.includes("pytorch-cuda") && gpuAvailable && (
+							<Button
+								onClick={() => downloadProvider("pytorch-cuda")}
+								size="sm"
+							>
+								Download (2.4GB)
+							</Button>
+						)}
+					</div>
 
-          {/* PyTorch CUDA */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="pytorch-cuda" id="cuda" disabled={!gpuAvailable} />
-              <Label htmlFor="cuda">
-                <div className="font-medium">PyTorch CUDA (NVIDIA GPU)</div>
-                <div className="text-sm text-muted-foreground">
-                  4-5x faster inference on NVIDIA GPUs
-                </div>
-              </Label>
-            </div>
-            {!installedProviders?.includes('pytorch-cuda') && gpuAvailable && (
-              <Button onClick={() => downloadProvider('pytorch-cuda')} size="sm">
-                Download (2.4GB)
-              </Button>
-            )}
-          </div>
+					{/* PyTorch CPU */}
+					<div className="flex items-center justify-between">
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem value="pytorch-cpu" id="cpu" />
+							<Label htmlFor="cpu">
+								<div className="font-medium">PyTorch CPU</div>
+								<div className="text-sm text-muted-foreground">
+									Works on any system, slower inference
+								</div>
+							</Label>
+						</div>
+						{!installedProviders?.includes("pytorch-cpu") && (
+							<Button onClick={() => downloadProvider("pytorch-cpu")} size="sm">
+								Download (300MB)
+							</Button>
+						)}
+					</div>
 
-          {/* PyTorch CPU */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="pytorch-cpu" id="cpu" />
-              <Label htmlFor="cpu">
-                <div className="font-medium">PyTorch CPU</div>
-                <div className="text-sm text-muted-foreground">
-                  Works on any system, slower inference
-                </div>
-              </Label>
-            </div>
-            {!installedProviders?.includes('pytorch-cpu') && (
-              <Button onClick={() => downloadProvider('pytorch-cpu')} size="sm">
-                Download (300MB)
-              </Button>
-            )}
-          </div>
+					{/* MLX (macOS only) */}
+					{isMacOS && (
+						<div className="flex items-center justify-between">
+							<div className="flex items-center space-x-2">
+								<RadioGroupItem value="mlx" id="mlx" />
+								<Label htmlFor="mlx">
+									<div className="font-medium">MLX (Apple Silicon)</div>
+									<div className="text-sm text-muted-foreground">
+										Optimized for M1/M2/M3 chips
+									</div>
+								</Label>
+							</div>
+							{!installedProviders?.includes("mlx") && (
+								<Button onClick={() => downloadProvider("mlx")} size="sm">
+									Download (800MB)
+								</Button>
+							)}
+						</div>
+					)}
 
-          {/* MLX (macOS only) */}
-          {isMacOS && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="mlx" id="mlx" />
-                <Label htmlFor="mlx">
-                  <div className="font-medium">MLX (Apple Silicon)</div>
-                  <div className="text-sm text-muted-foreground">
-                    Optimized for M1/M2/M3 chips
-                  </div>
-                </Label>
-              </div>
-              {!installedProviders?.includes('mlx') && (
-                <Button onClick={() => downloadProvider('mlx')} size="sm">
-                  Download (800MB)
-                </Button>
-              )}
-            </div>
-          )}
+					{/* Remote */}
+					<div className="space-y-2">
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem value="remote" id="remote" />
+							<Label htmlFor="remote">
+								<div className="font-medium">Remote Server</div>
+								<div className="text-sm text-muted-foreground">
+									Connect to your own TTS server
+								</div>
+							</Label>
+						</div>
+						{selectedProvider === "remote" && (
+							<Input placeholder="http://your-server:8000" className="ml-6" />
+						)}
+					</div>
 
-          {/* Remote */}
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="remote" id="remote" />
-              <Label htmlFor="remote">
-                <div className="font-medium">Remote Server</div>
-                <div className="text-sm text-muted-foreground">
-                  Connect to your own TTS server
-                </div>
-              </Label>
-            </div>
-            {selectedProvider === 'remote' && (
-              <Input
-                placeholder="http://your-server:8000"
-                className="ml-6"
-              />
-            )}
-          </div>
-
-          {/* OpenAI */}
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="openai" id="openai" />
-              <Label htmlFor="openai">
-                <div className="font-medium">OpenAI API</div>
-                <div className="text-sm text-muted-foreground">
-                  Use OpenAI's TTS API (requires API key)
-                </div>
-              </Label>
-            </div>
-            {selectedProvider === 'openai' && (
-              <Input
-                type="password"
-                placeholder="sk-..."
-                className="ml-6"
-              />
-            )}
-          </div>
-
-        </RadioGroup>
-      </CardContent>
-    </Card>
-  );
+					{/* OpenAI */}
+					<div className="space-y-2">
+						<div className="flex items-center space-x-2">
+							<RadioGroupItem value="openai" id="openai" />
+							<Label htmlFor="openai">
+								<div className="font-medium">OpenAI API</div>
+								<div className="text-sm text-muted-foreground">
+									Use OpenAI's TTS API (requires API key)
+								</div>
+							</Label>
+						</div>
+						{selectedProvider === "openai" && (
+							<Input type="password" placeholder="sk-..." className="ml-6" />
+						)}
+					</div>
+				</RadioGroup>
+			</CardContent>
+		</Card>
+	);
 }
 ```
 
@@ -718,11 +741,11 @@ Providers have their own version numbers, independent of the main app:
 **Example:**
 
 | App Version | Min Provider Version | Max Provider Version |
-|-------------|---------------------|---------------------|
-| v0.2.0      | v1.0.0              | v1.x.x              |
-| v0.3.0      | v1.0.0              | v1.x.x              |
-| v0.4.0      | v1.2.0              | v1.x.x              |
-| v1.0.0      | v2.0.0              | v2.x.x              |
+| ----------- | -------------------- | -------------------- |
+| v0.2.0      | v1.0.0               | v1.x.x               |
+| v0.3.0      | v1.0.0               | v1.x.x               |
+| v0.4.0      | v1.2.0               | v1.x.x               |
+| v1.0.0      | v2.0.0               | v2.x.x               |
 
 **Backend checks compatibility:**
 
@@ -735,6 +758,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 ```
 
 **UI shows warning if incompatible:**
+
 ```
 ⚠️ Provider version 0.9.0 is outdated. Update to v1.0.0+
 ```
@@ -748,6 +772,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 1. User downloads and installs Voicebox (~150MB)
 2. App launches → detects no TTS provider installed
 3. Shows setup wizard:
+
    ```
    Choose your TTS provider:
 
@@ -769,6 +794,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
    [ ] OpenAI API
        API Key: ________________
    ```
+
 4. User selects provider → downloads with progress bar
 5. Provider installs to AppData/Application Support
 6. App starts provider → ready to use
@@ -818,16 +844,16 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 
 ## Benefits
 
-| Benefit | Details |
-|---------|---------|
-| **GitHub Releases Work** | Main app ~150MB << 2GB limit |
-| **Fast Updates** | UI/feature updates don't require re-downloading providers |
-| **User Choice** | CPU, CUDA, MLX, OpenAI, remote server |
-| **External Provider Support** | Users can run their own TTS servers |
-| **Bandwidth Savings** | Only download provider once, app updates are small |
-| **Future-Proof** | Easy to add new providers (ElevenLabs, custom models) |
-| **Team Deployments** | Multiple users share one remote provider |
-| **Cloud-Ready** | Works with Modal, Replicate, RunPod, etc. |
+| Benefit                       | Details                                                   |
+| ----------------------------- | --------------------------------------------------------- |
+| **GitHub Releases Work**      | Main app ~150MB << 2GB limit                              |
+| **Fast Updates**              | UI/feature updates don't require re-downloading providers |
+| **User Choice**               | CPU, CUDA, MLX, OpenAI, remote server                     |
+| **External Provider Support** | Users can run their own TTS servers                       |
+| **Bandwidth Savings**         | Only download provider once, app updates are small        |
+| **Future-Proof**              | Easy to add new providers (ElevenLabs, custom models)     |
+| **Team Deployments**          | Multiple users share one remote provider                  |
+| **Cloud-Ready**               | Works with Modal, Replicate, RunPod, etc.                 |
 
 ---
 
@@ -838,6 +864,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 **Question:** Should providers have independent versions or match app version?
 
 **Options:**
+
 - A. Independent (providers: v1.x, app: v0.2.x)
 - B. Matched (both use v0.2.x)
 
@@ -850,6 +877,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 **Question:** Should providers auto-update separately from app?
 
 **Options:**
+
 - A. Manual updates only (user clicks "Update Provider")
 - B. Optional auto-update (user can enable)
 - C. Always auto-update
@@ -863,6 +891,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 **Question:** How does app find installed providers?
 
 **Options:**
+
 - A. Check standard paths in AppData/Application Support
 - B. Registry (Windows) / plist (macOS)
 - C. Config file with provider locations
@@ -876,6 +905,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 **Question:** What if no provider is installed?
 
 **Options:**
+
 - A. Show setup wizard on first launch
 - B. Block app until provider installed
 - C. Allow app to run in "demo mode" (transcription only)
@@ -889,6 +919,7 @@ async def check_provider_compatibility(provider_version: str) -> bool:
 **Question:** Should provider start automatically with app?
 
 **Options:**
+
 - A. Always start selected provider on app launch
 - B. Start on-demand (when user generates speech)
 - C. User preference
@@ -928,5 +959,6 @@ If you want to build a custom TTS provider:
 4. Share in GitHub Discussions
 
 **Questions?**
+
 - GitHub Issues: [voicebox/issues](https://github.com/jamiepine/voicebox/issues)
 - Discord: Coming soon
