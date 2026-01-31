@@ -91,7 +91,7 @@ This architecture solves:
 
 #### 1. Main App (voicebox.exe / .app / .AppImage)
 
-**Size:** ~150-200MB
+**Size:** ~100-150MB
 
 **Includes:**
 
