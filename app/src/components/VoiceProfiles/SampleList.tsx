@@ -1,4 +1,4 @@
-import { Plus, Trash2, Play, Edit, Check, X, Volume2, Pause } from 'lucide-react';
+import { Check, Edit, Pause, Play, Plus, Trash2, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleButton } from '@/components/ui/circle-button';
@@ -301,8 +301,8 @@ export function SampleList({ profileId }: SampleListProps) {
 
       <p className="text-xs text-muted-foreground text-center px-2">
         Note: A single 30-second sample is the sweet spot. Quality may decrease with multiple
-        samples. In a future update samples might be interchangable and tagged for varying styles of
-        the same voice.
+        samples. In a future update samples might be interchangeable and tagged for varying styles
+        of the same voice.
       </p>
 
       <SampleUpload profileId={profileId} open={uploadOpen} onOpenChange={setUploadOpen} />
