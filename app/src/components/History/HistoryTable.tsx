@@ -1,5 +1,6 @@
-import { AudioWaveform, Download, FileArchive, MoreHorizontal, Play, Trash2 } from 'lucide-react';
+import { AudioWaveform, Download, FileArchive, Loader2, MoreHorizontal, Play, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import type { HistoryResponse } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -33,18 +34,23 @@ import { usePlayerStore } from '@/stores/playerStore';
 // OLD TABLE-BASED COMPONENT - REMOVED (can be found in git history)
 // This is the new alternate history view with fixed height rows
 
-// NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS
+// NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS WITH INFINITE SCROLL
 export function HistoryTable() {
-  const [page, _setPage] = useState(0);
+  const [page, setPage] = useState(0);
+  const [allHistory, setAllHistory] = useState<HistoryResponse[]>([]);
+  const [total, setTotal] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [generationToDelete, setGenerationToDelete] = useState<{ id: string; name: string } | null>(null);
   const limit = 20;
   const { toast } = useToast();
 
-  const { data: historyData, isLoading } = useHistory({
+  const { data: historyData, isLoading, isFetching } = useHistory({
     limit,
     offset: page * limit,
   });
@@ -60,6 +66,56 @@ export function HistoryTable() {
   const audioUrl = usePlayerStore((state) => state.audioUrl);
   const isPlayerVisible = !!audioUrl;
 
+  // Update accumulated history when new data arrives
+  useEffect(() => {
+    if (historyData?.items) {
+      setTotal(historyData.total);
+      if (page === 0) {
+        // Reset to first page
+        setAllHistory(historyData.items);
+      } else {
+        // Append new items, avoiding duplicates
+        setAllHistory((prev) => {
+          const existingIds = new Set(prev.map((item) => item.id));
+          const newItems = historyData.items.filter((item) => !existingIds.has(item.id));
+          return [...prev, ...newItems];
+        });
+      }
+    }
+  }, [historyData, page]);
+
+  // Reset to page 0 when deletions or imports occur
+  useEffect(() => {
+    if (deleteGeneration.isSuccess || importGeneration.isSuccess) {
+      setPage(0);
+      setAllHistory([]);
+    }
+  }, [deleteGeneration.isSuccess, importGeneration.isSuccess]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const loadMoreEl = loadMoreRef.current;
+    if (!loadMoreEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting && !isFetching && allHistory.length < total) {
+          setPage((prev) => prev + 1);
+        }
+      },
+      {
+        root: scrollRef.current,
+        rootMargin: '100px',
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(loadMoreEl);
+    return () => observer.disconnect();
+  }, [isFetching, allHistory.length, total]);
+
+  // Track scroll position for gradient effect
   useEffect(() => {
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
@@ -113,24 +169,16 @@ export function HistoryTable() {
     );
   };
 
-  const _handleImportClick = () => {
-    file_handleImportClickk.click();
+  const handleDeleteClick = (generationId: string, profileName: string) => {
+    setGenerationToDelete({ id: generationId, name: profileName });
+    setDeleteDialogOpen(true);
   };
 
-  const _handleFileChange = (_e: React.ChangeEvent<HTMLInputElement>) => {
-    cons_handleFileChangeet.files?.[0];
-    if (file) {
-      // Validate file extension
-      if (!file.name.endsWith('.voicebox.zip')) {
-        toast({
-          title: 'Invalid file type',
-          description: 'Please select a valid .voicebox.zip file',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setSelectedFile(file);
-      setImportDialogOpen(true);
+  const handleDeleteConfirm = () => {
+    if (generationToDelete) {
+      deleteGeneration.mutate(generationToDelete.id);
+      setDeleteDialogOpen(false);
+      setGenerationToDelete(null);
     }
   };
 
@@ -159,13 +207,16 @@ export function HistoryTable() {
     }
   };
 
-  if (isLoading) {
-    return null;
+  if (isLoading && page === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
-  const history = historyData?.items || [];
-  const total = historyData?.total || 0;
-  const _hasMore = history.length === limit && (page + 1) * limit < total;
+  const history = allHistory;
+  const hasMore = allHistory.length < total;
 
   return (
     <div className="flex flex-col h-full min-h-0 relative">
@@ -271,7 +322,7 @@ export function HistoryTable() {
                           Export Package
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => deleteGeneration.mutate(gen.id)}
+                          onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
                           disabled={deleteGeneration.isPending}
                           className="text-destructive focus:text-destructive"
                         >
@@ -284,9 +335,52 @@ export function HistoryTable() {
                 </div>
               );
             })}
+
+            {/* Load more trigger element */}
+            {hasMore && (
+              <div ref={loadMoreRef} className="flex items-center justify-center py-4">
+                {isFetching && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+              </div>
+            )}
+
+            {/* End of list indicator */}
+            {!hasMore && history.length > 0 && (
+              <div className="text-center py-4 text-xs text-muted-foreground">
+                You've reached the end
+              </div>
+            )}
           </div>
         </>
       )}
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Generation</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this generation from "{generationToDelete?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setGenerationToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteGeneration.isPending}
+            >
+              {deleteGeneration.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent>

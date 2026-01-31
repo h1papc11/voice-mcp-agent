@@ -196,6 +196,8 @@ class PyTorchTTSBackend:
                 # Cache stores as torch.Tensor but actual prompt is dict
                 # Convert if needed
                 if isinstance(cached_prompt, dict):
+                    # For PyTorch backend, the dict should contain tensors, not file paths
+                    # So we can safely return it
                     return cached_prompt, True
                 elif isinstance(cached_prompt, torch.Tensor):
                     # Legacy cache format - convert to dict

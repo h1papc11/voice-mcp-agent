@@ -1,9 +1,17 @@
-import { Plus, Trash2, Play, Edit, Check, X, Volume2, Pause } from 'lucide-react';
+import { Check, Edit, Pause, Play, Plus, Trash2, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CircleButton } from '@/components/ui/circle-button';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Slider } from '@/components/ui/slider';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import { useDeleteSample, useProfileSamples, useUpdateSample } from '@/lib/hooks/useProfiles';
@@ -140,10 +148,19 @@ export function SampleList({ profileId }: SampleListProps) {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingSampleId, setEditingSampleId] = useState<string | null>(null);
   const [editedText, setEditedText] = useState<string>('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [sampleToDelete, setSampleToDelete] = useState<string | null>(null);
 
-  const handleDelete = (sampleId: string) => {
-    if (confirm('Are you sure you want to delete this sample?')) {
-      deleteSample.mutate(sampleId);
+  const handleDeleteClick = (sampleId: string) => {
+    setSampleToDelete(sampleId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (sampleToDelete) {
+      deleteSample.mutate(sampleToDelete);
+      setDeleteDialogOpen(false);
+      setSampleToDelete(null);
     }
   };
 
@@ -194,7 +211,9 @@ export function SampleList({ profileId }: SampleListProps) {
         <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg">
           <Volume2 className="h-8 w-8 text-muted-foreground/50 mb-2" />
           <p className="text-sm text-muted-foreground">No samples yet</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">Add your first audio sample to get started</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">
+            Add your first audio sample to get started
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -206,7 +225,7 @@ export function SampleList({ profileId }: SampleListProps) {
                 key={sample.id}
                 className={cn(
                   'group relative rounded-lg border bg-card transition-all duration-200',
-                  isEditing ? 'ring-2 ring-primary/20' : 'hover:border-primary/30'
+                  isEditing ? 'ring-2 ring-primary/20' : 'hover:border-primary/30',
                 )}
               >
                 {isEditing ? (
@@ -266,7 +285,7 @@ export function SampleList({ profileId }: SampleListProps) {
                         <CircleButton
                           icon={Trash2}
                           title="Delete sample"
-                          onClick={() => handleDelete(sample.id)}
+                          onClick={() => handleDeleteClick(sample.id)}
                           disabled={deleteSample.isPending}
                         />
                       </div>
@@ -287,12 +306,52 @@ export function SampleList({ profileId }: SampleListProps) {
         </div>
       )}
 
-      <Button type="button" variant="outline" className="w-full" onClick={() => setUploadOpen(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        onClick={() => setUploadOpen(true)}
+      >
         <Plus className="mr-2 h-4 w-4" />
         Add Sample
       </Button>
 
+      <p className="text-xs text-muted-foreground text-center px-2">
+        Note: A single 30-second sample is the sweet spot. Quality may decrease with multiple
+        samples. In a future update samples might be interchangeable and tagged for varying styles
+        of the same voice.
+      </p>
+
       <SampleUpload profileId={profileId} open={uploadOpen} onOpenChange={setUploadOpen} />
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Sample</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this audio sample? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSampleToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteSample.isPending}
+            >
+              {deleteSample.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

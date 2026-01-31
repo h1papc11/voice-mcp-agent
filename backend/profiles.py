@@ -22,6 +22,7 @@ from .database import (
 )
 from .utils.audio import validate_reference_audio, load_audio, save_audio
 from .utils.images import validate_image, process_avatar
+from .utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
 from . import config
 
@@ -119,6 +120,10 @@ async def add_profile_sample(
     
     db.commit()
     db.refresh(db_sample)
+    
+    # Invalidate combined audio cache for this profile
+    # Since a new sample was added, any cached combined audio is now stale
+    clear_profile_cache(profile_id)
     
     return ProfileSampleResponse.model_validate(db_sample)
 
@@ -241,6 +246,9 @@ async def delete_profile(
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
     
+    # Clean up combined audio cache files for this profile
+    clear_profile_cache(profile_id)
+    
     return True
 
 
@@ -262,6 +270,9 @@ async def delete_profile_sample(
     if not sample:
         return False
     
+    # Store profile_id before deleting
+    profile_id = sample.profile_id
+    
     # Delete audio file
     audio_path = Path(sample.audio_path)
     if audio_path.exists():
@@ -270,6 +281,10 @@ async def delete_profile_sample(
     # Delete from database
     db.delete(sample)
     db.commit()
+    
+    # Invalidate combined audio cache for this profile
+    # Since the sample set changed, any cached combined audio is now stale
+    clear_profile_cache(profile_id)
     
     return True
 
@@ -294,9 +309,16 @@ async def update_profile_sample(
     if not sample:
         return None
     
+    # Store profile_id before updating
+    profile_id = sample.profile_id
+    
     sample.reference_text = reference_text
     db.commit()
     db.refresh(sample)
+    
+    # Invalidate combined audio cache for this profile
+    # Since the reference text changed, cache keys and combined text are now stale
+    clear_profile_cache(profile_id)
     
     return ProfileSampleResponse.model_validate(sample)
 
@@ -345,23 +367,27 @@ async def create_voice_prompt_for_profile(
             reference_texts,
         )
 
-        # Save combined audio temporarily
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            save_audio(combined_audio, tmp.name, 24000)
-            tmp_path = tmp.name
+        # Save combined audio to cache directory (persistent)
+        # Create a hash of sample IDs to identify this specific combination
+        import hashlib
+        sample_ids_str = "-".join(sorted([s.id for s in samples]))
+        combination_hash = hashlib.md5(sample_ids_str.encode()).hexdigest()[:12]
+        
+        # Store in cache directory
+        cache_dir = _get_cache_dir()
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        combined_path = cache_dir / f"combined_{profile_id}_{combination_hash}.wav"
+        
+        # Save combined audio
+        save_audio(combined_audio, str(combined_path), 24000)
 
-        try:
-            # Create prompt from combined audio
-            voice_prompt, _ = await tts_model.create_voice_prompt(
-                tmp_path,
-                combined_text,
-                use_cache=use_cache,
-            )
-            return voice_prompt
-        finally:
-            # Clean up temp file
-            Path(tmp_path).unlink(missing_ok=True)
+        # Create prompt from combined audio
+        voice_prompt, _ = await tts_model.create_voice_prompt(
+            str(combined_path),
+            combined_text,
+            use_cache=use_cache,
+        )
+        return voice_prompt
 
 
 async def upload_avatar(

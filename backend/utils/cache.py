@@ -88,3 +88,63 @@ def cache_voice_prompt(
     # Store on disk (torch.save can handle both dicts and tensors)
     cache_file = _get_cache_dir() / f"{cache_key}.prompt"
     torch.save(voice_prompt, cache_file)
+
+
+def clear_voice_prompt_cache() -> int:
+    """
+    Clear all voice prompt caches (memory and disk).
+    
+    Returns:
+        Number of cache files deleted
+    """
+    # Clear memory cache
+    _memory_cache.clear()
+    
+    # Clear disk cache
+    cache_dir = _get_cache_dir()
+    deleted_count = 0
+    
+    if cache_dir.exists():
+        # Delete prompt cache files
+        for cache_file in cache_dir.glob("*.prompt"):
+            try:
+                cache_file.unlink()
+                deleted_count += 1
+            except Exception as e:
+                print(f"Failed to delete cache file {cache_file}: {e}")
+        
+        # Delete combined audio files
+        for audio_file in cache_dir.glob("combined_*.wav"):
+            try:
+                audio_file.unlink()
+                deleted_count += 1
+            except Exception as e:
+                print(f"Failed to delete combined audio file {audio_file}: {e}")
+    
+    return deleted_count
+
+
+def clear_profile_cache(profile_id: str) -> int:
+    """
+    Clear cache files for a specific profile.
+    
+    Args:
+        profile_id: Profile ID
+    
+    Returns:
+        Number of cache files deleted
+    """
+    cache_dir = _get_cache_dir()
+    deleted_count = 0
+    
+    if cache_dir.exists():
+        # Delete combined audio files for this profile
+        pattern = f"combined_{profile_id}_*.wav"
+        for audio_file in cache_dir.glob(pattern):
+            try:
+                audio_file.unlink()
+                deleted_count += 1
+            except Exception as e:
+                print(f"Failed to delete combined audio file {audio_file}: {e}")
+    
+    return deleted_count
