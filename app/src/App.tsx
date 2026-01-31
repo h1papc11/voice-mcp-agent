@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { router } from '@/router';
 import { useServerStore } from '@/stores/serverStore';
 import { usePlatform } from '@/platform/PlatformContext';
+import { useAutoUpdater } from '@/hooks/useAutoUpdater';
 
 const LOADING_MESSAGES = [
   'Warming up tensors...',
@@ -37,6 +38,9 @@ function App() {
   const [serverReady, setServerReady] = useState(false);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const serverStartingRef = useRef(false);
+
+  // Automatically check for app updates on startup and show toast notifications
+  useAutoUpdater({ checkOnMount: true, showToast: true });
 
   // Sync stored setting to Rust on startup
   useEffect(() => {
