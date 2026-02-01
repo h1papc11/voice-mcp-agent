@@ -239,8 +239,9 @@ export default function Home() {
           <div className="space-y-6 text-lg text-foreground/80 text-center">
             <p>
               Voicebox is a <strong>local-first voice cloning studio</strong> with DAW-like features
-              for professional voice synthesis. Think of it as the <strong>Ollama for voice</strong>{' '}
-              — download models, clone voices, and generate speech entirely on your machine.
+              for professional voice synthesis. Think of it as a{' '}
+              <strong>local, free and open-source alternative to ElevenLabs</strong> — download
+              models, clone voices, and generate speech entirely on your machine.
             </p>
             <p>
               Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives

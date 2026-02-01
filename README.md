@@ -59,7 +59,7 @@
 
 ## What is Voicebox?
 
-Voicebox is a **local-first voice cloning studio** with DAW-like features for professional voice synthesis. Think of it as the **Ollama for voice** — download models, clone voices, and generate speech entirely on your machine.
+Voicebox is a **local-first voice cloning studio** with DAW-like features for professional voice synthesis. Think of it as a **local, free and open-source alternative to ElevenLabs** — download models, clone voices, and generate speech entirely on your machine.
 
 Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives you:
 
