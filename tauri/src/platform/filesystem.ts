@@ -10,9 +10,20 @@ export const tauriFilesystem: PlatformFilesystem = {
       });
 
       if (filePath) {
-        const { writeBinaryFile } = await import('@tauri-apps/plugin-fs');
+        let resolvedPath = '';
+        if (typeof filePath === 'string') {
+          resolvedPath = filePath;
+        } else if (filePath && typeof filePath === 'object' && 'path' in filePath) {
+          resolvedPath = (filePath as { path: string }).path;
+        }
+
+        if (!resolvedPath) {
+          throw new Error('Failed to resolve save path');
+        }
+
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
         const arrayBuffer = await blob.arrayBuffer();
-        await writeBinaryFile(filePath, new Uint8Array(arrayBuffer));
+        await writeFile(resolvedPath, new Uint8Array(arrayBuffer));
       }
     } catch (error) {
       console.error('Failed to use Tauri dialog, falling back to browser download:', error);
