@@ -10,12 +10,12 @@ export const tauriFilesystem: PlatformFilesystem = {
       });
 
       if (filePath) {
-        const resolvedPath =
-          typeof filePath === 'string'
-            ? filePath
-            : filePath && typeof filePath === 'object' && 'path' in filePath
-              ? (filePath as { path: string }).path
-              : '';
+        let resolvedPath = '';
+        if (typeof filePath === 'string') {
+          resolvedPath = filePath;
+        } else if (filePath && typeof filePath === 'object' && 'path' in filePath) {
+          resolvedPath = (filePath as { path: string }).path;
+        }
 
         if (!resolvedPath) {
           throw new Error('Failed to resolve save path');
