@@ -1,64 +1,45 @@
-# Voicebox Documentation
+# fumadocs-ui-template
 
-This directory contains the documentation for Voicebox, built with [Mintlify](https://mintlify.com).
+This is a Next.js application generated with
+[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
 
-## Development
-
-### Prerequisites
-
-Install Mintlify globally using bun:
+Run development server:
 
 ```bash
-bun add -g mintlify
+npm run dev
+# or
+pnpm dev
+# or
+yarn dev
 ```
 
-Or use the helper script:
+Open http://localhost:3000 with your browser to see the result.
 
-```bash
-bun run install:mintlify
-```
+## Explore
 
-### Running Locally
+In the project, you can see:
 
-```bash
-bun run dev
-```
+- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
+- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
 
-This will start the Mintlify dev server.
+| Route                     | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `app/(home)`              | The route group for your landing page and other pages. |
+| `app/docs`                | The documentation layout and pages.                    |
+| `app/api/search/route.ts` | The Route Handler for search.                          |
 
-The docs will be available at `http://localhost:3000`
+### Fumadocs MDX
 
-### Structure
+A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
 
-```
-docs/
-├── mint.json           # Mintlify configuration
-├── custom.css          # Custom styles
-├── overview/           # Getting started & feature docs
-├── guides/             # User guides
-├── api/                # API reference
-├── development/        # Developer documentation
-├── logo/               # Logo assets
-└── public/             # Static assets
-```
+Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
 
-### Writing Docs
+## Learn More
 
-- Use `.mdx` files for all documentation pages
-- Follow the existing structure in `mint.json` for navigation
-- Use Mintlify components for enhanced formatting (Card, CardGroup, Accordion, etc.)
-- Reference the [Mintlify documentation](https://mintlify.com/docs) for available components
+To learn more about Next.js and Fumadocs, take a look at the following
+resources:
 
-## Deployment
-
-Docs are automatically deployed when changes are pushed to the main branch.
-
-To manually deploy:
-
-```bash
-mintlify deploy
-```
-
-## Contributing
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
+  features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
