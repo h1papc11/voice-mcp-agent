@@ -53,6 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Audio export failing when Tauri save dialog returns object instead of string path
+
 ### Added
 - **Makefile** - Comprehensive development workflow automation with commands for setup, development, building, testing, and code quality checks
   - Includes Python version detection and compatibility warnings
