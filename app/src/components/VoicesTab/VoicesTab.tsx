@@ -79,8 +79,8 @@ export function VoicesTab() {
     setDialogOpen(true);
   };
 
-  const handleDelete = (profileId: string) => {
-    if (confirm('Are you sure you want to delete this profile?')) {
+  const handleProfileDelete = async (profileId: string) => {
+    if (await confirm('Are you sure you want to delete this profile?')) {
       deleteProfile.mutate(profileId);
     }
   };
@@ -147,7 +147,7 @@ export function VoicesTab() {
                 channels={channels || []}
                 onChannelChange={(channelIds) => handleChannelChange(profile.id, channelIds)}
                 onEdit={() => handleEdit(profile.id)}
-                onDelete={() => handleDelete(profile.id)}
+                onDelete={() => handleProfileDelete(profile.id)}
               />
             ))}
           </TableBody>
