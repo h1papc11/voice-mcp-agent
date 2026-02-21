@@ -77,10 +77,39 @@ async def health():
     tts_model = tts.get_tts_model()
     backend_type = get_backend_type()
 
-    # Check for GPU availability (CUDA or MPS)
+    # Check for GPU availability (CUDA, MPS, Intel Arc XPU, or DirectML)
     has_cuda = torch.cuda.is_available()
     has_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
-    gpu_available = has_cuda or has_mps
+
+    # Intel Arc / Intel Xe via intel-extension-for-pytorch (IPEX)
+    has_xpu = False
+    xpu_name = None
+    try:
+        import intel_extension_for_pytorch as ipex  # noqa: F401
+        if hasattr(torch, 'xpu') and torch.xpu.is_available():
+            has_xpu = True
+            try:
+                xpu_name = torch.xpu.get_device_name(0)
+            except Exception:
+                xpu_name = "Intel GPU"
+    except ImportError:
+        pass
+
+    # DirectML backend (torch-directml) for any Windows GPU
+    has_directml = False
+    directml_name = None
+    try:
+        import torch_directml
+        if torch_directml.device_count() > 0:
+            has_directml = True
+            try:
+                directml_name = torch_directml.device_name(0)
+            except Exception:
+                directml_name = "DirectML GPU"
+    except ImportError:
+        pass
+
+    gpu_available = has_cuda or has_mps or has_xpu or has_directml or backend_type == "mlx"
 
     gpu_type = None
     if has_cuda:
@@ -89,6 +118,10 @@ async def health():
         gpu_type = "MPS (Apple Silicon)"
     elif backend_type == "mlx":
         gpu_type = "Metal (Apple Silicon via MLX)"
+    elif has_xpu:
+        gpu_type = f"XPU ({xpu_name})"
+    elif has_directml:
+        gpu_type = f"DirectML ({directml_name})"
 
     vram_used = None
     if has_cuda:
@@ -252,12 +285,17 @@ async def add_profile_sample(
     db: Session = Depends(get_db),
 ):
     """Add a sample to a voice profile."""
-    # Save uploaded file to temporary location
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+    # Preserve the uploaded file's extension so librosa can detect format correctly.
+    # Defaulting to .wav was causing soundfile to reject MP3/WebM content as invalid WAV.
+    _allowed_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg', '.flac', '.aac', '.webm', '.opus'}
+    _uploaded_ext = Path(file.filename or '').suffix.lower()
+    file_suffix = _uploaded_ext if _uploaded_ext in _allowed_audio_exts else '.wav'
+
+    with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
-    
+
     try:
         sample = await profiles.add_profile_sample(
             profile_id,
@@ -268,6 +306,8 @@ async def add_profile_sample(
         return sample
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process audio file: {str(e)}")
     finally:
         # Clean up temp file
         Path(tmp_path).unlink(missing_ok=True)
@@ -541,48 +581,49 @@ async def generate_speech(
         profile = await profiles.get_profile(data.profile_id, db)
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
-        
-        # Create voice prompt from profile
-        voice_prompt = await profiles.create_voice_prompt_for_profile(
-            data.profile_id,
-            db,
-        )
-        
-        # Generate audio
+
+        # Resolve model size and load the correct model FIRST.
+        # This must happen before create_voice_prompt_for_profile because that
+        # function calls load_model_async(None), which falls back to self.model_size.
+        # If the model is already loaded with the right size at that point, it
+        # returns immediately and the voice prompt is created by the correct model.
         tts_model = tts.get_tts_model()
-        # Load the requested model size if different from current (async to not block)
         model_size = data.model_size or "1.7B"
 
         # Check if model needs to be downloaded first
         model_path = tts_model._get_model_path(model_size)
-        if model_path.startswith("Qwen/"):
-            # Model not cached - check if it exists remotely or needs download
-            from huggingface_hub import constants as hf_constants
-            repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_path.replace("/", "--"))
-            if not repo_cache.exists():
-                # Start download in background
-                model_name = f"qwen-tts-{model_size}"
+        if not tts_model._is_model_cached(model_size):
+            # Model is not fully cached — kick off a background download and tell
+            # the client to retry once it's ready.
+            model_name = f"qwen-tts-{model_size}"
 
-                async def download_model_background():
-                    try:
-                        await tts_model.load_model_async(model_size)
-                    except Exception as e:
-                        task_manager.error_download(model_name, str(e))
+            async def download_model_background():
+                try:
+                    await tts_model.load_model_async(model_size)
+                except Exception as e:
+                    task_manager.error_download(model_name, str(e))
 
-                task_manager.start_download(model_name)
-                asyncio.create_task(download_model_background())
+            task_manager.start_download(model_name)
+            asyncio.create_task(download_model_background())
 
-                # Return 202 Accepted with download info
-                raise HTTPException(
-                    status_code=202,
-                    detail={
-                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
-                        "model_name": model_name,
-                        "downloading": True
-                    }
-                )
+            raise HTTPException(
+                status_code=202,
+                detail={
+                    "message": f"Model {model_size} is being downloaded. Please wait and try again.",
+                    "model_name": model_name,
+                    "downloading": True,
+                },
+            )
 
+        # Load (or switch to) the requested model before building the voice prompt
         await tts_model.load_model_async(model_size)
+
+        # Create voice prompt from profile (model is already loaded with correct size)
+        voice_prompt = await profiles.create_voice_prompt_for_profile(
+            data.profile_id,
+            db,
+        )
+
         audio, sample_rate = await tts_model.generate(
             data.text,
             voice_prompt,
@@ -623,6 +664,59 @@ async def generate_speech(
     except Exception as e:
         task_manager.complete_generation(generation_id)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/generate/stream")
+async def stream_speech(
+    data: models.GenerationRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Generate speech and stream the WAV audio directly without saving to disk.
+
+    Returns raw WAV bytes via a StreamingResponse so the client can start
+    playing audio before the entire file has been received.  This endpoint
+    does NOT create a history entry — use /generate for that.
+    """
+    profile = await profiles.get_profile(data.profile_id, db)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    tts_model = tts.get_tts_model()
+    model_size = data.model_size or "1.7B"
+
+    if not tts_model._is_model_cached(model_size):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
+        )
+
+    # Load the correct model before building the voice prompt (fixes issue #96)
+    await tts_model.load_model_async(model_size)
+
+    voice_prompt = await profiles.create_voice_prompt_for_profile(data.profile_id, db)
+
+    audio, sample_rate = await tts_model.generate(
+        data.text,
+        voice_prompt,
+        data.language,
+        data.seed,
+        data.instruct,
+    )
+
+    wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
+
+    async def _wav_stream():
+        # Yield in chunks so large responses don't block the event loop
+        chunk_size = 64 * 1024  # 64 KB
+        for i in range(0, len(wav_bytes), chunk_size):
+            yield wav_bytes[i : i + chunk_size]
+
+    return StreamingResponse(
+        _wav_stream(),
+        media_type="audio/wav",
+        headers={"Content-Disposition": 'attachment; filename="speech.wav"'},
+    )
 
 
 # ============================================
