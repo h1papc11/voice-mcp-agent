@@ -599,6 +599,8 @@ async def generate_speech(
         profile = await profiles.get_profile(data.profile_id, db)
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Generate audio
 
         # Resolve model size and load the correct model FIRST.
         # This must happen before create_voice_prompt_for_profile because that
