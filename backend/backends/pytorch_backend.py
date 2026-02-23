@@ -29,9 +29,23 @@ class PyTorchTTSBackend:
         """Get the best available device."""
         if torch.cuda.is_available():
             return "cuda"
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            # MPS can have issues, use CPU for stability
-            return "cpu"
+        # Intel Arc / Intel Xe GPU via intel-extension-for-pytorch (IPEX)
+        try:
+            import intel_extension_for_pytorch  # noqa: F401
+            if hasattr(torch, 'xpu') and torch.xpu.is_available():
+                return "xpu"
+        except ImportError:
+            pass
+        # Any GPU on Windows via DirectML (torch-directml)
+        try:
+            import torch_directml
+            if torch_directml.device_count() > 0:
+                return torch_directml.device(0)
+        except ImportError:
+            pass
+        # MPS (Apple Silicon) — kept for completeness but MLX backend is preferred
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "cpu"  # MPS disabled for stability; MLX backend handles Apple Silicon
         return "cpu"
     
     def is_loaded(self) -> bool:
@@ -166,11 +180,21 @@ class PyTorchTTSBackend:
 
             # Load the model (tqdm is patched, but filters out non-download progress)
             try:
-                self.model = Qwen3TTSModel.from_pretrained(
-                    model_path,
-                    device_map=self.device,
-                    torch_dtype=torch.float32 if self.device == "cpu" else torch.bfloat16,
-                )
+                # Don't pass device_map on CPU: accelerate's meta-tensor mechanism
+                # causes "Cannot copy out of meta tensor" when moving to CPU.
+                # Instead load directly then call .to(device) if needed.
+                if self.device == "cpu":
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_path,
+                        torch_dtype=torch.float32,
+                        low_cpu_mem_usage=False,
+                    )
+                else:
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_path,
+                        device_map=self.device,
+                        torch_dtype=torch.bfloat16,
+                    )
             finally:
                 # Exit the patch context
                 tracker_context.__exit__(None, None, None)
@@ -358,9 +382,22 @@ class PyTorchSTTBackend:
         """Get the best available device."""
         if torch.cuda.is_available():
             return "cuda"
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-            # MPS support for Whisper
-            return "cpu"  # Use CPU for stability
+        # Intel Arc / Intel Xe GPU via intel-extension-for-pytorch (IPEX)
+        try:
+            import intel_extension_for_pytorch  # noqa: F401
+            if hasattr(torch, 'xpu') and torch.xpu.is_available():
+                return "xpu"
+        except ImportError:
+            pass
+        # Any GPU on Windows via DirectML (torch-directml)
+        try:
+            import torch_directml
+            if torch_directml.device_count() > 0:
+                return torch_directml.device(0)
+        except ImportError:
+            pass
+        if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "cpu"  # MPS disabled for stability
         return "cpu"
     
     def is_loaded(self) -> bool:
