@@ -83,9 +83,13 @@ def build_server():
             '--hidden-import', 'mlx_audio.stt',
             '--collect-submodules', 'mlx',
             '--collect-submodules', 'mlx_audio',
-            # Collect MLX data files including Metal shader libraries (.metallib)
-            '--collect-data', 'mlx',
-            '--collect-data', 'mlx_audio',
+            # Use --collect-all so PyInstaller bundles both data files AND
+            # native shared libraries (.dylib, .metallib) for MLX.
+            # Previously only --collect-data was used, which caused MLX to
+            # raise OSError at runtime inside the bundled binary because
+            # the Metal shader libraries were missing.
+            '--collect-all', 'mlx',
+            '--collect-all', 'mlx_audio',
         ])
     else:
         print("Building for non-Apple Silicon platform - PyTorch only")
