@@ -22,6 +22,24 @@ import uuid
 import asyncio
 import signal
 import os
+from urllib.parse import quote
+
+
+def _safe_content_disposition(disposition_type: str, filename: str) -> str:
+    """Build a Content-Disposition header that is safe for non-ASCII filenames.
+
+    Uses RFC 5987 ``filename*`` parameter so that browsers can decode
+    UTF-8 filenames while the ``filename`` fallback stays ASCII-only.
+    """
+    ascii_name = "".join(
+        c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")
+    ).strip() or "download"
+    utf8_name = quote(filename, safe="")
+    return (
+        f'{disposition_type}; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{utf8_name}"
+    )
+
 
 from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
@@ -428,7 +446,7 @@ async def export_profile(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except ValueError as e:
@@ -847,7 +865,7 @@ async def export_generation(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except ValueError as e:
@@ -880,7 +898,7 @@ async def export_generation_audio(
         audio_path,
         media_type="audio/wav",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            "Content-Disposition": _safe_content_disposition("attachment", filename)
         }
     )
 
@@ -1148,7 +1166,7 @@ async def export_story_audio(
             io.BytesIO(audio_bytes),
             media_type="audio/wav",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except HTTPException:
