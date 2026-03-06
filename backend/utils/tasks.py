@@ -74,10 +74,7 @@ class TaskManager:
     
     def cancel_download(self, model_name: str) -> bool:
         """Cancel/dismiss a download task (removes it from active list)."""
-        if model_name in self._active_downloads:
-            del self._active_downloads[model_name]
-            return True
-        return False
+        return self._active_downloads.pop(model_name, None) is not None
 
     def is_download_active(self, model_name: str) -> bool:
         """Check if a download is active."""

@@ -157,16 +157,30 @@ export function ModelManagement() {
   });
 
   const handleCancel = (modelName: string) => {
-    // Immediately hide the error and suppress downloading state in UI
+    // Snapshot previous state for rollback
+    const prevDismissed = dismissedErrors;
+    const prevLocalErrors = localErrors;
+    const prevDownloadingModel = downloadingModel;
+    const prevDownloadingDisplayName = downloadingDisplayName;
+
+    // Optimistically hide the error and suppress downloading state in UI
     setDismissedErrors((prev) => new Set(prev).add(modelName));
     setLocalErrors((prev) => { const next = new Map(prev); next.delete(modelName); return next; });
-    // Also clear local downloading state if this was our current download
     if (downloadingModel === modelName) {
       setDownloadingModel(null);
       setDownloadingDisplayName(null);
     }
-    // Fire-and-forget the backend cancel, then refetch to sync
-    cancelMutation.mutate(modelName);
+
+    cancelMutation.mutate(modelName, {
+      onError: () => {
+        // Rollback optimistic updates on failure
+        setDismissedErrors(prevDismissed);
+        setLocalErrors(prevLocalErrors);
+        setDownloadingModel(prevDownloadingModel);
+        setDownloadingDisplayName(prevDownloadingDisplayName);
+        toast({ title: 'Cancel failed', description: 'Could not cancel the download task.', variant: 'destructive' });
+      },
+    });
   };
 
   const clearAllMutation = useMutation({
@@ -259,7 +273,7 @@ export function ModelManagement() {
                       }}
                       onCancel={() => handleCancel(model.model_name)}
                       isDownloading={downloadingModel === model.model_name}
-                      isCancelling={cancelMutation.isPending}
+                      isCancelling={cancelMutation.isPending && cancelMutation.variables === model.model_name}
                       isDismissed={dismissedErrors.has(model.model_name)}
                       erroredDownload={erroredDownloads.get(model.model_name)}
                       formatSize={formatSize}
@@ -291,7 +305,7 @@ export function ModelManagement() {
                       }}
                       onCancel={() => handleCancel(model.model_name)}
                       isDownloading={downloadingModel === model.model_name}
-                      isCancelling={cancelMutation.isPending}
+                      isCancelling={cancelMutation.isPending && cancelMutation.variables === model.model_name}
                       isDismissed={dismissedErrors.has(model.model_name)}
                       erroredDownload={erroredDownloads.get(model.model_name)}
                       formatSize={formatSize}
@@ -310,9 +324,9 @@ export function ModelManagement() {
                     className="flex items-center gap-2 hover:text-foreground transition-colors"
                   >
                     {consoleOpen ? (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    ) : (
                       <ChevronUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronDown className="h-3.5 w-3.5" />
                     )}
                     <span>Problems</span>
                     <Badge variant="destructive" className="text-[10px] h-4 px-1.5 rounded-full">

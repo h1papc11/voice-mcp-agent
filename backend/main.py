@@ -932,7 +932,11 @@ async def transcribe_audio(
 
         # Check if Whisper model is downloaded (uses default size "base")
         model_size = whisper_model.model_size
-        model_name = f"openai/whisper-{model_size}"
+        # Map model sizes to HF repo IDs (whisper-large needs -v3 suffix)
+        whisper_hf_repos = {
+            "large": "openai/whisper-large-v3",
+        }
+        model_name = whisper_hf_repos.get(model_size, f"openai/whisper-{model_size}")
 
         # Check if model is cached
         from huggingface_hub import constants as hf_constants
@@ -1595,11 +1599,15 @@ async def cancel_model_download(request: models.ModelDownloadRequest):
     removed = task_manager.cancel_download(request.model_name)
 
     # Also clear progress state so the model doesn't show as downloading
+    progress_removed = False
     with progress_manager._lock:
         if request.model_name in progress_manager._progress:
             del progress_manager._progress[request.model_name]
+            progress_removed = True
 
-    return {"message": f"Download task for {request.model_name} cancelled"}
+    if removed or progress_removed:
+        return {"message": f"Download task for {request.model_name} cancelled"}
+    return {"message": f"No active task found for {request.model_name}"}
 
 
 @app.post("/tasks/clear")
@@ -1613,8 +1621,8 @@ async def clear_all_tasks():
 
     with progress_manager._lock:
         progress_manager._progress.clear()
-    progress_manager._last_notify_time.clear()
-    progress_manager._last_notify_progress.clear()
+        progress_manager._last_notify_time.clear()
+        progress_manager._last_notify_progress.clear()
 
     return {"message": "All task state cleared"}
 
@@ -1771,6 +1779,7 @@ async def get_active_tasks():
                 model_name=model_name,
                 status=progress.get("status", "downloading"),
                 started_at=started_at,
+                error=progress.get("error"),
             ))
     
     # Get active generations
