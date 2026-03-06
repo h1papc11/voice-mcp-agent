@@ -1310,14 +1310,14 @@ async def get_model_status():
         whisper_base_id = "openai/whisper-base"
         whisper_small_id = "openai/whisper-small"
         whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large"
+        whisper_large_id = "openai/whisper-large-v3"
     else:
         tts_1_7b_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
         tts_0_6b_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
         whisper_base_id = "openai/whisper-base"
         whisper_small_id = "openai/whisper-small"
         whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large"
+        whisper_large_id = "openai/whisper-large-v3"
     
     model_configs = [
         {
@@ -1586,6 +1586,39 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     return {"message": f"Model {request.model_name} download started"}
 
 
+@app.post("/models/download/cancel")
+async def cancel_model_download(request: models.ModelDownloadRequest):
+    """Cancel or dismiss an errored/stale download task."""
+    task_manager = get_task_manager()
+    progress_manager = get_progress_manager()
+
+    removed = task_manager.cancel_download(request.model_name)
+
+    # Also clear progress state so the model doesn't show as downloading
+    with progress_manager._lock:
+        if request.model_name in progress_manager._progress:
+            del progress_manager._progress[request.model_name]
+
+    return {"message": f"Download task for {request.model_name} cancelled"}
+
+
+@app.post("/tasks/clear")
+async def clear_all_tasks():
+    """Clear all download tasks and progress state. Does not delete downloaded files."""
+    task_manager = get_task_manager()
+    progress_manager = get_progress_manager()
+
+    task_manager._active_downloads.clear()
+    task_manager._active_generations.clear()
+
+    with progress_manager._lock:
+        progress_manager._progress.clear()
+    progress_manager._last_notify_time.clear()
+    progress_manager._last_notify_progress.clear()
+
+    return {"message": "All task state cleared"}
+
+
 @app.delete("/models/{model_name}")
 async def delete_model(model_name: str):
     """Delete a downloaded model from the HuggingFace cache."""
@@ -1621,12 +1654,12 @@ async def delete_model(model_name: str):
             "model_type": "whisper",
         },
         "whisper-large": {
-            "hf_repo_id": "openai/whisper-large",
+            "hf_repo_id": "openai/whisper-large-v3",
             "model_size": "large",
             "model_type": "whisper",
         },
     }
-    
+
     if model_name not in model_configs:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
     
@@ -1710,10 +1743,18 @@ async def get_active_tasks():
         progress = progress_map.get(model_name)
         
         if task:
+            # Prefer task error, fall back to progress manager error
+            error = task.error
+            if not error:
+                with progress_manager._lock:
+                    pm_data = progress_manager._progress.get(model_name)
+                    if pm_data:
+                        error = pm_data.get("error")
             active_downloads.append(models.ActiveDownloadTask(
                 model_name=model_name,
                 status=task.status,
                 started_at=task.started_at,
+                error=error,
             ))
         elif progress:
             # Progress exists but no task - create from progress data
