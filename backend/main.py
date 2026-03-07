@@ -1616,8 +1616,7 @@ async def clear_all_tasks():
     task_manager = get_task_manager()
     progress_manager = get_progress_manager()
 
-    task_manager._active_downloads.clear()
-    task_manager._active_generations.clear()
+    task_manager.clear_all()
 
     with progress_manager._lock:
         progress_manager._progress.clear()
