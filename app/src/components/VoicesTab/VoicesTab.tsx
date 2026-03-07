@@ -179,9 +179,30 @@ function VoiceRow({
   onDelete,
 }: VoiceRowProps) {
   const { data: samples } = useProfileSamples(profile.id);
+  const sampleCount = samples?.length || 0;
+
+  const rowLabel = `${profile.name}, ${profile.language}, ${generationCount} generations, ${sampleCount} samples. Press Enter to edit.`;
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="combobox"]') || target.closest('[role="listbox"]')) {
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onEdit();
+    }
+  };
 
   return (
-    <TableRow className="cursor-pointer" onClick={onEdit}>
+    <TableRow
+      className="cursor-pointer"
+      onClick={onEdit}
+      tabIndex={0}
+      role="button"
+      aria-label={rowLabel}
+      onKeyDown={handleKeyDown}
+    >
       <TableCell>
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -197,7 +218,7 @@ function VoiceRow({
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>{profile.language}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>{generationCount}</TableCell>
-      <TableCell onClick={(e) => e.stopPropagation()}>{samples?.length || 0}</TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>{sampleCount}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>
         <MultiSelect
           options={channels.map((ch) => ({
@@ -213,7 +234,7 @@ function VoiceRow({
       <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label={`Actions for ${profile.name}`}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
