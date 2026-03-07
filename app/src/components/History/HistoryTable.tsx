@@ -274,7 +274,7 @@ export function HistoryTable() {
                   }}
                   onKeyDown={(e) => {
                     const target = e.target as HTMLElement;
-                    if (target.closest('textarea')) return;
+                    if (target.closest('textarea') || target.closest('button')) return;
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       handlePlay(gen.id, gen.text, gen.profile_id);

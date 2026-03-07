@@ -18,7 +18,7 @@ Improvements to support screen reader and keyboard users across the main app sur
 
 ### Generation UI (text box and voice choice)
 
-- **Generate speech** (submit) and **Fine tune instructions** (sliders) – Icon buttons now have `aria-label` (and state for fine-tune, e.g. "Fine tune instructions, on").
+- **Generate speech** (submit) and **Fine-tune instructions** (sliders) – Icon buttons now have `aria-label` (and state for fine-tune, e.g. "Fine-tune instructions, on").
 
 ### Voice selection (cards on Generate screen)
 
@@ -28,7 +28,7 @@ Improvements to support screen reader and keyboard users across the main app sur
 ### History list (generated samples)
 
 - Each **sample row** is focusable with `role="button"` and an `aria-label` (e.g. "Sample from [profile], [duration], [date]. Press Enter to play."); **Enter/Space** plays or restarts.
-- **Transcript textarea** has `aria-label` (e.g. "Transcript for sample from [profile], [duration]") so focus in the text area is announced in context.
+- **Transcript textarea** has `aria-label` (e.g. "Transcript for sample from [profile], [duration]") so when you focus on the text area, the sample is announced in context.
 
 ### Voices tab (table)
 

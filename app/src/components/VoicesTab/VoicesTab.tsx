@@ -183,38 +183,28 @@ function VoiceRow({
 
   const rowLabel = `${profile.name}, ${profile.language}, ${generationCount} generations, ${sampleCount} samples. Press Enter to edit.`;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[role="combobox"]') || target.closest('[role="listbox"]')) {
-      return;
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onEdit();
-    }
-  };
-
   return (
-    <TableRow
-      className="cursor-pointer"
-      onClick={onEdit}
-      tabIndex={0}
-      role="button"
-      aria-label={rowLabel}
-      onKeyDown={handleKeyDown}
-    >
+    <TableRow className="cursor-pointer" onClick={onEdit}>
       <TableCell>
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="flex w-full min-w-0 items-center gap-2 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+          aria-label={rowLabel}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
           <div className="h-8 w-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
             <Mic className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div>
-            <div className="font-medium">{profile.name}</div>
+          <div className="min-w-0">
+            <div className="font-medium truncate">{profile.name}</div>
             {profile.description && (
-              <div className="text-sm text-muted-foreground">{profile.description}</div>
+              <div className="text-sm text-muted-foreground truncate">{profile.description}</div>
             )}
           </div>
-        </div>
+        </button>
       </TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>{profile.language}</TableCell>
       <TableCell onClick={(e) => e.stopPropagation()}>{generationCount}</TableCell>

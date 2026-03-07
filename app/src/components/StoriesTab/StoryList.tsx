@@ -200,7 +200,12 @@ export function StoryList() {
                 'h-24 p-4 border rounded-2xl transition-colors group flex items-center cursor-pointer',
                 selectedStoryId === story.id && 'bg-muted border-primary',
               )}
-              aria-label={`Story ${story.name}, ${story.item_count} ${story.item_count === 1 ? 'item' : 'items'}, ${formatDate(story.updated_at)}. Press Enter to select.`}
+              aria-label={
+                selectedStoryId === story.id
+                  ? `Story ${story.name}, ${story.item_count} ${story.item_count === 1 ? 'item' : 'items'}, ${formatDate(story.updated_at)}. Selected. Press Enter to select.`
+                  : `Story ${story.name}, ${story.item_count} ${story.item_count === 1 ? 'item' : 'items'}, ${formatDate(story.updated_at)}. Press Enter to select.`
+              }
+              aria-pressed={selectedStoryId === story.id}
               onClick={() => setSelectedStoryId(story.id)}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;

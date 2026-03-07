@@ -62,6 +62,8 @@ export function ProfileCard({ profile }: ProfileCardProps) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       handleSelect();
