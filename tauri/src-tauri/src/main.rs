@@ -178,6 +178,56 @@ async fn start_server(
     println!("Data directory: {:?}", data_dir);
     println!("Remote mode: {}", remote.unwrap_or(false));
 
+    // Check for CUDA backend binary in data directory
+    let cuda_binary = {
+        let backends_dir = data_dir.join("backends");
+        let cuda_name = if cfg!(windows) {
+            "voicebox-server-cuda.exe"
+        } else {
+            "voicebox-server-cuda"
+        };
+        let path = backends_dir.join(cuda_name);
+        if path.exists() {
+            println!("Found CUDA backend binary at {:?}", path);
+
+            // Version check: run --version and compare to app version
+            let app_version = app.config().version.clone().unwrap_or_default();
+            let version_ok = match std::process::Command::new(&path)
+                .arg("--version")
+                .output()
+            {
+                Ok(output) => {
+                    // Output format: "voicebox-server X.Y.Z\n"
+                    let version_str = String::from_utf8_lossy(&output.stdout);
+                    let binary_version = version_str.trim().split_whitespace().last().unwrap_or("");
+                    if binary_version == app_version {
+                        println!("CUDA binary version {} matches app version", binary_version);
+                        true
+                    } else {
+                        println!(
+                            "CUDA binary version mismatch: binary={}, app={}. Falling back to CPU.",
+                            binary_version, app_version
+                        );
+                        false
+                    }
+                }
+                Err(e) => {
+                    println!("Failed to check CUDA binary version: {}. Falling back to CPU.", e);
+                    false
+                }
+            };
+
+            if version_ok {
+                Some(path)
+            } else {
+                None
+            }
+        } else {
+            println!("No CUDA backend found, using bundled CPU binary");
+            None
+        }
+    };
+
     let sidecar_result = app.shell().sidecar("voicebox-server");
 
     let mut sidecar = match sidecar_result {
@@ -216,22 +266,32 @@ async fn start_server(
 
     println!("Sidecar command created successfully");
 
-    // Pass data directory and port to Python server
-    sidecar = sidecar.args([
-        "--data-dir",
-        data_dir
-            .to_str()
-            .ok_or_else(|| "Invalid data dir path".to_string())?,
-        "--port",
-        &SERVER_PORT.to_string(),
-    ]);
+    // Build common args
+    let data_dir_str = data_dir
+        .to_str()
+        .ok_or_else(|| "Invalid data dir path".to_string())?
+        .to_string();
+    let port_str = SERVER_PORT.to_string();
+    let is_remote = remote.unwrap_or(false);
 
-    if remote.unwrap_or(false) {
-        sidecar = sidecar.args(["--host", "0.0.0.0"]);
-    }
-
-    println!("Spawning server process...");
-    let spawn_result = sidecar.spawn();
+    // If CUDA binary exists, launch it directly instead of the bundled sidecar
+    let spawn_result = if let Some(ref cuda_path) = cuda_binary {
+        println!("Launching CUDA backend: {:?}", cuda_path);
+        let mut cmd = app.shell().command(cuda_path.to_str().unwrap());
+        cmd = cmd.args(["--data-dir", &data_dir_str, "--port", &port_str]);
+        if is_remote {
+            cmd = cmd.args(["--host", "0.0.0.0"]);
+        }
+        cmd.spawn()
+    } else {
+        // Use the bundled CPU sidecar
+        sidecar = sidecar.args(["--data-dir", &data_dir_str, "--port", &port_str]);
+        if is_remote {
+            sidecar = sidecar.args(["--host", "0.0.0.0"]);
+        }
+        println!("Spawning server process...");
+        sidecar.spawn()
+    };
 
     let (mut rx, child) = match spawn_result {
         Ok(result) => result,
@@ -550,6 +610,25 @@ async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
 }
 
 #[command]
+async fn restart_server(
+    app: tauri::AppHandle,
+    state: State<'_, ServerState>,
+) -> Result<String, String> {
+    println!("restart_server: stopping current server...");
+
+    // Stop the current server
+    stop_server(state.clone()).await?;
+
+    // Wait for port to be released
+    println!("restart_server: waiting for port release...");
+    tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+    // Start server again (will auto-detect CUDA binary)
+    println!("restart_server: starting server...");
+    start_server(app, state, None).await
+}
+
+#[command]
 fn set_keep_server_running(state: State<'_, ServerState>, keep_running: bool) {
     *state.keep_running_on_close.lock().unwrap() = keep_running;
 }
@@ -640,6 +719,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             start_server,
             stop_server,
+            restart_server,
             set_keep_server_running,
             start_system_audio_capture,
             stop_system_audio_capture,

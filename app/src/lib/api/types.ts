@@ -78,7 +78,29 @@ export interface HealthResponse {
   model_downloaded?: boolean;
   model_size?: string;
   gpu_available: boolean;
+  gpu_type?: string;
   vram_used_mb?: number;
+  backend_type?: string;
+  backend_variant?: string; // "cpu" or "cuda"
+}
+
+export interface CudaDownloadProgress {
+  model_name: string;
+  current: number;
+  total: number;
+  progress: number;
+  filename?: string;
+  status: 'downloading' | 'extracting' | 'complete' | 'error';
+  timestamp: string;
+  error?: string;
+}
+
+export interface CudaStatus {
+  available: boolean; // CUDA binary exists on disk
+  active: boolean; // Currently running the CUDA binary
+  binary_path?: string;
+  downloading: boolean; // Download in progress
+  download_progress?: CudaDownloadProgress;
 }
 
 export interface ModelProgress {
@@ -96,7 +118,7 @@ export interface ModelStatus {
   model_name: string;
   display_name: string;
   downloaded: boolean;
-  downloading: boolean;  // True if download is in progress
+  downloading: boolean; // True if download is in progress
   size_mb?: number;
   loaded: boolean;
 }

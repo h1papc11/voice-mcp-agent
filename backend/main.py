@@ -206,6 +206,7 @@ async def health():
         gpu_type=gpu_type,
         vram_used_mb=vram_used,
         backend_type=backend_type,
+        backend_variant=os.environ.get("VOICEBOX_BACKEND_VARIANT", "cpu"),
     )
 
 
@@ -1794,6 +1795,75 @@ async def get_active_tasks():
     return models.ActiveTasksResponse(
         downloads=active_downloads,
         generations=active_generations,
+    )
+
+
+# ============================================
+# CUDA BACKEND MANAGEMENT
+# ============================================
+
+@app.get("/backend/cuda-status")
+async def get_cuda_status():
+    """Get CUDA backend download/availability status."""
+    from . import cuda_download
+    return cuda_download.get_cuda_status()
+
+
+@app.post("/backend/download-cuda")
+async def download_cuda_backend():
+    """Download the CUDA backend binary. Returns immediately; track progress via SSE."""
+    from . import cuda_download
+
+    # Check if already downloaded
+    if cuda_download.get_cuda_binary_path() is not None:
+        raise HTTPException(status_code=409, detail="CUDA backend already downloaded")
+
+    async def _download():
+        try:
+            await cuda_download.download_cuda_binary()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"CUDA download failed: {e}")
+
+    asyncio.create_task(_download())
+    return {"message": "CUDA backend download started", "progress_key": "cuda-backend"}
+
+
+@app.delete("/backend/cuda")
+async def delete_cuda_backend():
+    """Delete the downloaded CUDA backend binary."""
+    from . import cuda_download
+
+    if cuda_download.is_cuda_active():
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete CUDA backend while it is active. Switch to CPU first.",
+        )
+
+    deleted = await cuda_download.delete_cuda_binary()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No CUDA backend found to delete")
+
+    return {"message": "CUDA backend deleted"}
+
+
+@app.get("/backend/cuda-progress")
+async def get_cuda_download_progress():
+    """Get CUDA backend download progress via Server-Sent Events."""
+    progress_manager = get_progress_manager()
+
+    async def event_generator():
+        async for event in progress_manager.subscribe("cuda-backend"):
+            yield event
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
