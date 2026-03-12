@@ -407,7 +407,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and sol
 
 - **Backend won't start:** Check Python version (3.11+), ensure venv is activated, install dependencies
 - **Tauri build fails:** Ensure Rust is installed, clean build with `cd tauri/src-tauri && cargo clean`
-- **OpenAPI client generation fails:** Ensure backend is running, check `curl http://localhost:8000/openapi.json`
+- **OpenAPI client generation fails:** Ensure backend is running, check `curl http://localhost:17493/openapi.json`
 
 ## Questions?
 
