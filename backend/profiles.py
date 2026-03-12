@@ -327,6 +327,7 @@ async def create_voice_prompt_for_profile(
     profile_id: str,
     db: Session,
     use_cache: bool = True,
+    engine: str = "qwen",
 ) -> dict:
     """
     Create a combined voice prompt from all samples in a profile.
@@ -335,17 +336,20 @@ async def create_voice_prompt_for_profile(
         profile_id: Profile ID
         db: Database session
         use_cache: Whether to use cached prompts
+        engine: TTS engine to create prompt for ("qwen" or "luxtts")
 
     Returns:
         Voice prompt dictionary
     """
+    from .backends import get_tts_backend_for_engine
+
     # Get all samples for profile
     samples = db.query(DBProfileSample).filter_by(profile_id=profile_id).all()
 
     if not samples:
         raise ValueError(f"No samples found for profile {profile_id}")
 
-    tts_model = get_tts_model()
+    tts_model = get_tts_backend_for_engine(engine)
 
     if len(samples) == 1:
         # Single sample - use directly

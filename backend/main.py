@@ -602,47 +602,69 @@ async def generate_speech(
             raise HTTPException(status_code=404, detail="Profile not found")
         
         # Generate audio
+        from .backends import get_tts_backend_for_engine
 
-        # Resolve model size and load the correct model FIRST.
-        # This must happen before create_voice_prompt_for_profile because that
-        # function calls load_model_async(None), which falls back to self.model_size.
-        # If the model is already loaded with the right size at that point, it
-        # returns immediately and the voice prompt is created by the correct model.
-        tts_model = tts.get_tts_model()
+        engine = data.engine or "qwen"
+        tts_model = get_tts_backend_for_engine(engine)
+
+        # Resolve model size (only relevant for Qwen engine)
         model_size = data.model_size or "1.7B"
 
         # Check if model needs to be downloaded first
-        model_path = tts_model._get_model_path(model_size)
-        if not tts_model._is_model_cached(model_size):
-            # Model is not fully cached — kick off a background download and tell
-            # the client to retry once it's ready.
-            model_name = f"qwen-tts-{model_size}"
+        if engine == "qwen":
+            if not tts_model._is_model_cached(model_size):
+                model_name = f"qwen-tts-{model_size}"
 
-            async def download_model_background():
-                try:
-                    await tts_model.load_model_async(model_size)
-                except Exception as e:
-                    task_manager.error_download(model_name, str(e))
+                async def download_model_background():
+                    try:
+                        await tts_model.load_model_async(model_size)
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
 
-            task_manager.start_download(model_name)
-            asyncio.create_task(download_model_background())
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_model_background())
 
-            raise HTTPException(
-                status_code=202,
-                detail={
-                    "message": f"Model {model_size} is being downloaded. Please wait and try again.",
-                    "model_name": model_name,
-                    "downloading": True,
-                },
-            )
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
 
-        # Load (or switch to) the requested model before building the voice prompt
-        await tts_model.load_model_async(model_size)
+            # Load (or switch to) the requested model
+            await tts_model.load_model_async(model_size)
+        elif engine == "luxtts":
+            if not tts_model._is_model_cached():
+                model_name = "luxtts"
 
-        # Create voice prompt from profile (model is already loaded with correct size)
+                async def download_luxtts_background():
+                    try:
+                        await tts_model.load_model()
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_luxtts_background())
+
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": "LuxTTS model is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
+
+            await tts_model.load_model()
+
+        # Create voice prompt from profile
         voice_prompt = await profiles.create_voice_prompt_for_profile(
             data.profile_id,
             db,
+            use_cache=True,
+            engine=engine,
         )
 
         audio, sample_rate = await tts_model.generate(
@@ -699,23 +721,34 @@ async def stream_speech(
     playing audio before the entire file has been received.  This endpoint
     does NOT create a history entry — use /generate for that.
     """
+    from .backends import get_tts_backend_for_engine
+
     profile = await profiles.get_profile(data.profile_id, db)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    tts_model = tts.get_tts_model()
+    engine = data.engine or "qwen"
+    tts_model = get_tts_backend_for_engine(engine)
     model_size = data.model_size or "1.7B"
 
-    if not tts_model._is_model_cached(model_size):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
-        )
+    if engine == "qwen":
+        if not tts_model._is_model_cached(model_size):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model_async(model_size)
+    elif engine == "luxtts":
+        if not tts_model._is_model_cached():
+            raise HTTPException(
+                status_code=400,
+                detail="LuxTTS model is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model()
 
-    # Load the correct model before building the voice prompt (fixes issue #96)
-    await tts_model.load_model_async(model_size)
-
-    voice_prompt = await profiles.create_voice_prompt_for_profile(data.profile_id, db)
+    voice_prompt = await profiles.create_voice_prompt_for_profile(
+        data.profile_id, db, engine=engine,
+    )
 
     audio, sample_rate = await tts_model.generate(
         data.text,
@@ -1324,6 +1357,15 @@ async def get_model_status():
         whisper_medium_id = "openai/whisper-medium"
         whisper_large_id = "openai/whisper-large-v3"
     
+    # Check if LuxTTS backend is loaded
+    def check_luxtts_loaded():
+        try:
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("luxtts")
+            return backend.is_loaded()
+        except Exception:
+            return False
+
     model_configs = [
         {
             "model_name": "qwen-tts-1.7B",
@@ -1338,6 +1380,13 @@ async def get_model_status():
             "hf_repo_id": tts_0_6b_id,
             "model_size": "0.6B",
             "check_loaded": lambda: check_tts_loaded("0.6B"),
+        },
+        {
+            "model_name": "luxtts",
+            "display_name": "LuxTTS (Fast, CPU-friendly)",
+            "hf_repo_id": "YatharthS/LuxTTS",
+            "model_size": "default",
+            "check_loaded": check_luxtts_loaded,
         },
         {
             "model_name": "whisper-base",
@@ -1521,6 +1570,7 @@ async def get_model_status():
 async def trigger_model_download(request: models.ModelDownloadRequest):
     """Trigger download of a specific model."""
     import asyncio
+    from .backends import get_tts_backend_for_engine
     
     task_manager = get_task_manager()
     progress_manager = get_progress_manager()
@@ -1533,6 +1583,10 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
         "qwen-tts-0.6B": {
             "model_size": "0.6B",
             "load_func": lambda: tts.get_tts_model().load_model("0.6B"),
+        },
+        "luxtts": {
+            "model_size": "default",
+            "load_func": lambda: get_tts_backend_for_engine("luxtts").load_model(),
         },
         "whisper-base": {
             "model_size": "base",
@@ -1646,6 +1700,11 @@ async def delete_model(model_name: str):
             "model_size": "0.6B",
             "model_type": "tts",
         },
+        "luxtts": {
+            "hf_repo_id": "YatharthS/LuxTTS",
+            "model_size": "default",
+            "model_type": "luxtts",
+        },
         "whisper-base": {
             "hf_repo_id": "openai/whisper-base",
             "model_size": "base",
@@ -1680,6 +1739,11 @@ async def delete_model(model_name: str):
             tts_model = tts.get_tts_model()
             if tts_model.is_loaded() and tts_model.model_size == config["model_size"]:
                 tts.unload_tts_model()
+        elif config["model_type"] == "luxtts":
+            from .backends import get_tts_backend_for_engine
+            luxtts = get_tts_backend_for_engine("luxtts")
+            if luxtts.is_loaded():
+                luxtts.unload_model()
         elif config["model_type"] == "whisper":
             whisper_model = transcribe.get_whisper_model()
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:

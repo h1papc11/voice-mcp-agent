@@ -80,16 +80,19 @@ export function ModelManagement() {
     queryClient.invalidateQueries({ queryKey: ['activeTasks'] });
   }, [queryClient]);
 
-  const handleDownloadError = useCallback((error: string) => {
-    console.log('[ModelManagement] Download error, clearing state');
-    if (downloadingModel) {
-      setLocalErrors((prev) => new Map(prev).set(downloadingModel, error));
-      setConsoleOpen(true);
-    }
-    setDownloadingModel(null);
-    setDownloadingDisplayName(null);
-    queryClient.invalidateQueries({ queryKey: ['activeTasks'] });
-  }, [queryClient, downloadingModel]);
+  const handleDownloadError = useCallback(
+    (error: string) => {
+      console.log('[ModelManagement] Download error, clearing state');
+      if (downloadingModel) {
+        setLocalErrors((prev) => new Map(prev).set(downloadingModel, error));
+        setConsoleOpen(true);
+      }
+      setDownloadingModel(null);
+      setDownloadingDisplayName(null);
+      queryClient.invalidateQueries({ queryKey: ['activeTasks'] });
+    },
+    [queryClient, downloadingModel],
+  );
 
   // Use progress toast hook for the downloading model
   useModelDownloadToast({
@@ -165,7 +168,11 @@ export function ModelManagement() {
 
     // Optimistically hide the error and suppress downloading state in UI
     setDismissedErrors((prev) => new Set(prev).add(modelName));
-    setLocalErrors((prev) => { const next = new Map(prev); next.delete(modelName); return next; });
+    setLocalErrors((prev) => {
+      const next = new Map(prev);
+      next.delete(modelName);
+      return next;
+    });
     if (downloadingModel === modelName) {
       setDownloadingModel(null);
       setDownloadingDisplayName(null);
@@ -178,7 +185,11 @@ export function ModelManagement() {
         setLocalErrors(prevLocalErrors);
         setDownloadingModel(prevDownloadingModel);
         setDownloadingDisplayName(prevDownloadingDisplayName);
-        toast({ title: 'Cancel failed', description: 'Could not cancel the download task.', variant: 'destructive' });
+        toast({
+          title: 'Cancel failed',
+          description: 'Could not cancel the download task.',
+          variant: 'destructive',
+        });
       },
     });
   };
@@ -273,7 +284,9 @@ export function ModelManagement() {
                       }}
                       onCancel={() => handleCancel(model.model_name)}
                       isDownloading={downloadingModel === model.model_name}
-                      isCancelling={cancelMutation.isPending && cancelMutation.variables === model.model_name}
+                      isCancelling={
+                        cancelMutation.isPending && cancelMutation.variables === model.model_name
+                      }
                       isDismissed={dismissedErrors.has(model.model_name)}
                       erroredDownload={erroredDownloads.get(model.model_name)}
                       formatSize={formatSize}
@@ -281,6 +294,34 @@ export function ModelManagement() {
                   ))}
               </div>
             </div>
+
+            {/* LuxTTS Models */}
+            {modelStatus.models.some((m) => m.model_name.startsWith('luxtts')) && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">LuxTTS Models</h3>
+                <div className="space-y-2">
+                  {modelStatus.models
+                    .filter((m) => m.model_name.startsWith('luxtts'))
+                    .map((model) => (
+                      <ModelItem
+                        key={model.model_name}
+                        model={model}
+                        onDownload={() => handleDownload(model.model_name)}
+                        onDelete={() => {
+                          setModelToDelete({
+                            name: model.model_name,
+                            displayName: model.display_name,
+                            sizeMb: model.size_mb,
+                          });
+                          setDeleteDialogOpen(true);
+                        }}
+                        isDownloading={downloadingModel === model.model_name}
+                        formatSize={formatSize}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
 
             {/* Whisper Models */}
             <div>
@@ -305,7 +346,9 @@ export function ModelManagement() {
                       }}
                       onCancel={() => handleCancel(model.model_name)}
                       isDownloading={downloadingModel === model.model_name}
-                      isCancelling={cancelMutation.isPending && cancelMutation.variables === model.model_name}
+                      isCancelling={
+                        cancelMutation.isPending && cancelMutation.variables === model.model_name
+                      }
                       isDismissed={dismissedErrors.has(model.model_name)}
                       erroredDownload={erroredDownloads.get(model.model_name)}
                       formatSize={formatSize}
@@ -353,12 +396,16 @@ export function ModelManagement() {
                         {dl.error ? (
                           <>
                             {': '}
-                            <span className="text-[#ce9178] whitespace-pre-wrap break-all">{dl.error}</span>
+                            <span className="text-[#ce9178] whitespace-pre-wrap break-all">
+                              {dl.error}
+                            </span>
                           </>
                         ) : (
                           <>
                             {': '}
-                            <span className="text-[#808080]">No error details available. Try downloading again.</span>
+                            <span className="text-[#808080]">
+                              No error details available. Try downloading again.
+                            </span>
                           </>
                         )}
                         <div className="text-[#6a9955] mt-0.5">
@@ -422,21 +469,31 @@ interface ModelItemProps {
     model_name: string;
     display_name: string;
     downloaded: boolean;
-    downloading?: boolean;  // From server - true if download in progress
+    downloading?: boolean; // From server - true if download in progress
     size_mb?: number;
     loaded: boolean;
   };
   onDownload: () => void;
   onDelete: () => void;
   onCancel: () => void;
-  isDownloading: boolean;  // Local state - true if user just clicked download
+  isDownloading: boolean; // Local state - true if user just clicked download
   isCancelling: boolean;
   isDismissed: boolean;
   erroredDownload?: ActiveDownloadTask;
   formatSize: (sizeMb?: number) => string;
 }
 
-function ModelItem({ model, onDownload, onDelete, onCancel, isDownloading, isCancelling, isDismissed, erroredDownload, formatSize }: ModelItemProps) {
+function ModelItem({
+  model,
+  onDownload,
+  onDelete,
+  onCancel,
+  isDownloading,
+  isCancelling,
+  isDismissed,
+  erroredDownload,
+  formatSize,
+}: ModelItemProps) {
   // Use server's downloading state OR local state (for immediate feedback before server updates)
   // Suppress downloading if user just dismissed/cancelled this model
   const showDownloading = (model.downloading || isDownloading) && !erroredDownload && !isDismissed;

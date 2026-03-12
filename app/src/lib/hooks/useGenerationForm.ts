@@ -16,6 +16,7 @@ const generationSchema = z.object({
   seed: z.number().int().optional(),
   modelSize: z.enum(['1.7B', '0.6B']).optional(),
   instruct: z.string().max(500).optional(),
+  engine: z.enum(['qwen', 'luxtts']).optional(),
 });
 
 export type GenerationFormValues = z.infer<typeof generationSchema>;
@@ -47,6 +48,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       seed: undefined,
       modelSize: '1.7B',
       instruct: '',
+      engine: 'qwen',
       ...options.defaultValues,
     },
   });
@@ -67,8 +69,14 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
     try {
       setIsGenerating(true);
 
-      const modelName = `qwen-tts-${data.modelSize}`;
-      const displayName = data.modelSize === '1.7B' ? 'Qwen TTS 1.7B' : 'Qwen TTS 0.6B';
+      const engine = data.engine || 'qwen';
+      const modelName = engine === 'luxtts' ? 'luxtts' : `qwen-tts-${data.modelSize}`;
+      const displayName =
+        engine === 'luxtts'
+          ? 'LuxTTS'
+          : data.modelSize === '1.7B'
+            ? 'Qwen TTS 1.7B'
+            : 'Qwen TTS 0.6B';
 
       try {
         const modelStatus = await apiClient.getModelStatus();
@@ -87,8 +95,9 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         text: data.text,
         language: data.language,
         seed: data.seed,
-        model_size: data.modelSize,
-        instruct: data.instruct || undefined,
+        model_size: engine === 'luxtts' ? undefined : data.modelSize,
+        engine,
+        instruct: engine === 'luxtts' ? undefined : data.instruct || undefined,
       });
 
       toast({

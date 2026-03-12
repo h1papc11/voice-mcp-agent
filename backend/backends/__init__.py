@@ -112,29 +112,57 @@ class STTBackend(Protocol):
 
 # Global backend instances
 _tts_backend: Optional[TTSBackend] = None
+_tts_backends: dict[str, TTSBackend] = {}
 _stt_backend: Optional[STTBackend] = None
+
+# Supported TTS engines
+TTS_ENGINES = {
+    "qwen": "Qwen TTS",
+    "luxtts": "LuxTTS",
+}
 
 
 def get_tts_backend() -> TTSBackend:
     """
-    Get or create TTS backend instance based on platform.
+    Get or create the default (Qwen) TTS backend instance based on platform.
     
     Returns:
         TTS backend instance (MLX or PyTorch)
     """
-    global _tts_backend
+    return get_tts_backend_for_engine("qwen")
+
+
+def get_tts_backend_for_engine(engine: str) -> TTSBackend:
+    """
+    Get or create a TTS backend for the given engine.
     
-    if _tts_backend is None:
+    Args:
+        engine: Engine name ("qwen" or "luxtts")
+    
+    Returns:
+        TTS backend instance
+    """
+    global _tts_backends
+    
+    if engine in _tts_backends:
+        return _tts_backends[engine]
+    
+    if engine == "qwen":
         backend_type = get_backend_type()
-        
         if backend_type == "mlx":
             from .mlx_backend import MLXTTSBackend
-            _tts_backend = MLXTTSBackend()
+            backend = MLXTTSBackend()
         else:
             from .pytorch_backend import PyTorchTTSBackend
-            _tts_backend = PyTorchTTSBackend()
+            backend = PyTorchTTSBackend()
+    elif engine == "luxtts":
+        from .luxtts_backend import LuxTTSBackend
+        backend = LuxTTSBackend()
+    else:
+        raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
     
-    return _tts_backend
+    _tts_backends[engine] = backend
+    return backend
 
 
 def get_stt_backend() -> STTBackend:
@@ -161,6 +189,7 @@ def get_stt_backend() -> STTBackend:
 
 def reset_backends():
     """Reset backend instances (useful for testing)."""
-    global _tts_backend, _stt_backend
+    global _tts_backend, _tts_backends, _stt_backend
     _tts_backend = None
+    _tts_backends.clear()
     _stt_backend = None

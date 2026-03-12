@@ -76,29 +76,56 @@ export function GenerationForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="instruct"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Delivery Instructions (optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="e.g. Speak slowly with emphasis, Warm and friendly tone, Professional and authoritative..."
-                      className="min-h-[80px]"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Natural language instructions to control speech delivery (tone, emotion, pace).
-                    Max 500 characters
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {form.watch('engine') !== 'luxtts' && (
+              <FormField
+                control={form.control}
+                name="instruct"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Delivery Instructions (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="e.g. Speak slowly with emphasis, Warm and friendly tone, Professional and authoritative..."
+                        className="min-h-[80px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Natural language instructions to control speech delivery (tone, emotion,
+                      pace). Max 500 characters
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="grid gap-4 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="engine"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>TTS Engine</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="qwen">Qwen TTS</SelectItem>
+                        <SelectItem value="luxtts">LuxTTS</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      {field.value === 'luxtts' ? 'Fast, English-focused' : 'Multi-language'}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="language"
@@ -119,29 +146,6 @@ export function GenerationForm() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="modelSize"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Model Size</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="1.7B">Qwen TTS 1.7B (Higher Quality)</SelectItem>
-                        <SelectItem value="0.6B">Qwen TTS 0.6B (Faster)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Larger models produce better quality</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -170,11 +174,32 @@ export function GenerationForm() {
               />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isPending || !selectedProfileId}
-            >
+            {form.watch('engine') !== 'luxtts' && (
+              <FormField
+                control={form.control}
+                name="modelSize"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model Size</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1.7B">Qwen TTS 1.7B (Higher Quality)</SelectItem>
+                        <SelectItem value="0.6B">Qwen TTS 0.6B (Faster)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Larger models produce better quality</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            <Button type="submit" className="w-full" disabled={isPending || !selectedProfileId}>
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
