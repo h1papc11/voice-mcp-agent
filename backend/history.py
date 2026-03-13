@@ -29,6 +29,10 @@ async def create_generation(
     seed: Optional[int],
     db: Session,
     instruct: Optional[str] = None,
+    generation_id: Optional[str] = None,
+    status: str = "completed",
+    engine: Optional[str] = "qwen",
+    model_size: Optional[str] = None,
 ) -> GenerationResponse:
     """
     Create a new generation history entry.
@@ -42,12 +46,16 @@ async def create_generation(
         seed: Random seed used (if any)
         db: Database session
         instruct: Natural language instruction used (if any)
+        generation_id: Pre-assigned ID (for async generation flow)
+        status: Generation status (generating, completed, failed)
+        engine: TTS engine used (qwen, luxtts, chatterbox, chatterbox_turbo)
+        model_size: Model size variant (1.7B, 0.6B) — only relevant for qwen
 
     Returns:
         Created generation entry
     """
     db_generation = DBGeneration(
-        id=str(uuid.uuid4()),
+        id=generation_id or str(uuid.uuid4()),
         profile_id=profile_id,
         text=text,
         language=language,
@@ -55,6 +63,9 @@ async def create_generation(
         duration=duration,
         seed=seed,
         instruct=instruct,
+        engine=engine,
+        model_size=model_size,
+        status=status,
         created_at=datetime.utcnow(),
     )
 
@@ -63,6 +74,32 @@ async def create_generation(
     db.refresh(db_generation)
 
     return GenerationResponse.model_validate(db_generation)
+
+
+async def update_generation_status(
+    generation_id: str,
+    status: str,
+    db: Session,
+    audio_path: Optional[str] = None,
+    duration: Optional[float] = None,
+    error: Optional[str] = None,
+) -> Optional[GenerationResponse]:
+    """Update the status of a generation (used by async generation flow)."""
+    generation = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not generation:
+        return None
+
+    generation.status = status
+    if audio_path is not None:
+        generation.audio_path = audio_path
+    if duration is not None:
+        generation.duration = duration
+    if error is not None:
+        generation.error = error
+
+    db.commit()
+    db.refresh(generation)
+    return GenerationResponse.model_validate(generation)
 
 
 async def get_generation(
@@ -143,6 +180,10 @@ async def list_generations(
             duration=generation.duration,
             seed=generation.seed,
             instruct=generation.instruct,
+            engine=generation.engine or "qwen",
+            model_size=generation.model_size,
+            status=generation.status or "completed",
+            error=generation.error,
             created_at=generation.created_at,
         ))
     

@@ -200,6 +200,12 @@ class ApiClient {
     });
   }
 
+  async retryGeneration(generationId: string): Promise<GenerationResponse> {
+    return this.request<GenerationResponse>(`/generate/${generationId}/retry`, {
+      method: 'POST',
+    });
+  }
+
   // History
   async listHistory(query?: HistoryQuery): Promise<HistoryListResponse> {
     const params = new URLSearchParams();
@@ -276,6 +282,11 @@ class ApiClient {
     }
 
     return response.json();
+  }
+
+  // Generation status SSE
+  getGenerationStatusUrl(generationId: string): string {
+    return `${this.getBaseUrl()}/generate/${generationId}/status`;
   }
 
   // Audio

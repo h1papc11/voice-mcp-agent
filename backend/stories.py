@@ -270,11 +270,14 @@ async def add_item_to_story(
             generation_created_at=generation.created_at,
         )
 
+    # Get track from data or default to 0
+    track = data.track if data.track is not None else 0
+
     # Calculate start_time_ms if not provided
     if data.start_time_ms is not None:
         start_time_ms = data.start_time_ms
     else:
-        # Find the maximum end time (start_time_ms + duration_ms) of existing items
+        # Find the maximum end time on the target track only
         existing_items = db.query(
             DBStoryItem,
             DBGeneration
@@ -282,11 +285,11 @@ async def add_item_to_story(
             DBGeneration,
             DBStoryItem.generation_id == DBGeneration.id
         ).filter(
-            DBStoryItem.story_id == story_id
+            DBStoryItem.story_id == story_id,
+            DBStoryItem.track == track,
         ).all()
         
         if not existing_items:
-            # First item starts at 0
             start_time_ms = 0
         else:
             max_end_time_ms = 0
@@ -296,9 +299,6 @@ async def add_item_to_story(
             
             # Add 200ms gap after the last item
             start_time_ms = max_end_time_ms + 200
-
-    # Get track from data or default to 0
-    track = data.track if data.track is not None else 0
 
     # Create item
     item = DBStoryItem(

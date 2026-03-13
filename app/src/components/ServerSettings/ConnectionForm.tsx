@@ -124,6 +124,7 @@ export function ConnectionForm() {
           <div className="flex items-start space-x-3">
             <Checkbox
               id="keepServerRunning"
+              className="mt-[6px]"
               checked={keepServerRunningOnClose}
               onCheckedChange={(checked: boolean) => {
                 setKeepServerRunningOnClose(checked);
@@ -158,6 +159,7 @@ export function ConnectionForm() {
             <div className="flex items-start space-x-3">
               <Checkbox
                 id="allowNetworkAccess"
+                className="mt-[6px]"
                 checked={mode === 'remote'}
                 onCheckedChange={(checked: boolean) => {
                   setMode(checked ? 'remote' : 'local');

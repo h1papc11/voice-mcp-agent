@@ -23,6 +23,9 @@ interface ServerStore {
   normalizeAudio: boolean;
   setNormalizeAudio: (value: boolean) => void;
 
+  autoplayOnGenerate: boolean;
+  setAutoplayOnGenerate: (value: boolean) => void;
+
   customModelsDir: string | null;
   setCustomModelsDir: (dir: string | null) => void;
 }
@@ -50,6 +53,9 @@ export const useServerStore = create<ServerStore>()(
 
       normalizeAudio: true,
       setNormalizeAudio: (value) => set({ normalizeAudio: value }),
+
+      autoplayOnGenerate: true,
+      setAutoplayOnGenerate: (value) => set({ autoplayOnGenerate: value }),
 
       customModelsDir: null,
       setCustomModelsDir: (dir) => set({ customModelsDir: dir }),

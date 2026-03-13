@@ -8,7 +8,6 @@ import { LANGUAGE_CODES, type LanguageCode } from '@/lib/constants/languages';
 import { useGeneration } from '@/lib/hooks/useGeneration';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { useGenerationStore } from '@/stores/generationStore';
-import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
 
 const generationSchema = z.object({
@@ -30,8 +29,7 @@ interface UseGenerationFormOptions {
 export function useGenerationForm(options: UseGenerationFormOptions = {}) {
   const { toast } = useToast();
   const generation = useGeneration();
-  const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
-  const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
+  const addPendingGeneration = useGenerationStore((state) => state.addPendingGeneration);
   const maxChunkChars = useServerStore((state) => state.maxChunkChars);
   const crossfadeMs = useServerStore((state) => state.crossfadeMs);
   const normalizeAudio = useServerStore((state) => state.normalizeAudio);
@@ -71,8 +69,6 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
     }
 
     try {
-      setIsGenerating(true);
-
       const engine = data.engine || 'qwen';
       const modelName =
         engine === 'luxtts'
@@ -93,6 +89,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
                 ? 'Qwen TTS 1.7B'
                 : 'Qwen TTS 0.6B';
 
+      // Check if model needs downloading
       try {
         const modelStatus = await apiClient.getModelStatus();
         const model = modelStatus.models.find((m) => m.model_name === modelName);
@@ -106,6 +103,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       }
 
       const isQwen = engine === 'qwen';
+      // This now returns immediately with status="generating"
       const result = await generation.mutateAsync({
         profile_id: selectedProfileId,
         text: data.text,
@@ -119,14 +117,10 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         normalize: normalizeAudio,
       });
 
-      toast({
-        title: 'Generation complete!',
-        description: `Audio generated (${result.duration.toFixed(2)}s)`,
-      });
+      // Track this generation for SSE status updates
+      addPendingGeneration(result.id);
 
-      const audioUrl = apiClient.getAudioUrl(result.id);
-      setAudioWithAutoPlay(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
-
+      // Reset form immediately — user can start typing again
       form.reset({
         text: '',
         language: data.language,
@@ -143,7 +137,6 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         variant: 'destructive',
       });
     } finally {
-      setIsGenerating(false);
       setDownloadingModelName(null);
       setDownloadingDisplayName(null);
     }

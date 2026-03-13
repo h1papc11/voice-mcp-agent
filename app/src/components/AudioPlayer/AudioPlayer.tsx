@@ -7,8 +7,8 @@ import { Slider } from '@/components/ui/slider';
 import { apiClient } from '@/lib/api/client';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { debug } from '@/lib/utils/debug';
-import { usePlayerStore } from '@/stores/playerStore';
 import { usePlatform } from '@/platform/PlatformContext';
+import { usePlayerStore } from '@/stores/playerStore';
 
 export function AudioPlayer() {
   const platform = usePlatform();
@@ -360,7 +360,7 @@ export function AudioPlayer() {
         if (shouldAutoPlayNow) {
           // Clear the flag first
           usePlayerStore.getState().clearAutoPlayFlag();
-          
+
           // Use a small delay to ensure audio element is fully ready
           setTimeout(() => {
             wavesurfer.play().catch((error) => {
@@ -665,7 +665,7 @@ export function AudioPlayer() {
   // Handle shouldAutoPlay flag - for story mode auto-advance
   const shouldAutoPlay = usePlayerStore((state) => state.shouldAutoPlay);
   const clearAutoPlayFlag = usePlayerStore((state) => state.clearAutoPlayFlag);
-  
+
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !shouldAutoPlay || duration === 0) {
@@ -833,11 +833,7 @@ export function AudioPlayer() {
             className="shrink-0"
             title={duration === 0 && !isLoading ? 'Audio not loaded' : ''}
             aria-label={
-              duration === 0 && !isLoading
-                ? 'Audio not loaded'
-                : isPlaying
-                  ? 'Pause'
-                  : 'Play'
+              duration === 0 && !isLoading ? 'Audio not loaded' : isPlaying ? 'Pause' : 'Play'
             }
           >
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
@@ -872,7 +868,9 @@ export function AudioPlayer() {
 
           {/* Title */}
           {title && (
-            <div className="text-sm font-medium truncate max-w-[200px] shrink-0">{title}</div>
+            <div className="text-sm font-medium truncate max-w-[200px] shrink-0 hidden lg:block">
+              {title}
+            </div>
           )}
 
           {/* Loop Button */}
@@ -888,7 +886,11 @@ export function AudioPlayer() {
           </Button>
 
           {/* Volume Control */}
-          <div className="flex items-center gap-2 shrink-0 w-[120px]" role="group" aria-label="Volume">
+          <div
+            className="flex items-center gap-2 shrink-0 w-[120px]"
+            role="group"
+            aria-label="Volume"
+          >
             <Button
               variant="ghost"
               size="icon"

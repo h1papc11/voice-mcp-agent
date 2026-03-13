@@ -78,7 +78,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
     <>
       <Card
         className={cn(
-          'cursor-pointer hover:shadow-md transition-all flex flex-col',
+          'cursor-pointer hover:shadow-md transition-all flex flex-col h-[162px]',
           isSelected && 'ring-2 ring-primary shadow-md',
         )}
         onClick={handleSelect}

@@ -8,8 +8,10 @@ import { Sidebar } from '@/components/Sidebar';
 import { StoriesTab } from '@/components/StoriesTab/StoriesTab';
 import { Toaster } from '@/components/ui/toaster';
 import { VoicesTab } from '@/components/VoicesTab/VoicesTab';
+import { useGenerationProgress } from '@/lib/hooks/useGenerationProgress';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { MODEL_DISPLAY_NAMES, useRestoreActiveTasks } from '@/lib/hooks/useRestoreActiveTasks';
+
 // Simple platform check that works in both web and Tauri
 const isMacOS = () => navigator.platform.toLowerCase().includes('mac');
 
@@ -17,6 +19,9 @@ const isMacOS = () => navigator.platform.toLowerCase().includes('mac');
 function RootLayout() {
   // Monitor active downloads/generations and show toasts for them
   const activeDownloads = useRestoreActiveTasks();
+
+  // Subscribe to SSE for pending generations — handles completion, auto-play, and history refresh
+  useGenerationProgress();
 
   return (
     <AppFrame>

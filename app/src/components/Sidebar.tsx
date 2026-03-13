@@ -1,9 +1,9 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
-import { Box, BookOpen, Loader2, Mic, Server, Speaker, Volume2 } from 'lucide-react';
+import { BookOpen, Box, Mic, Server, Speaker, Volume2 } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
-import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { version } from '../../package.json';
 
 interface SidebarProps {
   isMacOS?: boolean;
@@ -19,10 +19,8 @@ const tabs = [
 ];
 
 export function Sidebar({ isMacOS }: SidebarProps) {
-  const isGenerating = useGenerationStore((state) => state.isGenerating);
-  const audioUrl = usePlayerStore((state) => state.audioUrl);
-  const isPlayerVisible = !!audioUrl;
   const matchRoute = useMatchRoute();
+  const isPlayerOpen = !!usePlayerStore((s) => s.audioUrl);
 
   return (
     <div
@@ -42,9 +40,7 @@ export function Sidebar({ isMacOS }: SidebarProps) {
           const Icon = tab.icon;
           // For index route, use exact match; for others, use default matching
           const isActive =
-            tab.path === '/'
-              ? matchRoute({ to: '/', exact: true })
-              : matchRoute({ to: tab.path });
+            tab.path === '/' ? matchRoute({ to: '/', exact: true }) : matchRoute({ to: tab.path });
 
           return (
             <Link
@@ -64,20 +60,13 @@ export function Sidebar({ isMacOS }: SidebarProps) {
         })}
       </div>
 
-      {/* Spacer to push loader to bottom */}
-      <div className="flex-1" />
-
-      {/* Generation Loader */}
-      {isGenerating && (
-        <div
-          className={cn(
-            'w-full flex items-center justify-center transition-all duration-200',
-            isPlayerVisible ? 'mb-[120px]' : 'mb-0',
-          )}
-        >
-          <Loader2 className="h-6 w-6 text-accent animate-spin" />
-        </div>
-      )}
+      {/* Version */}
+      <div
+        className="mt-auto text-[10px] text-muted-foreground/50 transition-all duration-300"
+        style={{ paddingBottom: isPlayerOpen ? '7rem' : undefined }}
+      >
+        v{version}
+      </div>
     </div>
   );
 }

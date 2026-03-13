@@ -12,12 +12,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/use-toast';
 import { getLanguageOptionsForEngine, type LanguageCode } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
-import { useAddStoryItem, useStory } from '@/lib/hooks/useStories';
+import { useStory } from '@/lib/hooks/useStories';
 import { cn } from '@/lib/utils/cn';
+import { useGenerationStore } from '@/stores/generationStore';
 import { useStoryStore } from '@/stores/storyStore';
 import { useUIStore } from '@/stores/uiStore';
 import { ParalinguisticInput } from './ParalinguisticInput';
@@ -44,8 +44,7 @@ export function FloatingGenerateBox({
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
   const trackEditorHeight = useStoryStore((state) => state.trackEditorHeight);
   const { data: currentStory } = useStory(selectedStoryId);
-  const addStoryItem = useAddStoryItem();
-  const { toast } = useToast();
+  const addPendingStoryAdd = useGenerationStore((s) => s.addPendingStoryAdd);
 
   // Calculate if track editor is visible (on stories route with items)
   const hasTrackEditor = isStoriesRoute && currentStory && currentStory.items.length > 0;
@@ -53,25 +52,9 @@ export function FloatingGenerateBox({
   const { form, handleSubmit, isPending } = useGenerationForm({
     onSuccess: async (generationId) => {
       setIsExpanded(false);
-      // If on stories route and a story is selected, add generation to story
+      // Defer the story add until TTS completes — useGenerationProgress handles it
       if (isStoriesRoute && selectedStoryId && generationId) {
-        try {
-          await addStoryItem.mutateAsync({
-            storyId: selectedStoryId,
-            data: { generation_id: generationId },
-          });
-          toast({
-            title: 'Added to story',
-            description: `Generation added to "${currentStory?.name || 'story'}"`,
-          });
-        } catch (error) {
-          toast({
-            title: 'Failed to add to story',
-            description:
-              error instanceof Error ? error.message : 'Could not add generation to story',
-            variant: 'destructive',
-          });
-        }
+        addPendingStoryAdd(generationId, selectedStoryId);
       }
     },
   });
@@ -182,7 +165,7 @@ export function FloatingGenerateBox({
         isStoriesRoute
           ? // Position aligned with story list: after sidebar + padding, width 360px
             'left-[calc(5rem+2rem)] w-[360px]'
-          : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
+          : 'left-[calc(5rem+2rem)] right-8 lg:right-auto lg:w-[calc((100%-5rem-4rem)/2-1rem)]',
       )}
       style={{
         // On stories route: offset by track editor height when visible
