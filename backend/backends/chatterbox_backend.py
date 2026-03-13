@@ -178,6 +178,30 @@ class ChatterboxTTSBackend:
                 progress_manager.mark_complete(model_name)
                 task_manager.complete_download(model_name)
 
+            # Monkey-patch prepare_conditionals to cast librosa's float64
+            # audio to float32 before it reaches the voice encoder.  The
+            # upstream VoiceEncoder's melspectrogram only casts to float32
+            # when hp.normalized_mels is True (it defaults to False), so
+            # float64 mels hit float32 model weights → dtype mismatch.
+            _orig_prepare = self.model.prepare_conditionals
+
+            def _f32_prepare(wav_fpath, **kwargs):
+                import librosa as _librosa
+
+                _orig_librosa_load = _librosa.load
+
+                def _load_f32(*a, **kw):
+                    wav, sr = _orig_librosa_load(*a, **kw)
+                    return wav.astype(np.float32), sr
+
+                _librosa.load = _load_f32
+                try:
+                    return _orig_prepare(wav_fpath, **kwargs)
+                finally:
+                    _librosa.load = _orig_librosa_load
+
+            self.model.prepare_conditionals = _f32_prepare
+
             logger.info("Chatterbox Multilingual TTS loaded successfully")
 
         except ImportError as e:
