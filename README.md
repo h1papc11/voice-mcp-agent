@@ -225,42 +225,21 @@ Voicebox aims to be the **one-stop shop for everything voice** — cloning, synt
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed setup and contribution guidelines.
 
-**Using the Makefile (recommended):** Run `make help` to see all available commands for setup, development, building, and testing.
-
 ### Quick Start
 
-**With Makefile (Unix/macOS/Linux):**
-
 ```bash
-# Clone the repo
 git clone https://github.com/jamiepine/voicebox.git
 cd voicebox
 
-# Setup everything
-make setup
-
-# Start development
-make dev
+just setup   # creates Python venv, installs all deps
+just dev     # starts backend + desktop app
 ```
 
-**Manual setup (all platforms):**
+Install [just](https://github.com/casey/just): `brew install just` or `cargo install just`. Run `just --list` to see all commands.
 
-```bash
-# Clone the repo
-git clone https://github.com/jamiepine/voicebox.git
-cd voicebox
+Also available via Makefile: `make setup && make dev` (run `make help` for all commands).
 
-# Install dependencies
-bun install
-
-# Install Python dependencies
-cd backend && pip install -r requirements.txt && cd ..
-
-# Start development
-bun run dev
-```
-
-**Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org). [XCode on macOS](https://developer.apple.com/xcode/).
+**Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org), [XCode on macOS](https://developer.apple.com/xcode/).
 
 **Performance:** 
 - **Apple Silicon (M1/M2/M3)**: Uses MLX backend with native Metal acceleration for 4-5x faster inference
