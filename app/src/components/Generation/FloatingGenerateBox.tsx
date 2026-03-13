@@ -323,7 +323,7 @@ export function FloatingGenerateBox({
                   </span>
                 </div>
                 <AnimatePresence>
-                  {isExpanded && (
+                  {isExpanded && form.watch('engine') === 'qwen' && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -414,30 +414,48 @@ export function FloatingGenerateBox({
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="modelSize"
-                    render={({ field }) => (
-                      <FormItem className="flex-1 space-y-0">
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="1.7B" className="text-xs text-muted-foreground">
-                              Qwen3-TTS 1.7B
-                            </SelectItem>
-                            <SelectItem value="0.6B" className="text-xs text-muted-foreground">
-                              Qwen3-TTS 0.6B
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
+                  <FormItem className="flex-1 space-y-0">
+                    <Select
+                      value={
+                        form.watch('engine') === 'luxtts'
+                          ? 'luxtts'
+                          : form.watch('engine') === 'chatterbox'
+                            ? 'chatterbox'
+                            : `qwen:${form.watch('modelSize') || '1.7B'}`
+                      }
+                      onValueChange={(value) => {
+                        if (value === 'luxtts') {
+                          form.setValue('engine', 'luxtts');
+                        } else if (value === 'chatterbox') {
+                          form.setValue('engine', 'chatterbox');
+                        } else {
+                          const [, modelSize] = value.split(':');
+                          form.setValue('engine', 'qwen');
+                          form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                        }
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="qwen:1.7B" className="text-xs text-muted-foreground">
+                          Qwen3-TTS 1.7B
+                        </SelectItem>
+                        <SelectItem value="qwen:0.6B" className="text-xs text-muted-foreground">
+                          Qwen3-TTS 0.6B
+                        </SelectItem>
+                        <SelectItem value="luxtts" className="text-xs text-muted-foreground">
+                          LuxTTS
+                        </SelectItem>
+                        <SelectItem value="chatterbox" className="text-xs text-muted-foreground">
+                          Chatterbox
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
                 </div>
               </motion.div>
             </AnimatePresence>
