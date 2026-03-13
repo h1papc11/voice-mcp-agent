@@ -3,7 +3,7 @@ import { create } from 'zustand';
 interface GenerationState {
   /** IDs of generations currently in progress */
   pendingGenerationIds: Set<string>;
-  /** Whether any generation is in progress (derived convenience) */
+  /** Whether any generation is in progress (derived from pendingGenerationIds) */
   isGenerating: boolean;
   /** Map of generationId → storyId for deferred story additions */
   pendingStoryAdds: Map<string, string>;
@@ -11,8 +11,6 @@ interface GenerationState {
   removePendingGeneration: (id: string) => void;
   addPendingStoryAdd: (generationId: string, storyId: string) => void;
   removePendingStoryAdd: (generationId: string) => string | undefined;
-  /** Legacy setter for backward compat with useRestoreActiveTasks */
-  setIsGenerating: (generating: boolean) => void;
   setActiveGenerationId: (id: string | null) => void;
   activeGenerationId: string | null;
 }
@@ -56,6 +54,5 @@ export const useGenerationStore = create<GenerationState>((set, get) => ({
     return storyId;
   },
 
-  setIsGenerating: (generating) => set({ isGenerating: generating }),
   setActiveGenerationId: (id) => set({ activeGenerationId: id }),
 }));

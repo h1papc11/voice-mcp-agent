@@ -8,7 +8,7 @@ import { useServerStore } from '@/stores/serverStore';
 
 interface GenerationStatusEvent {
   id: string;
-  status: 'generating' | 'completed' | 'failed';
+  status: 'generating' | 'completed' | 'failed' | 'not_found';
   duration?: number;
   error?: string;
 }
@@ -36,6 +36,17 @@ export function useGenerationProgress() {
 
   // Track active EventSource instances
   const eventSourcesRef = useRef<Map<string, EventSource>>(new Map());
+
+  // Unmount-only cleanup — close all SSE connections when the hook is torn down
+  useEffect(() => {
+    const sources = eventSourcesRef.current;
+    return () => {
+      for (const source of sources.values()) {
+        source.close();
+      }
+      sources.clear();
+    };
+  }, []);
 
   useEffect(() => {
     const currentSources = eventSourcesRef.current;
@@ -103,7 +114,7 @@ export function useGenerationProgress() {
               const genAudioUrl = apiClient.getAudioUrl(id);
               setAudioWithAutoPlay(genAudioUrl, id, '', '');
             }
-          } else if (data.status === 'failed') {
+          } else if (data.status === 'failed' || data.status === 'not_found') {
             source.close();
             currentSources.delete(id);
             removePendingGeneration(id);
@@ -112,7 +123,7 @@ export function useGenerationProgress() {
             queryClient.invalidateQueries({ queryKey: ['history'] });
 
             toast({
-              title: 'Generation failed',
+              title: data.status === 'not_found' ? 'Generation not found' : 'Generation failed',
               description: data.error || 'An error occurred during generation',
               variant: 'destructive',
             });
@@ -132,14 +143,6 @@ export function useGenerationProgress() {
 
       currentSources.set(id, source);
     }
-
-    return () => {
-      // Cleanup on unmount
-      for (const source of currentSources.values()) {
-        source.close();
-      }
-      currentSources.clear();
-    };
   }, [
     pendingIds,
     removePendingGeneration,

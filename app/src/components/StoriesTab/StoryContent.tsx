@@ -58,6 +58,7 @@ export function StoryContent() {
     const query = searchQuery.toLowerCase();
     return historyData.items.filter(
       (gen) =>
+        gen.status === 'completed' &&
         !storyGenerationIds.has(gen.id) &&
         (gen.text.toLowerCase().includes(query) || gen.profile_name.toLowerCase().includes(query)),
     );
