@@ -14,7 +14,6 @@ import {
   Scale,
   Trash2,
   X,
-  Zap,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -389,7 +388,7 @@ export function ModelManagement() {
                         ) : isDownloading ? (
                           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                         ) : model.loaded ? (
-                          <Zap className="h-4 w-4 text-primary" />
+                          <CircleCheck className="h-4 w-4 text-accent" />
                         ) : model.downloaded ? (
                           <CircleCheck className="h-4 w-4 text-emerald-500" />
                         ) : (
@@ -426,11 +425,11 @@ export function ModelManagement() {
                           </Badge>
                         )}
                         {model.loaded && (
-                          <Badge variant="default" className="text-[10px] h-5">
-                            Active
+                          <Badge className="text-[10px] h-5 bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
+                            Loaded
                           </Badge>
                         )}
-                        {model.downloaded && !model.loaded && !isDownloading && !hasError && (
+                        {model.downloaded && !isDownloading && !hasError && (
                           <span className="text-xs text-muted-foreground">
                             {formatSize(model.size_mb)}
                           </span>
@@ -538,9 +537,9 @@ export function ModelManagement() {
                 {/* Status badges */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {freshSelectedModel.loaded && (
-                    <Badge variant="default" className="text-xs">
-                      <Zap className="h-3 w-3 mr-1" />
-                      Loaded in memory
+                    <Badge className="text-xs bg-accent/15 text-accent border-accent/30 hover:bg-accent/15">
+                      <CircleCheck className="h-3 w-3 mr-1" />
+                      Loaded
                     </Badge>
                   )}
                   {freshSelectedModel.downloaded && !freshSelectedModel.loaded && (
