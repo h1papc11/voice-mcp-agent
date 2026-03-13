@@ -108,7 +108,14 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       const audioUrl = apiClient.getAudioUrl(result.id);
       setAudioWithAutoPlay(audioUrl, result.id, selectedProfileId, data.text.substring(0, 50));
 
-      form.reset();
+      form.reset({
+        text: '',
+        language: data.language,
+        seed: undefined,
+        modelSize: data.modelSize,
+        instruct: '',
+        engine: data.engine,
+      });
       options.onSuccess?.(result.id);
     } catch (error) {
       toast({

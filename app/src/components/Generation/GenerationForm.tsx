@@ -104,11 +104,19 @@ export function GenerationForm() {
               <FormItem>
                 <FormLabel>Model</FormLabel>
                 <Select
-                  value={`${form.watch('engine') || 'qwen'}:${form.watch('modelSize') || '1.7B'}`}
+                  value={
+                    form.watch('engine') === 'luxtts'
+                      ? 'luxtts'
+                      : `qwen:${form.watch('modelSize') || '1.7B'}`
+                  }
                   onValueChange={(value) => {
-                    const [engine, modelSize] = value.split(':');
-                    form.setValue('engine', engine as 'qwen' | 'luxtts');
-                    if (modelSize) form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                    if (value === 'luxtts') {
+                      form.setValue('engine', 'luxtts');
+                    } else {
+                      const [, modelSize] = value.split(':');
+                      form.setValue('engine', 'qwen');
+                      form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                    }
                   }}
                 >
                   <FormControl>
@@ -119,7 +127,7 @@ export function GenerationForm() {
                   <SelectContent>
                     <SelectItem value="qwen:1.7B">Qwen3-TTS 1.7B</SelectItem>
                     <SelectItem value="qwen:0.6B">Qwen3-TTS 0.6B</SelectItem>
-                    <SelectItem value="luxtts:default">LuxTTS</SelectItem>
+                    <SelectItem value="luxtts">LuxTTS</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>

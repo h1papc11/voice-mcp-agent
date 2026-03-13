@@ -404,11 +404,19 @@ export function FloatingGenerateBox({
 
                   <FormItem className="flex-1 space-y-0">
                     <Select
-                      value={`${form.watch('engine') || 'qwen'}:${form.watch('modelSize') || '1.7B'}`}
+                      value={
+                        form.watch('engine') === 'luxtts'
+                          ? 'luxtts'
+                          : `qwen:${form.watch('modelSize') || '1.7B'}`
+                      }
                       onValueChange={(value) => {
-                        const [engine, modelSize] = value.split(':');
-                        form.setValue('engine', engine as 'qwen' | 'luxtts');
-                        if (modelSize) form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                        if (value === 'luxtts') {
+                          form.setValue('engine', 'luxtts');
+                        } else {
+                          const [, modelSize] = value.split(':');
+                          form.setValue('engine', 'qwen');
+                          form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                        }
                       }}
                     >
                       <FormControl>
@@ -423,10 +431,7 @@ export function FloatingGenerateBox({
                         <SelectItem value="qwen:0.6B" className="text-xs text-muted-foreground">
                           Qwen3-TTS 0.6B
                         </SelectItem>
-                        <SelectItem
-                          value="luxtts:default"
-                          className="text-xs text-muted-foreground"
-                        >
+                        <SelectItem value="luxtts" className="text-xs text-muted-foreground">
                           LuxTTS
                         </SelectItem>
                       </SelectContent>
