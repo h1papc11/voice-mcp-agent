@@ -84,8 +84,8 @@ if __name__ == "__main__":
             os.environ["VOICEBOX_BACKEND_VARIANT"] = "cuda"
             logger.info("Backend variant: CUDA")
         else:
-            os.environ.setdefault("VOICEBOX_BACKEND_VARIANT", "cpu")
-            logger.info(f"Backend variant: {os.environ['VOICEBOX_BACKEND_VARIANT']}")
+            os.environ["VOICEBOX_BACKEND_VARIANT"] = "cpu"
+            logger.info("Backend variant: CPU")
 
         logger.info(f"Parsed arguments: host={args.host}, port={args.port}, data_dir={args.data_dir}")
 

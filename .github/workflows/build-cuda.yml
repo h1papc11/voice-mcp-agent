@@ -33,7 +33,8 @@ jobs:
           pip install torchaudio --index-url https://download.pytorch.org/whl/cu121
 
       - name: Verify CUDA support in torch
-        run: python -c "import torch; print(f'CUDA available in build: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
+        run: |
+          python -c "import torch; print(f'CUDA available in build: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
 
       - name: Build CUDA server binary
         shell: bash

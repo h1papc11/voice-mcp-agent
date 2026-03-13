@@ -126,8 +126,8 @@ async def download_cuda_binary(version: Optional[str] = None):
                     # Format: "sha256hex  filename\n"
                     expected_sha = sha_resp.text.strip().split()[0]
                     logger.info(f"Expected SHA-256: {expected_sha[:16]}...")
-            except Exception:
-                logger.warning("Could not fetch checksum file — skipping verification")
+            except Exception as e:
+                logger.warning(f"Could not fetch checksum file — skipping verification: {e}")
 
             # Download and concatenate parts
             total_downloaded = 0
@@ -169,10 +169,8 @@ async def download_cuda_binary(version: Optional[str] = None):
                 )
             logger.info(f"Integrity verified: {actual[:16]}...")
 
-        # Atomic move into place
-        if final_path.exists():
-            final_path.unlink()
-        temp_path.rename(final_path)
+        # Atomic move into place (replace handles existing target on all platforms)
+        temp_path.replace(final_path)
 
         # Make executable on Unix
         if sys.platform != "win32":
