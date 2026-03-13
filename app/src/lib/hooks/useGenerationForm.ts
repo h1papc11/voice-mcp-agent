@@ -16,7 +16,7 @@ const generationSchema = z.object({
   seed: z.number().int().optional(),
   modelSize: z.enum(['1.7B', '0.6B']).optional(),
   instruct: z.string().max(500).optional(),
-  engine: z.enum(['qwen', 'luxtts', 'chatterbox']).optional(),
+  engine: z.enum(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo']).optional(),
 });
 
 export type GenerationFormValues = z.infer<typeof generationSchema>;
@@ -75,15 +75,19 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
           ? 'luxtts'
           : engine === 'chatterbox'
             ? 'chatterbox-tts'
-            : `qwen-tts-${data.modelSize}`;
+            : engine === 'chatterbox_turbo'
+              ? 'chatterbox-turbo'
+              : `qwen-tts-${data.modelSize}`;
       const displayName =
         engine === 'luxtts'
           ? 'LuxTTS'
           : engine === 'chatterbox'
             ? 'Chatterbox TTS'
-            : data.modelSize === '1.7B'
-              ? 'Qwen TTS 1.7B'
-              : 'Qwen TTS 0.6B';
+            : engine === 'chatterbox_turbo'
+              ? 'Chatterbox Turbo'
+              : data.modelSize === '1.7B'
+                ? 'Qwen TTS 1.7B'
+                : 'Qwen TTS 0.6B';
 
       try {
         const modelStatus = await apiClient.getModelStatus();

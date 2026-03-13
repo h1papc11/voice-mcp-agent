@@ -1,6 +1,6 @@
 # Voicebox Project Status & Roadmap
 
-> Last updated: 2026-03-12 | Current version: **v0.1.13** | 13.1k stars | 176 open issues | 28 open PRs
+> Last updated: 2026-03-13 | Current version: **v0.1.13** | 13.1k stars | ~176 open issues | 25 open PRs
 
 ---
 
@@ -30,14 +30,18 @@
 │                         │ HTTP :17493                │
 │  ┌──────────────────────▼────────────────────────┐  │
 │  │  FastAPI Backend (backend/)                   │  │
-│  │  ┌─────────────┐  ┌───────────┐  ┌─────────┐ │  │
-│  │  │ TTSBackend  │  │ STTBackend│  │ Profiles│ │  │
-│  │  │ (Protocol)  │  │ (Whisper) │  │ History │ │  │
-│  │  │  ┌────────┐ │  └───────────┘  │ Stories │ │  │
-│  │  │  │PyTorch │ │                  └─────────┘ │  │
-│  │  │  │or MLX  │ │                              │  │
-│  │  │  └────────┘ │                              │  │
-│  │  └─────────────┘                              │  │
+│  │  ┌─────────────────────────────────────────┐  │  │
+│  │  │ TTSBackend Protocol                     │  │  │
+│  │  │  ┌──────────┐ ┌───────┐ ┌───────────┐  │  │  │
+│  │  │  │ Qwen3-TTS│ │LuxTTS │ │Chatterbox │  │  │  │
+│  │  │  │(Py/MLX)  │ │       │ │(MTL+Turbo)│  │  │  │
+│  │  │  └──────────┘ └───────┘ └───────────┘  │  │  │
+│  │  └─────────────────────────────────────────┘  │  │
+│  │  ┌───────────┐  ┌─────────┐                   │  │
+│  │  │ STTBackend│  │ Profiles│                   │  │
+│  │  │ (Whisper) │  │ History │                   │  │
+│  │  └───────────┘  │ Stories │                   │  │
+│  │                  └─────────┘                   │  │
 │  └───────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
@@ -46,130 +50,179 @@
 
 | Layer | File | Purpose |
 |-------|------|---------|
-| Backend entry | `backend/main.py` | FastAPI app, all API routes (~1700 lines) |
+| Backend entry | `backend/main.py` | FastAPI app, all API routes (~2100 lines) |
 | TTS protocol | `backend/backends/__init__.py:14-81` | `TTSBackend` Protocol definition |
-| TTS factory | `backend/backends/__init__.py:118-137` | Singleton backend selection (MLX vs PyTorch) |
+| TTS factory | `backend/backends/__init__.py:138-178` | Thread-safe engine registry (double-checked locking) |
 | PyTorch TTS | `backend/backends/pytorch_backend.py` | Qwen3-TTS via `qwen_tts` package |
 | MLX TTS | `backend/backends/mlx_backend.py` | Qwen3-TTS via `mlx_audio.tts` |
+| LuxTTS | `backend/backends/luxtts_backend.py` | LuxTTS — fast, CPU-friendly |
+| Chatterbox MTL | `backend/backends/chatterbox_backend.py` | Chatterbox Multilingual — 23 languages |
+| Chatterbox Turbo | `backend/backends/chatterbox_turbo_backend.py` | Chatterbox Turbo — English, paralinguistic tags |
 | Platform detect | `backend/platform_detect.py` | Apple Silicon → MLX, else → PyTorch |
 | API types | `backend/models.py` | Pydantic request/response models |
+| HF progress | `backend/utils/hf_progress.py` | HFProgressTracker (tqdm patching for download progress) |
+| Audio utils | `backend/utils/audio.py` | `trim_tts_output()`, normalize, load/save audio |
 | Frontend API | `app/src/lib/api/client.ts` | Hand-written fetch wrapper |
 | Frontend types | `app/src/lib/api/types.ts` | TypeScript API types |
 | Generation form | `app/src/components/Generation/GenerationForm.tsx` | TTS generation UI |
-| Model manager | `app/src/components/ServerSettings/ModelManagement.tsx` | Model download/status UI |
+| Floating gen box | `app/src/components/Generation/FloatingGenerateBox.tsx` | Compact generation UI |
+| Model manager | `app/src/components/ServerSettings/ModelManagement.tsx` | Model download/status/progress UI |
+| GPU acceleration | `app/src/components/ServerSettings/GpuAcceleration.tsx` | CUDA backend swap UI |
 | Gen form hook | `app/src/lib/hooks/useGenerationForm.ts` | Form validation + submission |
+| Language constants | `app/src/lib/constants/languages.ts` | Per-engine language maps |
 
 ### How TTS Generation Works (Current Flow)
 
 ```
 POST /generate
   1. Look up voice profile from DB
-  2. Check model cache → if missing, trigger background download, return HTTP 202
-  3. Load model (lazy): tts_backend.load_model(model_size)
-  4. Create voice prompt: profiles.create_voice_prompt_for_profile()
+  2. Resolve engine from request (qwen | luxtts | chatterbox | chatterbox_turbo)
+  3. Get backend: get_tts_backend_for_engine(engine)  # thread-safe singleton per engine
+  4. Check model cache → if missing, trigger background download, return HTTP 202
+  5. Load model (lazy): tts_backend.load_model(model_size)
+  6. Create voice prompt: profiles.create_voice_prompt_for_profile(engine=engine)
        → tts_backend.create_voice_prompt(audio_path, reference_text)
-  5. Generate: tts_backend.generate(text, voice_prompt, language, seed, instruct)
-  6. Save WAV → data/generations/{id}.wav
-  7. Insert history record in SQLite
-  8. Return GenerationResponse
+  7. Generate: tts_backend.generate(text, voice_prompt, language, seed, instruct)
+  8. Post-process: trim_tts_output() for Chatterbox engines
+  9. Save WAV → data/generations/{id}.wav
+  10. Insert history record in SQLite
+  11. Return GenerationResponse
 ```
 
 ---
 
 ## Current State
 
-### What's Shipped (v0.1.13)
+### What's Shipped (v0.1.13 + recent merges)
 
+**Core TTS:**
 - Qwen3-TTS voice cloning (1.7B and 0.6B models)
 - MLX backend for Apple Silicon, PyTorch for everything else
+- Multi-engine TTS architecture with thread-safe backend registry (PR #254)
+- LuxTTS integration — fast, CPU-friendly English TTS (PR #254)
+- Chatterbox Multilingual TTS — 23 languages including Hebrew (PR #257)
+- Delivery instructions (instruct parameter, Qwen only)
+- Single flat model dropdown (Qwen 1.7B, Qwen 0.6B, LuxTTS, Chatterbox, Chatterbox Turbo)
+
+**Infrastructure:**
+- CUDA backend swap via binary download and restart (PR #252)
+- GPU acceleration settings UI
 - Voice profiles with multi-sample support
 - Stories editor (multi-track DAW timeline)
 - Whisper transcription (base, small, medium, large variants)
-- Model management UI with download progress (SSE)
+- Model management UI with inline download progress bars (HFProgressTracker)
+- Download cancel/clear UI with error panel (PR #238)
 - Generation history with caching
 - Streaming generation endpoint (MLX only)
-- Delivery instructions (instruct parameter)
+- Duplicate profile name validation (PR #175)
+- Linux NVIDIA GBM buffer + WebKitGTK microphone fix (PR #210)
 
-### What's NOT Shipped But Has Code
+### What's In-Flight
 
-| Feature | Branch | Status |
-|---------|--------|--------|
-| External provider binaries (CUDA split) | `external-provider-binaries` | PR #33, significant work done, stale since Feb |
-| Dual server binaries | `feat/dual-server-binaries` | Branch exists, no PR |
-| Multi-sample fix | `fix-multi-sample` | Branch exists, no PR |
-| Model download notification fix | `fix-dl-notification-...` | Branch exists, no PR |
+| Feature | Branch/PR | Status |
+|---------|-----------|--------|
+| Chatterbox Turbo + per-engine language lists | `feat/chatterbox-turbo` / PR #258 | Open, ready for review |
 
-### Hardcoded Qwen3-TTS Assumptions
+### TTS Engine Comparison
 
-These are the specific coupling points that block multi-model support:
+| Engine | Model Name | Languages | Size | Key Features |
+|--------|-----------|-----------|------|-------------|
+| Qwen3-TTS 1.7B | `qwen-tts-1.7B` | 10 (zh, en, ja, ko, de, fr, ru, pt, es, it) | ~3.5 GB | Instruct mode, highest quality |
+| Qwen3-TTS 0.6B | `qwen-tts-0.6B` | 10 | ~1.2 GB | Lighter, faster |
+| LuxTTS | `luxtts` | English | ~300 MB | CPU-friendly, 48 kHz, fast |
+| Chatterbox | `chatterbox-tts` | 23 (incl. Hebrew, Arabic, Hindi, etc.) | ~3.2 GB | Zero-shot cloning, multilingual |
+| Chatterbox Turbo | `chatterbox-turbo` | English | ~1.5 GB | Paralinguistic tags ([laugh], [cough]), 350M params, low latency |
 
-| Location | What's Hardcoded |
-|----------|-----------------|
-| `backend/models.py:58` | `model_size` regex: `^(1\.7B\|0\.6B)$` |
-| `backend/main.py:611` | Default: `model_size or "1.7B"` |
-| `backend/main.py:1322-1365` | Model status list (2 Qwen + 4 Whisper) |
-| `backend/main.py:1523-1548` | Download trigger map |
-| `backend/main.py:1597-1628` | Delete map |
-| `backend/backends/pytorch_backend.py:65-68` | HF repo ID map |
-| `backend/backends/mlx_backend.py:41-44` | MLX repo ID map |
-| `backend/backends/__init__.py:118-137` | Single global TTS backend |
-| `app/src/lib/hooks/useGenerationForm.ts:17` | `modelSize: z.enum(['1.7B', '0.6B'])` |
-| `app/src/lib/hooks/useGenerationForm.ts:70-71` | `modelName = "qwen-tts-${data.modelSize}"` |
-| `app/src/components/Generation/GenerationForm.tsx:140-141` | Hardcoded "Qwen TTS" labels |
-| `app/src/components/ServerSettings/ModelManagement.tsx:166-213` | Filters by `qwen-tts` and `whisper` prefix |
-| `backend/utils/cache.py` | Voice prompt cache uses `torch.save()` |
+### Multi-Engine Architecture (Shipped)
+
+The singleton TTS backend blocker described in the previous version of this doc has been **resolved**. The architecture now supports:
+
+- **Thread-safe backend registry** (`_tts_backends` dict + `_tts_backends_lock`) with double-checked locking
+- **Per-engine backend instances** — each engine gets its own singleton, loaded lazily
+- **Engine field on GenerationRequest** — frontend sends `engine: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo'`
+- **Per-engine language filtering** — `ENGINE_LANGUAGES` map in frontend, backend regex accepts all languages
+- **Per-engine voice prompts** — `create_voice_prompt_for_profile()` dispatches to the correct backend
+- **Trim post-processing** — `trim_tts_output()` for Chatterbox engines (cuts trailing silence/hallucination)
+
+### Known Limitations
+
+- **HF XET progress**: Large files downloaded via `hf-xet` (HuggingFace's new transfer backend) report `n=0` in tqdm updates. Progress bars may appear stuck for large `.safetensors` files even though the download is proceeding. This is a known upstream limitation.
+- **Chatterbox Turbo upstream token bug**: `from_pretrained()` passes `token=os.getenv("HF_TOKEN") or True` which fails without a stored HF token. Our backend works around this by calling `snapshot_download(token=None)` + `from_local()`.
+- **chatterbox-tts must install with `--no-deps`**: It pins `numpy<1.26`, `torch==2.6.0`, `transformers==4.46.3` — all incompatible with our stack (Python 3.12, torch 2.10, transformers 4.57.3). Sub-deps listed explicitly in `requirements.txt`.
+- **Streaming generation** only works for Qwen on MLX. Other engines use the non-streaming `/generate` endpoint.
+- **dicta-onnx** (Hebrew diacritization) not included — upstream Chatterbox bug requires `model_path` arg but calls `Dicta()` with none. Hebrew works fine without it.
 
 ---
 
 ## Open PRs — Triage & Analysis
 
+### Recently Merged (Since Last Update)
+
+| PR | Title | Merged |
+|----|-------|--------|
+| **#257** | feat: Chatterbox TTS engine with multilingual voice cloning | 2026-03-13 |
+| **#254** | feat: LuxTTS integration — multi-engine TTS support | 2026-03-13 |
+| **#252** | feat: CUDA backend swap via binary download and restart | 2026-03-13 |
+| **#238** | Download cancel/clear UI, fixed model downloading | 2026-03-13 |
+| **#250** | docs: align local API port examples | 2026-03-13 |
+| **#210** | fix: Linux NVIDIA GBM buffer crash | 2026-03-13 |
+| **#175** | Fix #134: duplicate profile name validation | 2026-03-13 |
+
+### In-Flight (Our Work)
+
+| PR | Title | Status | Notes |
+|----|-------|--------|-------|
+| **#258** | feat: Chatterbox Turbo engine + per-engine language lists | Open | Ready for review. Adds Turbo engine + dynamic language dropdown. |
+
 ### Merge-Ready / Near-Ready (Bug Fixes & Small Features)
 
 | PR | Title | Risk | Notes |
 |----|-------|------|-------|
-| **#250** | docs: align local API port examples | None | Docs-only |
 | **#230** | docs: fix README grammar | None | Docs-only |
 | **#243** | a11y: screen reader and keyboard improvements | Low | Accessibility, no backend changes |
-| **#175** | Fix #134: duplicate profile name validation | Low | Simple validation |
 | **#178** | Fix #168 #140: generation error handling | Low | Error handling improvements |
 | **#152** | Fix: prevent crashes when HuggingFace unreachable | Medium | Monkey-patches HF hub; solves real offline bug (#150, #151) |
 | **#218** | fix: unify qwen tts cache dir on Windows | Low | Windows-specific path fix |
 | **#214** | fix: panic on launch from tokio::spawn | Low | Rust-side Tauri fix |
-| **#210** | fix: Linux NVIDIA GBM buffer crash | Low | Linux-specific, narrowly scoped |
 | **#88** | security: restrict CORS to known local origins | Low | Security hardening |
+| **#133** | feat: network access toggle | Low | Wires up existing plumbing |
 
 ### Significant Feature PRs
 
-| PR | Title | Complexity | Dependencies | Notes |
-|----|-------|-----------|--------------|-------|
-| **#97** | fix: pass language parameter to TTS models | Medium | None | **Critical bug** — language param was silently dropped. Adds `LANGUAGE_CODE_TO_NAME` mapping to both backends. Should be high priority. |
-| **#133** | feat: network access toggle | Low | None | Wires up existing plumbing (`--host 0.0.0.0`). Clean, small. |
-| **#238** | download cancel/clear UI + error panel | Medium | None | Adds cancel buttons, VS Code-style Problems panel, fixes whisper-large repo. Quality-of-life win. |
-| **#99** | feat: chunked TTS with quality selector | Medium | None | Solves the 500-char/2048-token limit. Sentence-aware splitting, crossfade concat, 44.1kHz upsampling. Addresses #191, #203, #69, #111. |
-| **#154** | feat: Audiobook tab | Medium | Depends on #99 concepts | Full audiobook workflow — chunked gen, preview, auto-save to Stories. New route + tab. |
-| **#91** | fix: CoreAudio device enumeration | Medium | None | macOS audio device handling. |
+| PR | Title | Complexity | Notes |
+|----|-------|-----------|-------|
+| **#253** | Enhance speech tokenizer with 48kHz version | Medium | Qwen tokenizer upgrade |
+| **#97** | fix: pass language parameter to TTS models | Medium | May be partially obsoleted by multi-engine work — needs review |
+| **#99** | feat: chunked TTS with quality selector | Medium | Solves 500-char limit. Addresses #191, #203, #69, #111. |
+| **#154** | feat: Audiobook tab | Medium | Full audiobook workflow. Depends on #99 concepts. |
+| **#91** | fix: CoreAudio device enumeration | Medium | macOS audio device handling |
 
 ### Architectural PRs (Need Careful Review)
 
 | PR | Title | Complexity | Notes |
 |----|-------|-----------|-------|
-| **#33** | CUDA GPU Support — External Provider Binaries | **Very High** | The big one. Splits monolithic backend into main app + downloadable provider executables (PyTorch CPU, CUDA). New provider management system, CI/CD for R2 uploads, provider settings UI. Created Feb 1, significant codebase. **This is the foundation for multi-model support** but is currently Qwen-only. |
-| **#225** | feat: custom HuggingFace model support | High | Adds `custom_models.py`, `custom:<slug>` model IDs, frontend model grouping (Built-in vs Custom). **Takes a different approach than #33** — keeps single backend but allows arbitrary HF repos. These two PRs may conflict architecturally. |
-| **#194** | feat: Hebrew + Chatterbox TTS | High | **First non-Qwen TTS model.** Adds `ChatterboxTTSBackend` alongside existing backends. Routes by language (`he` → Chatterbox, else → Qwen). Adds Hebrew Whisper models. Includes a lot of cleanup. Important precedent for multi-model. |
-| **#195** | feat: per-profile LoRA fine-tuning | **Very High** | Depends on #194. Training pipeline, adapter management, SSE progress, 15 new API endpoints. New DB tables. Forces PyTorch even on MLX systems for adapter inference. |
-| **#161** | feat: Docker + web deployment | High | 3-stage Dockerfile, SPA serving from FastAPI, docker-compose. Implements the Docker deployment plan. |
-| **#124** | Add Dockerfiles + docker-compose + docs | Medium | Earlier, simpler Docker attempt. Overlaps with #161. |
-| **#123** | added docker | Low | Minimal Docker PR. Overlaps with #161 and #124. |
-| **#227** | fix: harden input validation & file safety | Medium | Follow-up to #225. Atomic writes, threading locks, input validation. Good hardening but coupled to the custom models feature. |
+| **#225** | feat: custom HuggingFace model support | High | Arbitrary HF repo loading. May need rework given multi-engine arch is now shipped. |
+| **#194** | feat: Hebrew + Chatterbox TTS | High | **Superseded** by PR #257 which shipped Chatterbox multilingual (23 langs incl. Hebrew). May be closeable. |
+| **#195** | feat: per-profile LoRA fine-tuning | Very High | Training pipeline, adapter management, 15 new endpoints. Depends on #194 (now superseded). |
+| **#161** | feat: Docker + web deployment | High | 3-stage Dockerfile, SPA serving. Independent of TTS engine work. |
+| **#124** / **#123** | Docker (simpler attempts) | Low-Medium | Overlap with #161 |
+| **#227** | fix: harden input validation & file safety | Medium | Coupled to #225 (custom models) |
 
 ### PRs That Need Author Action / Are Stale
 
 | PR | Title | Notes |
 |----|-------|-------|
-| **#237** | fix: bundle qwen_tts source files in PyInstaller | Solves #212 but needs review for build system impact |
+| **#237** | fix: bundle qwen_tts source files in PyInstaller | Build system, needs review |
 | **#215** | Update prerequisites with Tauri deps | Branch is `main` — will have conflicts |
 | **#89** | Linux Support | Branch is `main` — will have conflicts. Broad scope. |
 | **#83** | Update download links for v0.1.12 | Outdated (we're on v0.1.13) |
+
+### PRs Likely Superseded
+
+| PR | Superseded By | Notes |
+|----|--------------|-------|
+| **#194** (Hebrew + Chatterbox) | PR #257 (merged) | #257 ships Chatterbox multilingual with 23 languages including Hebrew. #194 took a different approach (route by language). Can likely be closed. |
+| **#33** (External provider binaries) | PR #252 (merged) | #252 shipped CUDA backend swap. #33's broader provider architecture may still have value but needs reassessment. |
 
 ---
 
@@ -186,15 +239,15 @@ The single most reported category. Users on Windows with NVIDIA GPUs frequently 
 
 **Key issues:** #239, #222, #220, #217, #208, #198, #192, #167, #164, #141, #130, #127
 
-**Fix path:** PR #33 (external provider binaries) is designed to solve this. Ship a small main app, let users download the CUDA provider separately.
+**Fix path:** PR #252 (CUDA backend swap) is now merged. Users can download the CUDA binary separately from the GPU acceleration settings. Many of these issues may now be resolvable — needs triage to confirm.
 
 ### Model Downloads (20 issues)
 
-Second most reported. Users get stuck downloads, can't resume, no cancel button, no offline fallback.
+Second most reported. Users get stuck downloads, can't resume, no offline fallback.
 
 **Key issues:** #249, #240, #221, #216, #212, #181, #180, #159, #150, #149, #145, #143, #135, #134
 
-**Fix path:** PR #238 (cancel/clear UI), PR #152 (offline crash fix). Resume support not yet addressed.
+**Fix path:** PR #238 (cancel/clear UI) is now merged. PR #152 (offline crash fix) still open. Inline progress bars now show for all engines. Resume support not yet addressed.
 
 ### Language Requests (18 issues)
 
@@ -202,7 +255,7 @@ Strong demand for: Hindi (#245), Indonesian (#247), Dutch (#236), Hebrew (#199),
 
 **Key issues:** #247, #245, #236, #211, #205, #199, #189, #188, #187, #183, #179, #162
 
-**Fix path:** PR #97 (pass language param — currently silently dropped!) is the prerequisite. Qwen3-TTS already supports many languages; the bug is that the language code isn't forwarded. Multi-model (#194 Chatterbox for Hebrew) expands coverage further.
+**Fix path:** Chatterbox Multilingual (merged via #257) now supports 23 languages including many of the requested ones: Arabic, Danish, German, Greek, Finnish, Hebrew, Hindi, Dutch, Norwegian, Polish, Swedish, Swahili, Turkish. Per-engine language filtering (PR #258) ensures the UI shows correct options. Several of these issues may be closeable.
 
 ### New Model Requests (5 explicit issues)
 
@@ -214,7 +267,7 @@ Strong demand for: Hindi (#245), Indonesian (#247), Dutch (#236), Hebrew (#199),
 | #132 | LavaSR (transcription) |
 | #76 | (General model expansion) |
 
-Community is also vocally requesting: LuxTTS, Chatterbox, XTTS-v2, Fish Speech, CosyVoice, Kokoro on social media and in issue comments.
+Community also requests: XTTS-v2, Fish Speech, CosyVoice, Kokoro. The multi-engine architecture is now in place, making new model integration significantly easier.
 
 ### Long-Form / Chunking (5 issues)
 
@@ -255,17 +308,14 @@ Notable requests:
 
 | Document | Target Version | Status | Relevance |
 |----------|---------------|--------|-----------|
-| `TTS_PROVIDER_ARCHITECTURE.md` | v0.1.13 | **Partially implemented** in PR #33 | Core architecture for multi-model + CUDA distribution |
-| `EXTERNAL_PROVIDERS.md` | v0.2.0 | **Not started** | Remote server support. API path inconsistency with provider arch doc (`/v1/` vs `/tts/`) |
-| `MLX_AUDIO.md` | — | **Shipped** (the only one) | MLX backend is live. 0.6B MLX model still missing. |
-| `DOCKER_DEPLOYMENT.md` | v0.2.0 | **PR exists** (#161) | Waiting on review. No official images published. |
-| `OPENAI_SUPPORT.md` | v0.2.0 | **Not started** | OpenAI-compatible API layer. Linked to issue #10. Low complexity. |
-
-### Cross-Document Conflicts
-
-1. **API path inconsistency:** Provider arch uses `/tts/generate`, External providers uses `/v1/generate`, OpenAI compat uses `/v1/audio/speech`. Need to reconcile.
-2. **Docker vs. Provider split:** Docker doc assumes monolithic backend. Provider arch splits into separate binaries. Need to decide: does Docker run the monolith or individual providers?
-3. **Version targeting:** Provider arch targets v0.1.13 (current!) but isn't merged. Everything else targets v0.2.0.
+| `TTS_PROVIDER_ARCHITECTURE.md` | v0.1.13 | **Partially superseded** by multi-engine arch + CUDA swap | Core concepts implemented differently than planned |
+| `CUDA_BACKEND_SWAP.md` | — | **Shipped** (PR #252) | CUDA binary download + backend restart |
+| `CUDA_BACKEND_SWAP_FINAL.md` | — | **Shipped** (PR #252) | Final implementation plan |
+| `EXTERNAL_PROVIDERS.md` | v0.2.0 | **Not started** | Remote server support |
+| `MLX_AUDIO.md` | — | **Shipped** | MLX backend is live |
+| `DOCKER_DEPLOYMENT.md` | v0.2.0 | **PR exists** (#161) | Waiting on review |
+| `OPENAI_SUPPORT.md` | v0.2.0 | **Not started** | OpenAI-compatible API layer |
+| `PR33_CUDA_PROVIDER_REVIEW.md` | — | **Reference** | Analysis of the original provider approach |
 
 ---
 
@@ -273,135 +323,95 @@ Notable requests:
 
 ### Models Worth Supporting (2026 SOTA)
 
-| Model | Cloning | Speed | Sample Rate | Languages | VRAM | Integration Ease | Repo |
-|-------|---------|-------|-------------|-----------|------|-----------------|------|
-| **LuxTTS** | 3s zero-shot | 150x RT, CPU ok | 48 kHz | English-first | <1 GB | Easy | `ysharma3501/LuxTTS` |
-| **Chatterbox** | 5s zero-shot | Sub-200ms streaming | 24-48 kHz | 23+ | Low | Medium | `resemble-ai/chatterbox` |
-| **XTTS-v2** | 6s zero-shot | Fast mid-GPU | 24 kHz | 17+ | Medium | Medium | `coqui/XTTS-v2` |
-| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | Medium | `fishaudio/fish-speech` |
-| **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | Easy | Alibaba HF org |
-| **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny | Medium | Kokoro repo |
+| Model | Cloning | Speed | Sample Rate | Languages | VRAM | Integration Ease | Status |
+|-------|---------|-------|-------------|-----------|------|-----------------|--------|
+| **Qwen3-TTS** | 10s zero-shot | Medium | 24 kHz | 10 | Medium | **Shipped** | v0.1.13 |
+| **LuxTTS** | 3s zero-shot | 150x RT, CPU ok | 48 kHz | English | <1 GB | **Shipped** | PR #254 |
+| **Chatterbox MTL** | 5s zero-shot | Medium | 24 kHz | 23 | Medium | **Shipped** | PR #257 |
+| **Chatterbox Turbo** | 5s zero-shot | Fast | 24 kHz | English | Low | **PR #258** | In review |
+| **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Ready | Multi-engine arch in place |
+| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | Ready | Multi-engine arch in place |
+| **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | Ready | Multi-engine arch in place |
+| **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny | Ready | Multi-engine arch in place |
 
-### What's Needed Architecturally for Multi-Model
+### Adding a New Engine (Now Straightforward)
 
-The current codebase assumes one TTS model family (Qwen3-TTS). Adding any new model requires:
+With the multi-engine architecture shipped, adding a new TTS engine requires:
 
-1. **Model type concept** — A `model_type` field (e.g. `qwen`, `luxtts`, `chatterbox`) alongside `model_size`. The `GenerationRequest` schema, frontend form, and all model config dicts need updating.
+1. **Create `backend/backends/<engine>_backend.py`** — implement `TTSBackend` protocol (~200-300 lines)
+2. **Register in `backend/backends/__init__.py`** — add to `TTS_ENGINES` dict + factory function
+3. **Update `backend/models.py`** — add engine name to regex
+4. **Update `backend/main.py`** — add engine cases in generate, stream, model-status, download, delete (5 dispatch points)
+5. **Update frontend** — add to engine union type, form schema, model dropdown, language map (5-6 files)
 
-2. **Multiple backend instances** — The singleton `get_tts_backend()` needs to become a registry. Different models have different voice prompt formats, different inference APIs, different sample rates.
-
-3. **Voice prompt format abstraction** — Qwen uses `torch.save()`-serialized tensors. LuxTTS uses `encode_prompt()` returning its own format. Chatterbox uses audio-path-based cloning. The cache system (`backend/utils/cache.py`) needs to handle heterogeneous formats.
-
-4. **Sample rate normalization** — Qwen outputs 24 kHz. LuxTTS outputs 48 kHz. The Stories editor and audio pipeline need to handle mixed rates.
-
-5. **Per-model capabilities** — Not all models support `instruct` (delivery instructions), not all support streaming, not all support the same languages. The UI needs to adapt.
-
-### PR #194 as Precedent
-
-The Hebrew/Chatterbox PR (#194) is the first attempt at multi-model. It takes a pragmatic approach: route by language (`he` → Chatterbox, else → Qwen). This works for one extra model but doesn't scale — what happens when you want Chatterbox for English too?
-
-### PR #225 as Alternative Approach
-
-The custom HuggingFace models PR (#225) takes a different angle: let users register arbitrary HF repos and attempt to load them through the existing Qwen backend. This is flexible but fragile — it assumes all models have the same API as Qwen3-TTS.
-
-### PR #33 as Foundation
-
-The external provider binaries PR (#33) has the most robust architecture for multi-model, since each provider is a separate process with its own dependencies. But it's complex, currently Qwen-only, and has been stale since early February.
+Total effort: **~1 day** for a well-documented model with a PyPI package.
 
 ---
 
 ## Architectural Bottlenecks
 
-### 1. Single Backend Singleton
+### ~~1. Single Backend Singleton~~ — RESOLVED
 
-**File:** `backend/backends/__init__.py:118-137`
+The singleton TTS backend was replaced with a thread-safe per-engine registry in PR #254. Multiple engines can now be loaded simultaneously.
 
-The entire TTS system runs through one global `_tts_backend` instance. You literally cannot have two models loaded. This is the #1 blocker for multi-model support.
+### 2. `main.py` is 2100+ Lines
 
-### 2. `main.py` is 1700+ Lines
+All API routes, all model configs, all business logic in one file. Five separate dispatch points for each engine. Any new engine touches this file in 5 places. A model config registry pattern would reduce duplication.
 
-All API routes, all model configs, all business logic in one file. Three separate hardcoded model config dicts that must stay in sync. Any multi-model change touches this file heavily.
+### 3. Model Config is Scattered (Improved)
 
-### 3. Model Config is Scattered
-
-Model identifiers, HF repo IDs, display names, and download logic are duplicated across:
-- `main.py` (3 separate dicts)
-- `pytorch_backend.py` (HF repo map)
-- `mlx_backend.py` (MLX repo map)
-- `GenerationForm.tsx` (UI labels)
-- `useGenerationForm.ts` (validation schema)
-- `ModelManagement.tsx` (prefix filters)
-
-There is no single source of truth for "what models does Voicebox support."
+Model identifiers are still duplicated across `main.py` (3 dicts), backend files, frontend components, and the languages constant. However, the pattern is now consistent and well-understood. A centralized model registry would help but isn't blocking.
 
 ### 4. Voice Prompt Cache Assumes PyTorch Tensors
 
-`backend/utils/cache.py` uses `torch.save()` / `torch.load()` for caching voice prompts. Models that don't use PyTorch tensors (LuxTTS, MLX-native models) can't use this cache.
+`backend/utils/cache.py` uses `torch.save()` / `torch.load()`. LuxTTS and Chatterbox backends work around this by storing reference audio paths instead of tensors in their voice prompt dicts. Not ideal but functional.
 
-### 5. Frontend Assumes Qwen Model Sizes
+### 5. ~~Frontend Assumes Qwen Model Sizes~~ — RESOLVED
 
-The generation form schema (`useGenerationForm.ts:17`) validates `model_size` as `'1.7B' | '0.6B'`. The model management UI filters by string prefix `qwen-tts`. Adding any model requires touching 3-4 frontend files.
+The generation form now uses a flat model dropdown with engine-based routing. Per-engine language filtering is in place. Model size is only sent for Qwen.
 
 ---
 
 ## Recommended Priorities
 
-### Tier 1 — Ship Now (Bug Fixes & Critical Improvements)
+### Tier 1 — Ship Now (Low Risk)
 
-These PRs fix real user pain with low risk. Can be reviewed and merged quickly.
+| Priority | PR/Item | Impact | Effort |
+|----------|---------|--------|--------|
+| 1 | **#258** — Chatterbox Turbo + per-engine languages | Paralinguistic tags, proper language filtering | Review only |
+| 2 | **#152** — Offline mode crash fix | Fixes #150, #151 | Low |
+| 3 | **#99** — Chunked TTS + quality selector | Removes 500-char limit, addresses 5 issues | Medium |
+| 4 | **#218** — Windows HF cache dir fix | Windows-specific pain | Low |
+| 5 | **#178** — Generation error handling | Error UX | Low |
+| 6 | **#230** — Docs fixes | Zero risk | None |
+| 7 | **#133** — Network access toggle | Wires up existing code | Low |
+| 8 | **#88** — CORS restriction | Security improvement | Low |
+| 9 | **#214** — Tauri window close panic fix | Stability | Low |
+| 10 | Triage GPU issues | Many may be resolved by CUDA swap (#252) | Low |
+| 11 | Close superseded PRs | #194 (superseded by #257), #83 (outdated) | None |
 
-| Priority | PR | Impact | Effort |
-|----------|-----|--------|--------|
-| 1 | **#97** — Pass language param to TTS | Fixes all non-English generation (18 language issues) | Low |
-| 2 | **#238** — Download cancel/clear UI | Addresses 20 download-related issues | Low |
-| 3 | **#152** — Offline mode crash fix | Fixes #150, #151 | Low |
-| 4 | **#99** — Chunked TTS + quality selector | Removes 500-char limit, addresses 5 issues | Medium |
-| 5 | **#218** — Windows HF cache dir fix | Windows-specific pain | Low |
-| 6 | **#175, #178** — Profile validation + error handling | Small fixes | Low |
-| 7 | **#250, #230** — Docs fixes | Zero risk | None |
-| 8 | **#133** — Network access toggle | Wires up existing code | Low |
-| 9 | **#88** — CORS restriction | Security improvement | Low |
-| 10 | **#214** — Tauri window close panic fix | Stability | Low |
+### Tier 2 — Next Release (v0.2.0)
 
-### Tier 2 — Next Release (v0.2.0 Foundations)
-
-These require more review but unlock major capabilities.
-
-| Priority | Item | Impact | Effort | Dependencies |
-|----------|------|--------|--------|-------------|
-| 1 | **PR #33** — External provider binaries | Solves GPU distribution (19 issues), foundation for multi-model | Very High | Needs rebase, thorough review |
-| 2 | **Multi-model abstraction layer** | Required before adding LuxTTS/Chatterbox/etc. | High | Informed by #33, #194, #225 |
-| 3 | **PR #161** — Docker deployment | Server/headless users | Medium | Independent of #33 |
-| 4 | **PR #194** — Hebrew + Chatterbox | First non-Qwen model, language expansion | High | Should align with multi-model abstraction |
-| 5 | **PR #154** — Audiobook tab | Significant feature for long-form users | Medium | Benefits from #99 (chunking) |
+| Priority | Item | Impact | Effort |
+|----------|------|--------|--------|
+| 1 | **#253** — 48kHz speech tokenizer | Quality improvement | Medium |
+| 2 | **#161** — Docker deployment | Server/headless users | Medium |
+| 3 | **#154** — Audiobook tab | Long-form users | Medium |
+| 4 | **Model config registry** | Reduce 5-dispatch-point duplication in main.py | Medium |
+| 5 | **#225** — Custom HuggingFace models | User-supplied models | High (needs rework for multi-engine) |
 
 ### Tier 3 — Future (v0.3.0+)
 
 | Item | Notes |
 |------|-------|
-| LuxTTS integration | 48 kHz, low VRAM, but needs multi-model arch first |
-| XTTS-v2 / Fish Speech | Multilingual powerhouses |
+| XTTS-v2 / Fish Speech / CosyVoice | Multi-engine arch is ready; just needs backend implementation |
 | OpenAI-compatible API (plan doc exists) | Low effort once API is stable |
-| LoRA fine-tuning (PR #195) | Complex, depends on #194 |
-| External/remote providers (plan doc exists) | Depends on provider architecture |
+| LoRA fine-tuning (PR #195) | Complex, needs rework for multi-engine |
+| External/remote providers | Depends on use case demand |
 | GGUF support (#226) | Depends on model ecosystem maturity |
 | Queue system (#234) | Batch generation |
-| Real-time streaming synthesis | MLX-only currently, needs PyTorch path |
-
-### Decision Point: Multi-Model Architecture
-
-Before adding any new TTS model, a decision is needed on *how*:
-
-**Option A — Provider Binary Split (PR #33 approach)**
-Each model family is a separate executable/process. Most isolated, most flexible, but most complex. Solves the CUDA distribution problem simultaneously.
-
-**Option B — In-Process Model Registry**
-Keep everything in one process but replace the singleton with a registry that can instantiate multiple `TTSBackend` implementations. Simpler, but doesn't solve binary size / CUDA distribution.
-
-**Option C — Hybrid (Recommended)**
-Use Option B for lightweight models (LuxTTS, Kokoro — small, CPU-friendly) that can coexist in-process. Use Option A for heavy models (CUDA Qwen3-TTS, Fish Speech) that need their own process/dependencies. The provider architecture from PR #33 becomes the escape hatch for heavy models, while light models are built-in.
-
-This matches how PR #194 already works (Chatterbox loaded in-process alongside Qwen) while keeping the door open for PR #33's provider split.
+| Streaming for non-MLX engines | Currently MLX-only |
+| Kokoro-82M | Tiny model, great for CPU-only machines |
 
 ---
 
@@ -409,24 +419,20 @@ This matches how PR #194 already works (Chatterbox loaded in-process alongside Q
 
 | Branch | PR | Status | Notes |
 |--------|-----|--------|-------|
-| `external-provider-binaries` | #33 | Open, stale | Major architecture work |
-| `feat/dual-server-binaries` | — | No PR | Related to provider split? |
+| `feat/chatterbox-turbo` | #258 | Open | Chatterbox Turbo + per-engine languages |
+| `feat/chatterbox` | #257 | **Merged** | Chatterbox Multilingual |
+| `feat/luxtts` | #254 | **Merged** | LuxTTS + multi-engine arch |
+| `external-provider-binaries` | #33 | Superseded by #252 | Original CUDA provider approach |
+| `feat/dual-server-binaries` | — | No PR | Related to provider split |
 | `fix-multi-sample` | — | No PR | Voice profile multi-sample fix |
 | `fix-dl-notification-...` | — | No PR | Model download UX |
-| `improvements` | — | No PR | Unknown scope |
-| `stories` | — | No PR | Stories editor work? |
-| `windows-server-shutdown` | — | No PR | Windows lifecycle |
-| `model-dl-fix` | — | No PR | Model download fix |
-| `channels` | — | No PR | Audio channels |
-| `audio-export-entitlement-fix` | — | No PR | macOS entitlements |
-| `better-docs` | — | No PR | Documentation |
 
 ---
 
 ## Quick Reference: API Endpoints
 
 <details>
-<summary>All current endpoints (v0.1.13)</summary>
+<summary>All current endpoints</summary>
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
@@ -437,20 +443,21 @@ This matches how PR #194 already works (Chatterbox loaded in-process alongside Q
 | `/profiles/{id}/avatar` | POST, GET, DELETE | Avatar management |
 | `/profiles/{id}/export` | GET | Export profile as ZIP |
 | `/profiles/import` | POST | Import profile from ZIP |
-| `/generate` | POST | Generate speech |
-| `/generate/stream` | POST | Stream speech (SSE) |
+| `/generate` | POST | Generate speech (engine param selects TTS backend) |
+| `/generate/stream` | POST | Stream speech (MLX only) |
 | `/history` | GET | List generation history |
 | `/history/{id}` | GET, DELETE | Get/delete generation |
 | `/history/{id}/export` | GET | Export generation ZIP |
 | `/history/{id}/export-audio` | GET | Export audio only |
 | `/transcribe` | POST | Transcribe audio (Whisper) |
-| `/models/status` | GET | All model statuses |
+| `/models/status` | GET | All model statuses (Qwen, LuxTTS, Chatterbox, Chatterbox Turbo, Whisper) |
 | `/models/download` | POST | Trigger model download |
+| `/models/download/cancel` | POST | Cancel/dismiss download |
 | `/models/{name}` | DELETE | Delete downloaded model |
 | `/models/load` | POST | Load model into memory |
 | `/models/unload` | POST | Unload model |
 | `/models/progress/{name}` | GET | SSE download progress |
-| `/tasks/active` | GET | Active downloads/generations |
+| `/tasks/active` | GET | Active downloads/generations (with inline progress) |
 | `/stories` | POST, GET | Create/list stories |
 | `/stories/{id}` | GET, PUT, DELETE | Story CRUD |
 | `/stories/{id}/items` | POST, GET | Story items CRUD |
@@ -458,5 +465,8 @@ This matches how PR #194 already works (Chatterbox loaded in-process alongside Q
 | `/channels` | POST, GET | Audio channel CRUD |
 | `/channels/{id}` | PUT, DELETE | Channel update/delete |
 | `/cache/clear` | POST | Clear voice prompt cache |
+| `/server/cuda/status` | GET | CUDA binary availability |
+| `/server/cuda/download` | POST | Download CUDA binary |
+| `/server/cuda/switch` | POST | Switch to CUDA backend |
 
 </details>

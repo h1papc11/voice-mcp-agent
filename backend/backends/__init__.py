@@ -122,6 +122,7 @@ TTS_ENGINES = {
     "qwen": "Qwen TTS",
     "luxtts": "LuxTTS",
     "chatterbox": "Chatterbox TTS",
+    "chatterbox_turbo": "Chatterbox Turbo",
 }
 
 
@@ -171,6 +172,9 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
         elif engine == "chatterbox":
             from .chatterbox_backend import ChatterboxTTSBackend
             backend = ChatterboxTTSBackend()
+        elif engine == "chatterbox_turbo":
+            from .chatterbox_turbo_backend import ChatterboxTurboTTSBackend
+            backend = ChatterboxTurboTTSBackend()
         else:
             raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
         

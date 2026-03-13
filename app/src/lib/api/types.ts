@@ -34,7 +34,7 @@ export interface GenerationRequest {
   language: LanguageCode;
   seed?: number;
   model_size?: '1.7B' | '0.6B';
-  engine?: 'qwen' | 'luxtts' | 'chatterbox';
+  engine?: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo';
   instruct?: string;
 }
 

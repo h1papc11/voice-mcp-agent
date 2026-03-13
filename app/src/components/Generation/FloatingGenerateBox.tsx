@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { LANGUAGE_OPTIONS } from '@/lib/constants/languages';
+import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
 import { useAddStoryItem, useStory } from '@/lib/hooks/useStories';
@@ -381,25 +381,30 @@ export function FloatingGenerateBox({
                   <FormField
                     control={form.control}
                     name="language"
-                    render={({ field }) => (
-                      <FormItem className="flex-1 space-y-0">
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {LANGUAGE_OPTIONS.map((lang) => (
-                              <SelectItem key={lang.value} value={lang.value} className="text-xs">
-                                {lang.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const engineLangs = getLanguageOptionsForEngine(
+                        form.watch('engine') || 'qwen',
+                      );
+                      return (
+                        <FormItem className="flex-1 space-y-0">
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {engineLangs.map((lang) => (
+                                <SelectItem key={lang.value} value={lang.value} className="text-xs">
+                                  {lang.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   <FormItem className="flex-1 space-y-0">
@@ -409,13 +414,19 @@ export function FloatingGenerateBox({
                           ? 'luxtts'
                           : form.watch('engine') === 'chatterbox'
                             ? 'chatterbox'
-                            : `qwen:${form.watch('modelSize') || '1.7B'}`
+                            : form.watch('engine') === 'chatterbox_turbo'
+                              ? 'chatterbox_turbo'
+                              : `qwen:${form.watch('modelSize') || '1.7B'}`
                       }
                       onValueChange={(value) => {
                         if (value === 'luxtts') {
                           form.setValue('engine', 'luxtts');
+                          form.setValue('language', 'en');
                         } else if (value === 'chatterbox') {
                           form.setValue('engine', 'chatterbox');
+                        } else if (value === 'chatterbox_turbo') {
+                          form.setValue('engine', 'chatterbox_turbo');
+                          form.setValue('language', 'en');
                         } else {
                           const [, modelSize] = value.split(':');
                           form.setValue('engine', 'qwen');
@@ -440,6 +451,12 @@ export function FloatingGenerateBox({
                         </SelectItem>
                         <SelectItem value="chatterbox" className="text-xs text-muted-foreground">
                           Chatterbox
+                        </SelectItem>
+                        <SelectItem
+                          value="chatterbox_turbo"
+                          className="text-xs text-muted-foreground"
+                        >
+                          Chatterbox Turbo
                         </SelectItem>
                       </SelectContent>
                     </Select>
