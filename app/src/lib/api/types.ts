@@ -37,6 +37,7 @@ export interface GenerationRequest {
   engine?: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo';
   instruct?: string;
   max_chunk_chars?: number;
+  crossfade_ms?: number;
 }
 
 export interface GenerationResponse {

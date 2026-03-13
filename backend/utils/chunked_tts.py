@@ -224,6 +224,7 @@ async def generate_chunked(
     seed: int | None = None,
     instruct: str | None = None,
     max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
+    crossfade_ms: int = 50,
     trim_fn=None,
 ) -> Tuple[np.ndarray, int]:
     """Generate audio with automatic chunking for long text.
@@ -234,7 +235,7 @@ async def generate_chunked(
     For longer text the input is split at natural sentence boundaries,
     each chunk is generated independently, optionally trimmed (useful for
     Chatterbox engines that hallucinate trailing noise), and the results
-    are concatenated with a short crossfade.
+    are concatenated with a crossfade (or hard cut if *crossfade_ms* is 0).
 
     Parameters
     ----------
@@ -246,6 +247,9 @@ async def generate_chunked(
         Forwarded to ``backend.generate()`` verbatim.
     max_chunk_chars : int
         Maximum characters per chunk (default 800).
+    crossfade_ms : int
+        Crossfade duration in milliseconds between chunks.  0 for a hard
+        cut with no overlap (default 50).
     trim_fn : callable | None
         Optional ``(audio, sample_rate) -> audio`` post-processing
         function applied to each chunk before concatenation (e.g.
@@ -294,5 +298,5 @@ async def generate_chunked(
         if sample_rate is None:
             sample_rate = chunk_sr
 
-    audio = concatenate_audio_chunks(audio_chunks, sample_rate)
+    audio = concatenate_audio_chunks(audio_chunks, sample_rate, crossfade_ms=crossfade_ms)
     return audio, sample_rate

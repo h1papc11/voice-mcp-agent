@@ -840,6 +840,7 @@ async def generate_speech(
             seed=data.seed,
             instruct=data.instruct,
             max_chunk_chars=data.max_chunk_chars,
+            crossfade_ms=data.crossfade_ms,
             trim_fn=trim_fn,
         )
 
@@ -970,6 +971,7 @@ async def stream_speech(
         seed=data.seed,
         instruct=data.instruct,
         max_chunk_chars=data.max_chunk_chars,
+        crossfade_ms=data.crossfade_ms,
         trim_fn=trim_fn,
     )
 

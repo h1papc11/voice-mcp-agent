@@ -36,6 +36,8 @@ export function ConnectionForm() {
   const setMode = useServerStore((state) => state.setMode);
   const maxChunkChars = useServerStore((state) => state.maxChunkChars);
   const setMaxChunkChars = useServerStore((state) => state.setMaxChunkChars);
+  const crossfadeMs = useServerStore((state) => state.crossfadeMs);
+  const setCrossfadeMs = useServerStore((state) => state.setCrossfadeMs);
   const { toast } = useToast();
 
   const form = useForm<ConnectionFormValues>({
@@ -175,6 +177,29 @@ export function ConnectionForm() {
             <p className="text-sm text-muted-foreground">
               Long text is split into chunks at sentence boundaries before generating. Lower values
               can improve quality for long outputs. Default is 800.
+            </p>
+          </div>
+
+          <div className="space-y-3 mt-4">
+            <div className="flex items-center justify-between">
+              <label htmlFor="crossfadeMs" className="text-sm font-medium leading-none">
+                Chunk crossfade
+              </label>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {crossfadeMs === 0 ? 'Cut' : `${crossfadeMs}ms`}
+              </span>
+            </div>
+            <Slider
+              id="crossfadeMs"
+              value={[crossfadeMs]}
+              onValueChange={([value]) => setCrossfadeMs(value)}
+              min={0}
+              max={200}
+              step={10}
+              aria-label="Chunk crossfade duration"
+            />
+            <p className="text-sm text-muted-foreground">
+              Blends audio between chunks to smooth transitions. Set to 0 for a hard cut.
             </p>
           </div>
         </div>

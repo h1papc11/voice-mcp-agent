@@ -33,6 +33,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
   const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
   const maxChunkChars = useServerStore((state) => state.maxChunkChars);
+  const crossfadeMs = useServerStore((state) => state.crossfadeMs);
   const [downloadingModelName, setDownloadingModelName] = useState<string | null>(null);
   const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
 
@@ -113,6 +114,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         engine,
         instruct: isQwen ? data.instruct || undefined : undefined,
         max_chunk_chars: maxChunkChars,
+        crossfade_ms: crossfadeMs,
       });
 
       toast({

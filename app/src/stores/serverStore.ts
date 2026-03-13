@@ -16,6 +16,9 @@ interface ServerStore {
 
   maxChunkChars: number;
   setMaxChunkChars: (value: number) => void;
+
+  crossfadeMs: number;
+  setCrossfadeMs: (value: number) => void;
 }
 
 export const useServerStore = create<ServerStore>()(
@@ -35,6 +38,9 @@ export const useServerStore = create<ServerStore>()(
 
       maxChunkChars: 800,
       setMaxChunkChars: (value) => set({ maxChunkChars: value }),
+
+      crossfadeMs: 50,
+      setCrossfadeMs: (value) => set({ crossfadeMs: value }),
     }),
     {
       name: 'voicebox-server',
