@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -14,10 +15,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
-import { useServerStore } from '@/stores/serverStore';
 import { usePlatform } from '@/platform/PlatformContext';
+import { useServerStore } from '@/stores/serverStore';
 
 const connectionSchema = z.object({
   serverUrl: z.string().url('Please enter a valid URL'),
@@ -33,6 +34,8 @@ export function ConnectionForm() {
   const setKeepServerRunningOnClose = useServerStore((state) => state.setKeepServerRunningOnClose);
   const mode = useServerStore((state) => state.mode);
   const setMode = useServerStore((state) => state.setMode);
+  const maxChunkChars = useServerStore((state) => state.maxChunkChars);
+  const setMaxChunkChars = useServerStore((state) => state.setMaxChunkChars);
   const { toast } = useToast();
 
   const form = useForm<ConnectionFormValues>({
@@ -59,11 +62,7 @@ export function ConnectionForm() {
   }
 
   return (
-    <Card
-      role="region"
-      aria-label="Server Connection"
-      tabIndex={0}
-    >
+    <Card role="region" aria-label="Server Connection" tabIndex={0}>
       <CardHeader>
         <CardTitle>Server Connection</CardTitle>
       </CardHeader>
@@ -153,6 +152,32 @@ export function ConnectionForm() {
             </div>
           </div>
         )}
+
+        <div className="mt-6 pt-6 border-t">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="maxChunkChars" className="text-sm font-medium leading-none">
+                Auto-chunking limit
+              </label>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {maxChunkChars} chars
+              </span>
+            </div>
+            <Slider
+              id="maxChunkChars"
+              value={[maxChunkChars]}
+              onValueChange={([value]) => setMaxChunkChars(value)}
+              min={100}
+              max={2000}
+              step={50}
+              aria-label="Auto-chunking character limit"
+            />
+            <p className="text-sm text-muted-foreground">
+              Long text is split into chunks at sentence boundaries before generating. Lower values
+              can improve quality for long outputs. Default is 800.
+            </p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

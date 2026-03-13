@@ -9,9 +9,10 @@ import { useGeneration } from '@/lib/hooks/useGeneration';
 import { useModelDownloadToast } from '@/lib/hooks/useModelDownloadToast';
 import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
+import { useServerStore } from '@/stores/serverStore';
 
 const generationSchema = z.object({
-  text: z.string().min(1, 'Text is required').max(5000),
+  text: z.string().min(1, 'Text is required').max(50000),
   language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
   seed: z.number().int().optional(),
   modelSize: z.enum(['1.7B', '0.6B']).optional(),
@@ -31,6 +32,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
   const generation = useGeneration();
   const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
+  const maxChunkChars = useServerStore((state) => state.maxChunkChars);
   const [downloadingModelName, setDownloadingModelName] = useState<string | null>(null);
   const [downloadingDisplayName, setDownloadingDisplayName] = useState<string | null>(null);
 
@@ -110,6 +112,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         model_size: isQwen ? data.modelSize : undefined,
         engine,
         instruct: isQwen ? data.instruct || undefined : undefined,
+        max_chunk_chars: maxChunkChars,
       });
 
       toast({

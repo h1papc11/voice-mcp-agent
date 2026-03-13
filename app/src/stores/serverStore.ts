@@ -13,6 +13,9 @@ interface ServerStore {
 
   keepServerRunningOnClose: boolean;
   setKeepServerRunningOnClose: (keepRunning: boolean) => void;
+
+  maxChunkChars: number;
+  setMaxChunkChars: (value: number) => void;
 }
 
 export const useServerStore = create<ServerStore>()(
@@ -29,6 +32,9 @@ export const useServerStore = create<ServerStore>()(
 
       keepServerRunningOnClose: false,
       setKeepServerRunningOnClose: (keepRunning) => set({ keepServerRunningOnClose: keepRunning }),
+
+      maxChunkChars: 800,
+      setMaxChunkChars: (value) => set({ maxChunkChars: value }),
     }),
     {
       name: 'voicebox-server',
