@@ -147,17 +147,20 @@ Create multi-voice narratives, podcasts, and conversations with a timeline-based
 
 Voicebox exposes a full REST API, so you can integrate voice synthesis into your own apps.
 
+For the current local app and development workflow, the backend is typically available at `http://localhost:17493`.
+If you launch the backend manually with a different host or port, use that address instead.
+
 ```bash
 # Generate speech
-curl -X POST http://localhost:8000/generate \
+curl -X POST http://localhost:17493/generate \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello world", "profile_id": "abc123", "language": "en"}'
 
 # List voice profiles
-curl http://localhost:8000/profiles
+curl http://localhost:17493/profiles
 
 # Create a profile
-curl -X POST http://localhost:8000/profiles \
+curl -X POST http://localhost:17493/profiles \
   -H "Content-Type: application/json" \
   -d '{"name": "My Voice", "language": "en"}'
 ```
@@ -170,7 +173,7 @@ curl -X POST http://localhost:8000/profiles \
 - Voice assistants
 - Content creation automation
 
-Full API documentation available at `http://localhost:8000/docs` when running.
+Full API documentation is available at `http://localhost:17493/docs` in the default local workflow, or at `/docs` on whatever server address you configured.
 
 ---
 
