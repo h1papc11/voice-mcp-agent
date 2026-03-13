@@ -773,7 +773,7 @@ export function ModelManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
   );
 }
 
@@ -782,13 +782,13 @@ interface ModelItemProps {
     model_name: string;
     display_name: string;
     downloaded: boolean;
-    downloading?: boolean;  // From server - true if download in progress
+    downloading?: boolean; // From server - true if download in progress
     size_mb?: number;
     loaded: boolean;
   };
   onDownload: () => void;
   onDelete: () => void;
-  isDownloading: boolean;  // Local state - true if user just clicked download
+  isDownloading: boolean; // Local state - true if user just clicked download
   formatSize: (sizeMb?: number) => string;
 }
 
@@ -848,16 +848,19 @@ function ModelItem({ model, onDownload, onDelete, isDownloading, formatSize }: M
               disabled={model.loaded}
               title={model.loaded ? 'Unload model before deleting' : 'Delete model'}
               aria-label={
-                model.loaded
-                  ? 'Unload model before deleting'
-                  : `Delete ${model.display_name}`
+                model.loaded ? 'Unload model before deleting' : `Delete ${model.display_name}`
               }
             >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         ) : showDownloading ? (
-          <Button size="sm" variant="outline" disabled aria-label={`${model.display_name} downloading`}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled
+            aria-label={`${model.display_name} downloading`}
+          >
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             Downloading...
           </Button>
