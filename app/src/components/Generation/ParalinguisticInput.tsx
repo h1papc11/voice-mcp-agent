@@ -136,7 +136,7 @@ export const ParalinguisticInput = forwardRef<ParalinguisticInputRef, Paralingui
       left: 0,
     });
     const triggerRangeRef = useRef<Range | null>(null);
-    const lastSerializedRef = useRef<string>(value ?? '');
+    const lastSerializedRef = useRef<string>('');
     const isComposingRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
@@ -218,6 +218,13 @@ export const ParalinguisticInput = forwardRef<ParalinguisticInputRef, Paralingui
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent) => {
         if (showMenu) {
+          if (filteredTags.length === 0) {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              setShowMenu(false);
+            }
+            return;
+          }
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             setMenuIndex((i) => (i + 1) % filteredTags.length);
@@ -334,10 +341,11 @@ export const ParalinguisticInput = forwardRef<ParalinguisticInputRef, Paralingui
           ref={editorRef}
           contentEditable={!disabled}
           suppressContentEditableWarning
-          role="textbox"
-          aria-multiline
+          role={disabled ? undefined : 'textbox'}
+          aria-multiline={disabled ? undefined : true}
           aria-placeholder={placeholder}
           aria-disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           className={cn(
             'min-h-[32px] text-sm whitespace-pre-wrap break-words outline-none',
             '[&_.ptag-badge]:inline-flex [&_.ptag-badge]:items-center [&_.ptag-badge]:rounded-full',
@@ -349,11 +357,15 @@ export const ParalinguisticInput = forwardRef<ParalinguisticInputRef, Paralingui
             className,
           )}
           style={style}
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onClick={onClick}
-          onFocus={onFocus}
+          onInput={!disabled ? handleInput : undefined}
+          onKeyDown={!disabled ? handleKeyDown : undefined}
+          onPaste={!disabled ? handlePaste : undefined}
+          onClick={!disabled ? onClick : undefined}
+          onFocus={!disabled ? onFocus : undefined}
+          onBlur={() => {
+            setShowMenu(false);
+            triggerRangeRef.current = null;
+          }}
           onCompositionStart={() => {
             isComposingRef.current = true;
           }}

@@ -1546,7 +1546,7 @@ async def unload_model_by_name(model_name: str):
 
         return {"message": f"Model {model_name} unloaded successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/models/progress/{model_name}")
