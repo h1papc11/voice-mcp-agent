@@ -178,6 +178,21 @@ class ChatterboxTTSBackend:
                 progress_manager.mark_complete(model_name)
                 task_manager.complete_download(model_name)
 
+            # Monkey-patch VoiceEncoder.forward to cast input to float32.
+            # The upstream melspectrogram returns float64 numpy arrays when
+            # hp.normalized_mels is False (the default).  pack() preserves
+            # the dtype, so double tensors hit float32 LSTM weights →
+            # "expected m1 and m2 to have the same dtype: float != double".
+            _ve = self.model.ve
+            _orig_ve_forward = _ve.forward.__func__ if hasattr(_ve.forward, '__func__') else _ve.forward
+
+            import types
+
+            def _f32_forward(self_ve, mels):
+                return _orig_ve_forward(self_ve, mels.float())
+
+            _ve.forward = types.MethodType(_f32_forward, _ve)
+
             logger.info("Chatterbox Multilingual TTS loaded successfully")
 
         except ImportError as e:
