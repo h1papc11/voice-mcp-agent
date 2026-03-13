@@ -15,12 +15,9 @@ huggingface_hub>=0.20.0
 qwen-tts>=0.0.5
 
 # LuxTTS (voice cloning engine)
+# piper-phonemize needs custom index (no PyPI wheels)
+--find-links https://k2-fsa.github.io/icefall/piper_phonemize.html
 Zipvoice @ git+https://github.com/ysharma3501/LuxTTS.git
-onnxruntime>=1.16.0
-piper-phonemize>=1.1.0
-lhotse>=1.20.0
-pydub>=0.25.0
-inflect>=7.0.0
 
 # Audio processing
 librosa>=0.10.0
