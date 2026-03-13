@@ -1,0 +1,71 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { useServerStore } from '@/stores/serverStore';
+
+export function GenerationSettings() {
+  const maxChunkChars = useServerStore((state) => state.maxChunkChars);
+  const setMaxChunkChars = useServerStore((state) => state.setMaxChunkChars);
+  const crossfadeMs = useServerStore((state) => state.crossfadeMs);
+  const setCrossfadeMs = useServerStore((state) => state.setCrossfadeMs);
+
+  return (
+    <Card role="region" aria-label="Generation Settings" tabIndex={0}>
+      <CardHeader>
+        <CardTitle>Generation Settings</CardTitle>
+        <CardDescription>
+          Controls for long text generation. These settings apply to all engines.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="maxChunkChars" className="text-sm font-medium leading-none">
+                Auto-chunking limit
+              </label>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {maxChunkChars} chars
+              </span>
+            </div>
+            <Slider
+              id="maxChunkChars"
+              value={[maxChunkChars]}
+              onValueChange={([value]) => setMaxChunkChars(value)}
+              min={100}
+              max={2000}
+              step={50}
+              aria-label="Auto-chunking character limit"
+            />
+            <p className="text-sm text-muted-foreground">
+              Long text is split into chunks at sentence boundaries before generating. Lower values
+              can improve quality for long outputs.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label htmlFor="crossfadeMs" className="text-sm font-medium leading-none">
+                Chunk crossfade
+              </label>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {crossfadeMs === 0 ? 'Cut' : `${crossfadeMs}ms`}
+              </span>
+            </div>
+            <Slider
+              id="crossfadeMs"
+              value={[crossfadeMs]}
+              onValueChange={([value]) => setCrossfadeMs(value)}
+              min={0}
+              max={200}
+              step={10}
+              aria-label="Chunk crossfade duration"
+            />
+            <p className="text-sm text-muted-foreground">
+              Blends audio between chunks to smooth transitions. Set to 0 for a hard cut.
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

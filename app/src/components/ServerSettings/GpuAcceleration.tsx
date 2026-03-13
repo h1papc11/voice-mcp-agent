@@ -1,7 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Cpu, Download, Loader2, RotateCw, Trash2, Zap } from 'lucide-react';
+import { AlertCircle, Download, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -216,31 +215,19 @@ export function GpuAcceleration() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Zap className="h-4 w-4" />
-          GPU Acceleration
-        </CardTitle>
+        <CardTitle>GPU Acceleration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Current status */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="text-sm font-medium">Backend</div>
-            <div className="text-sm text-muted-foreground">
-              {isCurrentlyCuda ? 'CUDA (GPU accelerated)' : 'CPU'}
-            </div>
+        <div className="space-y-1">
+          <div className="text-sm font-medium">Backend</div>
+          <div className="text-sm text-muted-foreground">
+            {isCurrentlyCuda
+              ? 'CUDA (GPU accelerated)'
+              : hasNativeGpu
+                ? `${health.backend_type === 'mlx' ? 'MLX' : 'PyTorch'} (GPU accelerated)`
+                : 'CPU'}
           </div>
-          <Badge variant={isCurrentlyCuda ? 'default' : 'secondary'}>
-            {isCurrentlyCuda ? (
-              <>
-                <Zap className="h-3 w-3 mr-1" /> CUDA
-              </>
-            ) : (
-              <>
-                <Cpu className="h-3 w-3 mr-1" /> CPU
-              </>
-            )}
-          </Badge>
         </div>
 
         {/* GPU info from health */}
@@ -257,14 +244,6 @@ export function GpuAcceleration() {
         )}
 
         {/* Native GPU detected - no CUDA download needed */}
-        {hasNativeGpu && (
-          <div className="p-3 rounded-lg bg-accent/10 border border-accent/20">
-            <div className="text-sm">
-              Your system uses <strong>{health.gpu_type}</strong> for acceleration. No additional
-              downloads needed.
-            </div>
-          </div>
-        )}
 
         {/* CUDA download section - only show when native GPU is NOT detected (i.e., Windows/Linux NVIDIA users) */}
         {!hasNativeGpu && (

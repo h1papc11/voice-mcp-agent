@@ -824,18 +824,25 @@ async def generate_speech(
             engine=engine,
         )
 
-        audio, sample_rate = await tts_model.generate(
-            data.text,
-            voice_prompt,
-            data.language,
-            data.seed,
-            data.instruct,
-        )
+        from .utils.chunked_tts import generate_chunked
 
-        # Trim trailing silence/hallucination for Chatterbox output
+        # Resolve per-chunk trim function for engines that need it
+        trim_fn = None
         if engine in ("chatterbox", "chatterbox_turbo"):
             from .utils.audio import trim_tts_output
-            audio = trim_tts_output(audio, sample_rate)
+            trim_fn = trim_tts_output
+
+        audio, sample_rate = await generate_chunked(
+            tts_model,
+            data.text,
+            voice_prompt,
+            language=data.language,
+            seed=data.seed,
+            instruct=data.instruct,
+            max_chunk_chars=data.max_chunk_chars,
+            crossfade_ms=data.crossfade_ms,
+            trim_fn=trim_fn,
+        )
 
         # Calculate duration
         duration = len(audio) / sample_rate
@@ -949,18 +956,24 @@ async def stream_speech(
         data.profile_id, db, engine=engine,
     )
 
-    audio, sample_rate = await tts_model.generate(
-        data.text,
-        voice_prompt,
-        data.language,
-        data.seed,
-        data.instruct,
-    )
+    from .utils.chunked_tts import generate_chunked
 
-    # Trim trailing silence/hallucination for Chatterbox output
+    trim_fn = None
     if engine in ("chatterbox", "chatterbox_turbo"):
         from .utils.audio import trim_tts_output
-        audio = trim_tts_output(audio, sample_rate)
+        trim_fn = trim_tts_output
+
+    audio, sample_rate = await generate_chunked(
+        tts_model,
+        data.text,
+        voice_prompt,
+        language=data.language,
+        seed=data.seed,
+        instruct=data.instruct,
+        max_chunk_chars=data.max_chunk_chars,
+        crossfade_ms=data.crossfade_ms,
+        trim_fn=trim_fn,
+    )
 
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
 

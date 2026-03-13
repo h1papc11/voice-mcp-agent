@@ -13,6 +13,12 @@ interface ServerStore {
 
   keepServerRunningOnClose: boolean;
   setKeepServerRunningOnClose: (keepRunning: boolean) => void;
+
+  maxChunkChars: number;
+  setMaxChunkChars: (value: number) => void;
+
+  crossfadeMs: number;
+  setCrossfadeMs: (value: number) => void;
 }
 
 export const useServerStore = create<ServerStore>()(
@@ -29,6 +35,12 @@ export const useServerStore = create<ServerStore>()(
 
       keepServerRunningOnClose: false,
       setKeepServerRunningOnClose: (keepRunning) => set({ keepServerRunningOnClose: keepRunning }),
+
+      maxChunkChars: 800,
+      setMaxChunkChars: (value) => set({ maxChunkChars: value }),
+
+      crossfadeMs: 50,
+      setCrossfadeMs: (value) => set({ crossfadeMs: value }),
     }),
     {
       name: 'voicebox-server',

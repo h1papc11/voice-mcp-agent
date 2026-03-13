@@ -36,6 +36,8 @@ export interface GenerationRequest {
   model_size?: '1.7B' | '0.6B';
   engine?: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo';
   instruct?: string;
+  max_chunk_chars?: number;
+  crossfade_ms?: number;
 }
 
 export interface GenerationResponse {
