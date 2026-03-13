@@ -5,18 +5,23 @@ interface GenerationState {
   pendingGenerationIds: Set<string>;
   /** Whether any generation is in progress (derived convenience) */
   isGenerating: boolean;
+  /** Map of generationId → storyId for deferred story additions */
+  pendingStoryAdds: Map<string, string>;
   addPendingGeneration: (id: string) => void;
   removePendingGeneration: (id: string) => void;
+  addPendingStoryAdd: (generationId: string, storyId: string) => void;
+  removePendingStoryAdd: (generationId: string) => string | undefined;
   /** Legacy setter for backward compat with useRestoreActiveTasks */
   setIsGenerating: (generating: boolean) => void;
   setActiveGenerationId: (id: string | null) => void;
   activeGenerationId: string | null;
 }
 
-export const useGenerationStore = create<GenerationState>((set) => ({
+export const useGenerationStore = create<GenerationState>((set, get) => ({
   pendingGenerationIds: new Set(),
   isGenerating: false,
   activeGenerationId: null,
+  pendingStoryAdds: new Map(),
 
   addPendingGeneration: (id) =>
     set((state) => {
@@ -31,6 +36,25 @@ export const useGenerationStore = create<GenerationState>((set) => ({
       next.delete(id);
       return { pendingGenerationIds: next, isGenerating: next.size > 0 };
     }),
+
+  addPendingStoryAdd: (generationId, storyId) =>
+    set((state) => {
+      const next = new Map(state.pendingStoryAdds);
+      next.set(generationId, storyId);
+      return { pendingStoryAdds: next };
+    }),
+
+  removePendingStoryAdd: (generationId) => {
+    const storyId = get().pendingStoryAdds.get(generationId);
+    if (storyId) {
+      set((state) => {
+        const next = new Map(state.pendingStoryAdds);
+        next.delete(generationId);
+        return { pendingStoryAdds: next };
+      });
+    }
+    return storyId;
+  },
 
   setIsGenerating: (generating) => set({ isGenerating: generating }),
   setActiveGenerationId: (id) => set({ activeGenerationId: id }),

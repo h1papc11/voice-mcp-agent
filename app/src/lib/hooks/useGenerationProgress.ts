@@ -23,6 +23,7 @@ export function useGenerationProgress() {
   const { toast } = useToast();
   const pendingIds = useGenerationStore((s) => s.pendingGenerationIds);
   const removePendingGeneration = useGenerationStore((s) => s.removePendingGeneration);
+  const removePendingStoryAdd = useGenerationStore((s) => s.removePendingStoryAdd);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const setAudioWithAutoPlay = usePlayerStore((s) => s.setAudioWithAutoPlay);
   const autoplayOnGenerate = useServerStore((s) => s.autoplayOnGenerate);
@@ -66,12 +67,36 @@ export function useGenerationProgress() {
             // Refresh history to pick up the completed generation
             queryClient.invalidateQueries({ queryKey: ['history'] });
 
-            toast({
-              title: 'Generation complete!',
-              description: data.duration
-                ? `Audio generated (${data.duration.toFixed(2)}s)`
-                : 'Audio generated',
-            });
+            // If this generation was queued for a story, add it now
+            const storyId = removePendingStoryAdd(id);
+            if (storyId) {
+              apiClient
+                .addStoryItem(storyId, { generation_id: id })
+                .then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['stories'] });
+                  queryClient.invalidateQueries({ queryKey: ['stories', storyId] });
+                  toast({
+                    title: 'Added to story',
+                    description: data.duration
+                      ? `Audio generated (${data.duration.toFixed(2)}s) and added to story`
+                      : 'Audio generated and added to story',
+                  });
+                })
+                .catch(() => {
+                  toast({
+                    title: 'Generation complete',
+                    description: 'Audio generated but failed to add to story',
+                    variant: 'destructive',
+                  });
+                });
+            } else {
+              toast({
+                title: 'Generation complete!',
+                description: data.duration
+                  ? `Audio generated (${data.duration.toFixed(2)}s)`
+                  : 'Audio generated',
+              });
+            }
 
             // Auto-play if enabled and nothing is currently playing
             if (autoplayRef.current && !isPlayingRef.current) {
@@ -82,6 +107,7 @@ export function useGenerationProgress() {
             source.close();
             currentSources.delete(id);
             removePendingGeneration(id);
+            removePendingStoryAdd(id);
 
             queryClient.invalidateQueries({ queryKey: ['history'] });
 
@@ -114,5 +140,12 @@ export function useGenerationProgress() {
       }
       currentSources.clear();
     };
-  }, [pendingIds, removePendingGeneration, queryClient, toast, setAudioWithAutoPlay]);
+  }, [
+    pendingIds,
+    removePendingGeneration,
+    removePendingStoryAdd,
+    queryClient,
+    toast,
+    setAudioWithAutoPlay,
+  ]);
 }
