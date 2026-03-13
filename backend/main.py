@@ -48,6 +48,18 @@ from .utils.tasks import get_task_manager
 from .utils.cache import clear_voice_prompt_cache
 from .platform_detect import get_backend_type
 
+# Keep references to fire-and-forget background tasks to prevent GC
+_background_tasks: set = set()
+
+
+def _create_background_task(coro) -> asyncio.Task:
+    """Create a background task and prevent it from being garbage collected."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
 app = FastAPI(
     title="voicebox API",
     description="Production-quality Qwen3-TTS voice cloning API",
@@ -622,7 +634,7 @@ async def generate_speech(
                         task_manager.error_download(model_name, str(e))
 
                 task_manager.start_download(model_name)
-                asyncio.create_task(download_model_background())
+                _create_background_task(download_model_background())
 
                 raise HTTPException(
                     status_code=202,
@@ -646,7 +658,7 @@ async def generate_speech(
                         task_manager.error_download(model_name, str(e))
 
                 task_manager.start_download(model_name)
-                asyncio.create_task(download_luxtts_background())
+                _create_background_task(download_luxtts_background())
 
                 raise HTTPException(
                     status_code=202,
@@ -986,7 +998,7 @@ async def transcribe_audio(
                     get_task_manager().error_download(progress_model_name, str(e))
 
             get_task_manager().start_download(progress_model_name)
-            asyncio.create_task(download_whisper_background())
+            _create_background_task(download_whisper_background())
 
             # Return 202 Accepted
             raise HTTPException(
@@ -1639,7 +1651,7 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     )
 
     # Start download in background task (don't await)
-    asyncio.create_task(download_in_background())
+    _create_background_task(download_in_background())
 
     # Return immediately - frontend should poll progress endpoint
     return {"message": f"Model {request.model_name} download started"}
@@ -1889,7 +1901,7 @@ async def download_cuda_backend():
             import logging
             logging.getLogger(__name__).error(f"CUDA download failed: {e}")
 
-    asyncio.create_task(_download())
+    _create_background_task(_download())
     return {"message": "CUDA backend download started", "progress_key": "cuda-backend"}
 
 

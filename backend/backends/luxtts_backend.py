@@ -171,9 +171,10 @@ class LuxTTSBackend:
         """
         await self.load_model()
 
-        if use_cache:
-            # Include "luxtts" in the cache key so it doesn't collide with Qwen prompts
-            cache_key = "luxtts_" + get_cache_key(audio_path, reference_text)
+        # Compute cache key once for both lookup and storage
+        cache_key = ("luxtts_" + get_cache_key(audio_path, reference_text)) if use_cache else None
+
+        if cache_key:
             cached = get_cached_voice_prompt(cache_key)
             if cached is not None and isinstance(cached, dict):
                 return cached, True
@@ -187,8 +188,7 @@ class LuxTTSBackend:
 
         encoded = await asyncio.to_thread(_encode_sync)
 
-        if use_cache:
-            cache_key = "luxtts_" + get_cache_key(audio_path, reference_text)
+        if cache_key:
             cache_voice_prompt(cache_key, encoded)
 
         return encoded, False
@@ -206,7 +206,7 @@ class LuxTTSBackend:
         """
         combined_audio = []
         for path in audio_paths:
-            audio, sr = load_audio(path, sample_rate=24000)
+            audio, _sr = load_audio(path, sample_rate=24000)
             audio = normalize_audio(audio)
             combined_audio.append(audio)
 
@@ -257,8 +257,8 @@ class LuxTTSBackend:
                 return_smooth=False,  # 48kHz output
             )
 
-            # LuxTTS returns a tensor, convert to numpy
-            audio = wav.numpy().squeeze()
+            # LuxTTS returns a tensor (may be on GPU/MPS), move to CPU first
+            audio = wav.detach().cpu().numpy().squeeze()
             return audio, 48000
 
         return await asyncio.to_thread(_generate_sync)

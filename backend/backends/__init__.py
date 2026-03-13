@@ -4,6 +4,7 @@ Backend abstraction layer for TTS and STT.
 Provides a unified interface for MLX and PyTorch backends.
 """
 
+import threading
 from typing import Protocol, Optional, Tuple, List
 from typing_extensions import runtime_checkable
 import numpy as np
@@ -113,6 +114,7 @@ class STTBackend(Protocol):
 # Global backend instances
 _tts_backend: Optional[TTSBackend] = None
 _tts_backends: dict[str, TTSBackend] = {}
+_tts_backends_lock = threading.Lock()
 _stt_backend: Optional[STTBackend] = None
 
 # Supported TTS engines
@@ -144,25 +146,32 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
     """
     global _tts_backends
     
+    # Fast path: check without lock
     if engine in _tts_backends:
         return _tts_backends[engine]
     
-    if engine == "qwen":
-        backend_type = get_backend_type()
-        if backend_type == "mlx":
-            from .mlx_backend import MLXTTSBackend
-            backend = MLXTTSBackend()
+    # Slow path: create with lock to avoid duplicate instantiation
+    with _tts_backends_lock:
+        # Double-check after acquiring lock
+        if engine in _tts_backends:
+            return _tts_backends[engine]
+        
+        if engine == "qwen":
+            backend_type = get_backend_type()
+            if backend_type == "mlx":
+                from .mlx_backend import MLXTTSBackend
+                backend = MLXTTSBackend()
+            else:
+                from .pytorch_backend import PyTorchTTSBackend
+                backend = PyTorchTTSBackend()
+        elif engine == "luxtts":
+            from .luxtts_backend import LuxTTSBackend
+            backend = LuxTTSBackend()
         else:
-            from .pytorch_backend import PyTorchTTSBackend
-            backend = PyTorchTTSBackend()
-    elif engine == "luxtts":
-        from .luxtts_backend import LuxTTSBackend
-        backend = LuxTTSBackend()
-    else:
-        raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
-    
-    _tts_backends[engine] = backend
-    return backend
+            raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
+        
+        _tts_backends[engine] = backend
+        return backend
 
 
 def get_stt_backend() -> STTBackend:
