@@ -22,6 +22,24 @@ import uuid
 import asyncio
 import signal
 import os
+from urllib.parse import quote
+
+
+def _safe_content_disposition(disposition_type: str, filename: str) -> str:
+    """Build a Content-Disposition header that is safe for non-ASCII filenames.
+
+    Uses RFC 5987 ``filename*`` parameter so that browsers can decode
+    UTF-8 filenames while the ``filename`` fallback stays ASCII-only.
+    """
+    ascii_name = "".join(
+        c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")
+    ).strip() or "download"
+    utf8_name = quote(filename, safe="")
+    return (
+        f'{disposition_type}; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{utf8_name}"
+    )
+
 
 from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
@@ -29,6 +47,18 @@ from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
 from .utils.cache import clear_voice_prompt_cache
 from .platform_detect import get_backend_type
+
+# Keep references to fire-and-forget background tasks to prevent GC
+_background_tasks: set = set()
+
+
+def _create_background_task(coro) -> asyncio.Task:
+    """Create a background task and prevent it from being garbage collected."""
+    task = asyncio.create_task(coro)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
 
 app = FastAPI(
     title="voicebox API",
@@ -188,6 +218,7 @@ async def health():
         gpu_type=gpu_type,
         vram_used_mb=vram_used,
         backend_type=backend_type,
+        backend_variant=os.environ.get("VOICEBOX_BACKEND_VARIANT", "cpu"),
     )
 
 
@@ -203,7 +234,10 @@ async def create_profile(
     """Create a new voice profile."""
     try:
         return await profiles.create_profile(data, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # Fallback for unexpected errors
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -259,10 +293,13 @@ async def update_profile(
     db: Session = Depends(get_db),
 ):
     """Update a voice profile."""
-    profile = await profiles.update_profile(profile_id, data, db)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return profile
+    try:
+        profile = await profiles.update_profile(profile_id, data, db)
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+        return profile
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.delete("/profiles/{profile_id}")
@@ -428,7 +465,7 @@ async def export_profile(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except ValueError as e:
@@ -581,47 +618,94 @@ async def generate_speech(
         profile = await profiles.get_profile(data.profile_id, db)
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
+        
+        # Generate audio
+        from .backends import get_tts_backend_for_engine
 
-        # Resolve model size and load the correct model FIRST.
-        # This must happen before create_voice_prompt_for_profile because that
-        # function calls load_model_async(None), which falls back to self.model_size.
-        # If the model is already loaded with the right size at that point, it
-        # returns immediately and the voice prompt is created by the correct model.
-        tts_model = tts.get_tts_model()
+        engine = data.engine or "qwen"
+        tts_model = get_tts_backend_for_engine(engine)
+
+        # Resolve model size (only relevant for Qwen engine)
         model_size = data.model_size or "1.7B"
 
         # Check if model needs to be downloaded first
-        model_path = tts_model._get_model_path(model_size)
-        if not tts_model._is_model_cached(model_size):
-            # Model is not fully cached — kick off a background download and tell
-            # the client to retry once it's ready.
-            model_name = f"qwen-tts-{model_size}"
+        if engine == "qwen":
+            if not tts_model._is_model_cached(model_size):
+                model_name = f"qwen-tts-{model_size}"
 
-            async def download_model_background():
-                try:
-                    await tts_model.load_model_async(model_size)
-                except Exception as e:
-                    task_manager.error_download(model_name, str(e))
+                async def download_model_background():
+                    try:
+                        await tts_model.load_model_async(model_size)
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
 
-            task_manager.start_download(model_name)
-            asyncio.create_task(download_model_background())
+                task_manager.start_download(model_name)
+                _create_background_task(download_model_background())
 
-            raise HTTPException(
-                status_code=202,
-                detail={
-                    "message": f"Model {model_size} is being downloaded. Please wait and try again.",
-                    "model_name": model_name,
-                    "downloading": True,
-                },
-            )
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
 
-        # Load (or switch to) the requested model before building the voice prompt
-        await tts_model.load_model_async(model_size)
+            # Load (or switch to) the requested model
+            await tts_model.load_model_async(model_size)
+        elif engine == "luxtts":
+            if not tts_model._is_model_cached():
+                model_name = "luxtts"
 
-        # Create voice prompt from profile (model is already loaded with correct size)
+                async def download_luxtts_background():
+                    try:
+                        await tts_model.load_model()
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                _create_background_task(download_luxtts_background())
+
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": "LuxTTS model is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
+
+            await tts_model.load_model()
+        elif engine == "chatterbox":
+            if not tts_model._is_model_cached():
+                model_name = "chatterbox-tts"
+
+                async def download_chatterbox_background():
+                    try:
+                        await tts_model.load_model()
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_chatterbox_background())
+
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": "Chatterbox model is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
+
+            await tts_model.load_model()
+
+        # Create voice prompt from profile
         voice_prompt = await profiles.create_voice_prompt_for_profile(
             data.profile_id,
             db,
+            use_cache=True,
+            engine=engine,
         )
 
         audio, sample_rate = await tts_model.generate(
@@ -631,6 +715,11 @@ async def generate_speech(
             data.seed,
             data.instruct,
         )
+
+        # Trim trailing silence/hallucination for Chatterbox output
+        if engine == "chatterbox":
+            from .utils.audio import trim_tts_output
+            audio = trim_tts_output(audio, sample_rate)
 
         # Calculate duration
         duration = len(audio) / sample_rate
@@ -678,23 +767,41 @@ async def stream_speech(
     playing audio before the entire file has been received.  This endpoint
     does NOT create a history entry — use /generate for that.
     """
+    from .backends import get_tts_backend_for_engine
+
     profile = await profiles.get_profile(data.profile_id, db)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    tts_model = tts.get_tts_model()
+    engine = data.engine or "qwen"
+    tts_model = get_tts_backend_for_engine(engine)
     model_size = data.model_size or "1.7B"
 
-    if not tts_model._is_model_cached(model_size):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
-        )
+    if engine == "qwen":
+        if not tts_model._is_model_cached(model_size):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model_async(model_size)
+    elif engine == "luxtts":
+        if not tts_model._is_model_cached():
+            raise HTTPException(
+                status_code=400,
+                detail="LuxTTS model is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model()
+    elif engine == "chatterbox":
+        if not tts_model._is_model_cached():
+            raise HTTPException(
+                status_code=400,
+                detail="Chatterbox model is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model()
 
-    # Load the correct model before building the voice prompt (fixes issue #96)
-    await tts_model.load_model_async(model_size)
-
-    voice_prompt = await profiles.create_voice_prompt_for_profile(data.profile_id, db)
+    voice_prompt = await profiles.create_voice_prompt_for_profile(
+        data.profile_id, db, engine=engine,
+    )
 
     audio, sample_rate = await tts_model.generate(
         data.text,
@@ -703,6 +810,11 @@ async def stream_speech(
         data.seed,
         data.instruct,
     )
+
+    # Trim trailing silence/hallucination for Chatterbox output
+    if engine == "chatterbox":
+        from .utils.audio import trim_tts_output
+        audio = trim_tts_output(audio, sample_rate)
 
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
 
@@ -847,7 +959,7 @@ async def export_generation(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except ValueError as e:
@@ -880,7 +992,7 @@ async def export_generation_audio(
         audio_path,
         media_type="audio/wav",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            "Content-Disposition": _safe_content_disposition("attachment", filename)
         }
     )
 
@@ -912,7 +1024,11 @@ async def transcribe_audio(
 
         # Check if Whisper model is downloaded (uses default size "base")
         model_size = whisper_model.model_size
-        model_name = f"openai/whisper-{model_size}"
+        # Map model sizes to HF repo IDs (whisper-large needs -v3 suffix)
+        whisper_hf_repos = {
+            "large": "openai/whisper-large-v3",
+        }
+        model_name = whisper_hf_repos.get(model_size, f"openai/whisper-{model_size}")
 
         # Check if model is cached
         from huggingface_hub import constants as hf_constants
@@ -928,7 +1044,7 @@ async def transcribe_audio(
                     get_task_manager().error_download(progress_model_name, str(e))
 
             get_task_manager().start_download(progress_model_name)
-            asyncio.create_task(download_whisper_background())
+            _create_background_task(download_whisper_background())
 
             # Return 202 Accepted
             raise HTTPException(
@@ -1148,7 +1264,7 @@ async def export_story_audio(
             io.BytesIO(audio_bytes),
             media_type="audio/wav",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
+                "Content-Disposition": _safe_content_disposition("attachment", filename)
             }
         )
     except HTTPException:
@@ -1290,15 +1406,33 @@ async def get_model_status():
         whisper_base_id = "openai/whisper-base"
         whisper_small_id = "openai/whisper-small"
         whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large"
+        whisper_large_id = "openai/whisper-large-v3"
     else:
         tts_1_7b_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
         tts_0_6b_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
         whisper_base_id = "openai/whisper-base"
         whisper_small_id = "openai/whisper-small"
         whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large"
+        whisper_large_id = "openai/whisper-large-v3"
     
+    # Check if LuxTTS backend is loaded
+    def check_luxtts_loaded():
+        try:
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("luxtts")
+            return backend.is_loaded()
+        except Exception:
+            return False
+
+    # Check if Chatterbox backend is loaded
+    def check_chatterbox_loaded():
+        try:
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("chatterbox")
+            return backend.is_loaded()
+        except Exception:
+            return False
+
     model_configs = [
         {
             "model_name": "qwen-tts-1.7B",
@@ -1313,6 +1447,20 @@ async def get_model_status():
             "hf_repo_id": tts_0_6b_id,
             "model_size": "0.6B",
             "check_loaded": lambda: check_tts_loaded("0.6B"),
+        },
+        {
+            "model_name": "luxtts",
+            "display_name": "LuxTTS (Fast, CPU-friendly)",
+            "hf_repo_id": "YatharthS/LuxTTS",
+            "model_size": "default",
+            "check_loaded": check_luxtts_loaded,
+        },
+        {
+            "model_name": "chatterbox-tts",
+            "display_name": "Chatterbox TTS (Multilingual)",
+            "hf_repo_id": "ResembleAI/chatterbox",
+            "model_size": "default",
+            "check_loaded": check_chatterbox_loaded,
         },
         {
             "model_name": "whisper-base",
@@ -1465,6 +1613,7 @@ async def get_model_status():
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
+                hf_repo_id=config["hf_repo_id"],
                 downloaded=downloaded,
                 downloading=is_downloading,
                 size_mb=size_mb,
@@ -1483,6 +1632,7 @@ async def get_model_status():
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
+                hf_repo_id=config["hf_repo_id"],
                 downloaded=False,  # Assume not downloaded if check failed
                 downloading=is_downloading,
                 size_mb=None,
@@ -1496,6 +1646,7 @@ async def get_model_status():
 async def trigger_model_download(request: models.ModelDownloadRequest):
     """Trigger download of a specific model."""
     import asyncio
+    from .backends import get_tts_backend_for_engine
     
     task_manager = get_task_manager()
     progress_manager = get_progress_manager()
@@ -1508,6 +1659,14 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
         "qwen-tts-0.6B": {
             "model_size": "0.6B",
             "load_func": lambda: tts.get_tts_model().load_model("0.6B"),
+        },
+        "luxtts": {
+            "model_size": "default",
+            "load_func": lambda: get_tts_backend_for_engine("luxtts").load_model(),
+        },
+        "chatterbox-tts": {
+            "model_size": "default",
+            "load_func": lambda: get_tts_backend_for_engine("chatterbox").load_model(),
         },
         "whisper-base": {
             "model_size": "base",
@@ -1560,10 +1719,46 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
     )
 
     # Start download in background task (don't await)
-    asyncio.create_task(download_in_background())
+    _create_background_task(download_in_background())
 
     # Return immediately - frontend should poll progress endpoint
     return {"message": f"Model {request.model_name} download started"}
+
+
+@app.post("/models/download/cancel")
+async def cancel_model_download(request: models.ModelDownloadRequest):
+    """Cancel or dismiss an errored/stale download task."""
+    task_manager = get_task_manager()
+    progress_manager = get_progress_manager()
+
+    removed = task_manager.cancel_download(request.model_name)
+
+    # Also clear progress state so the model doesn't show as downloading
+    progress_removed = False
+    with progress_manager._lock:
+        if request.model_name in progress_manager._progress:
+            del progress_manager._progress[request.model_name]
+            progress_removed = True
+
+    if removed or progress_removed:
+        return {"message": f"Download task for {request.model_name} cancelled"}
+    return {"message": f"No active task found for {request.model_name}"}
+
+
+@app.post("/tasks/clear")
+async def clear_all_tasks():
+    """Clear all download tasks and progress state. Does not delete downloaded files."""
+    task_manager = get_task_manager()
+    progress_manager = get_progress_manager()
+
+    task_manager.clear_all()
+
+    with progress_manager._lock:
+        progress_manager._progress.clear()
+        progress_manager._last_notify_time.clear()
+        progress_manager._last_notify_progress.clear()
+
+    return {"message": "All task state cleared"}
 
 
 @app.delete("/models/{model_name}")
@@ -1585,6 +1780,16 @@ async def delete_model(model_name: str):
             "model_size": "0.6B",
             "model_type": "tts",
         },
+        "luxtts": {
+            "hf_repo_id": "YatharthS/LuxTTS",
+            "model_size": "default",
+            "model_type": "luxtts",
+        },
+        "chatterbox-tts": {
+            "hf_repo_id": "ResembleAI/chatterbox",
+            "model_size": "default",
+            "model_type": "chatterbox",
+        },
         "whisper-base": {
             "hf_repo_id": "openai/whisper-base",
             "model_size": "base",
@@ -1601,12 +1806,12 @@ async def delete_model(model_name: str):
             "model_type": "whisper",
         },
         "whisper-large": {
-            "hf_repo_id": "openai/whisper-large",
+            "hf_repo_id": "openai/whisper-large-v3",
             "model_size": "large",
             "model_type": "whisper",
         },
     }
-    
+
     if model_name not in model_configs:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
     
@@ -1619,6 +1824,16 @@ async def delete_model(model_name: str):
             tts_model = tts.get_tts_model()
             if tts_model.is_loaded() and tts_model.model_size == config["model_size"]:
                 tts.unload_tts_model()
+        elif config["model_type"] == "luxtts":
+            from .backends import get_tts_backend_for_engine
+            luxtts = get_tts_backend_for_engine("luxtts")
+            if luxtts.is_loaded():
+                luxtts.unload_model()
+        elif config["model_type"] == "chatterbox":
+            from .backends import get_tts_backend_for_engine
+            chatterbox = get_tts_backend_for_engine("chatterbox")
+            if chatterbox.is_loaded():
+                chatterbox.unload_model()
         elif config["model_type"] == "whisper":
             whisper_model = transcribe.get_whisper_model()
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:
@@ -1690,10 +1905,29 @@ async def get_active_tasks():
         progress = progress_map.get(model_name)
         
         if task:
+            # Prefer task error, fall back to progress manager error
+            error = task.error
+            if not error:
+                with progress_manager._lock:
+                    pm_data = progress_manager._progress.get(model_name)
+                    if pm_data:
+                        error = pm_data.get("error")
+            # Include progress data if available
+            prog = progress or {}
+            if not prog:
+                with progress_manager._lock:
+                    pm_data = progress_manager._progress.get(model_name)
+                    if pm_data:
+                        prog = pm_data
             active_downloads.append(models.ActiveDownloadTask(
                 model_name=model_name,
                 status=task.status,
                 started_at=task.started_at,
+                error=error,
+                progress=prog.get("progress"),
+                current=prog.get("current"),
+                total=prog.get("total"),
+                filename=prog.get("filename"),
             ))
         elif progress:
             # Progress exists but no task - create from progress data
@@ -1710,6 +1944,11 @@ async def get_active_tasks():
                 model_name=model_name,
                 status=progress.get("status", "downloading"),
                 started_at=started_at,
+                error=progress.get("error"),
+                progress=progress.get("progress"),
+                current=progress.get("current"),
+                total=progress.get("total"),
+                filename=progress.get("filename"),
             ))
     
     # Get active generations
@@ -1725,6 +1964,75 @@ async def get_active_tasks():
     return models.ActiveTasksResponse(
         downloads=active_downloads,
         generations=active_generations,
+    )
+
+
+# ============================================
+# CUDA BACKEND MANAGEMENT
+# ============================================
+
+@app.get("/backend/cuda-status")
+async def get_cuda_status():
+    """Get CUDA backend download/availability status."""
+    from . import cuda_download
+    return cuda_download.get_cuda_status()
+
+
+@app.post("/backend/download-cuda")
+async def download_cuda_backend():
+    """Download the CUDA backend binary. Returns immediately; track progress via SSE."""
+    from . import cuda_download
+
+    # Check if already downloaded
+    if cuda_download.get_cuda_binary_path() is not None:
+        raise HTTPException(status_code=409, detail="CUDA backend already downloaded")
+
+    async def _download():
+        try:
+            await cuda_download.download_cuda_binary()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"CUDA download failed: {e}")
+
+    _create_background_task(_download())
+    return {"message": "CUDA backend download started", "progress_key": "cuda-backend"}
+
+
+@app.delete("/backend/cuda")
+async def delete_cuda_backend():
+    """Delete the downloaded CUDA backend binary."""
+    from . import cuda_download
+
+    if cuda_download.is_cuda_active():
+        raise HTTPException(
+            status_code=409,
+            detail="Cannot delete CUDA backend while it is active. Switch to CPU first.",
+        )
+
+    deleted = await cuda_download.delete_cuda_binary()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No CUDA backend found to delete")
+
+    return {"message": "CUDA backend deleted"}
+
+
+@app.get("/backend/cuda-progress")
+async def get_cuda_download_progress():
+    """Get CUDA backend download progress via Server-Sent Events."""
+    progress_manager = get_progress_manager()
+
+    async def event_generator():
+        async for event in progress_manager.subscribe("cuda-backend"):
+            yield event
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
