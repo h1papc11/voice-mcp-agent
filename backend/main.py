@@ -1512,7 +1512,10 @@ async def unload_model_by_name(model_name: str):
     try:
         if model_type == "tts":
             tts_model = tts.get_tts_model()
-            if tts_model.is_loaded() and tts_model.model_size == model_size:
+            loaded_size = getattr(
+                tts_model, "_current_model_size", None
+            ) or getattr(tts_model, "model_size", None)
+            if tts_model.is_loaded() and loaded_size == model_size:
                 tts.unload_tts_model()
             else:
                 return {"message": f"Model {model_name} is not loaded"}
@@ -1595,7 +1598,10 @@ async def get_model_status():
         """Check if TTS model is loaded with specific size."""
         try:
             tts_model = tts.get_tts_model()
-            return tts_model.is_loaded() and getattr(tts_model, 'model_size', None) == model_size
+            loaded_size = getattr(
+                tts_model, "_current_model_size", None
+            ) or getattr(tts_model, "model_size", None)
+            return tts_model.is_loaded() and loaded_size == model_size
         except Exception:
             return False
     
@@ -2072,7 +2078,10 @@ async def delete_model(model_name: str):
         # Check if model is loaded and unload it first
         if config["model_type"] == "tts":
             tts_model = tts.get_tts_model()
-            if tts_model.is_loaded() and tts_model.model_size == config["model_size"]:
+            loaded_size = getattr(
+                tts_model, "_current_model_size", None
+            ) or getattr(tts_model, "model_size", None)
+            if tts_model.is_loaded() and loaded_size == config["model_size"]:
                 tts.unload_tts_model()
         elif config["model_type"] == "luxtts":
             from .backends import get_tts_backend_for_engine

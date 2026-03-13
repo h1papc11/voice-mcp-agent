@@ -136,6 +136,10 @@ class ChatterboxTTSBackend:
             import torch
             from chatterbox.mtl_tts import ChatterboxMultilingualTTS
 
+            # Load into a local variable first, apply all patches, then
+            # assign to self.model.  This avoids leaving a half-initialised
+            # model on self.model if any patch step raises an exception.
+            #
             # Monkey-patch torch.load for CPU loading. The model's .pt files
             # were saved on CUDA; from_pretrained() doesn't pass map_location
             # so loading on CPU fails without this.
@@ -150,13 +154,13 @@ class ChatterboxTTSBackend:
                     with ChatterboxTTSBackend._load_lock:
                         torch.load = _patched_load
                         try:
-                            self.model = ChatterboxMultilingualTTS.from_pretrained(
+                            model = ChatterboxMultilingualTTS.from_pretrained(
                                 device=device,
                             )
                         finally:
                             torch.load = _orig_torch_load
                 else:
-                    self.model = ChatterboxMultilingualTTS.from_pretrained(
+                    model = ChatterboxMultilingualTTS.from_pretrained(
                         device=device,
                     )
             finally:
@@ -165,7 +169,7 @@ class ChatterboxTTSBackend:
             # Fix: transformers >= 4.36 defaults LlamaModel to sdpa attention
             # which doesn't support output_attentions=True (needed by
             # Chatterbox's AlignmentStreamAnalyzer). Force eager attention.
-            t3_tfmr = self.model.t3.tfmr
+            t3_tfmr = model.t3.tfmr
             if hasattr(t3_tfmr, "config") and hasattr(
                 t3_tfmr.config, "_attn_implementation"
             ):
@@ -185,7 +189,7 @@ class ChatterboxTTSBackend:
             import types
 
             # Patch S3Tokenizer (used by s3gen.tokenizer)
-            _tokzr = self.model.s3gen.tokenizer
+            _tokzr = model.s3gen.tokenizer
             _orig_log_mel = _tokzr.log_mel_spectrogram.__func__
 
             def _f32_log_mel(self_tokzr, audio, padding=0):
@@ -197,13 +201,16 @@ class ChatterboxTTSBackend:
             _tokzr.log_mel_spectrogram = types.MethodType(_f32_log_mel, _tokzr)
 
             # Patch VoiceEncoder
-            _ve = self.model.ve
+            _ve = model.ve
             _orig_ve_forward = _ve.forward.__func__
 
             def _f32_ve_forward(self_ve, mels):
                 return _orig_ve_forward(self_ve, mels.float())
 
             _ve.forward = types.MethodType(_f32_ve_forward, _ve)
+
+            # All patches applied successfully — publish the model
+            self.model = model
 
             logger.info("Chatterbox Multilingual TTS loaded successfully")
 
