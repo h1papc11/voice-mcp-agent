@@ -21,7 +21,6 @@ services:
       - huggingface-cache:/home/voicebox/.cache/huggingface
 
     environment:
-      - TTS_MODE=local
       - LOG_LEVEL=info
 
     networks:
