@@ -18,7 +18,6 @@ import numpy as np
 from . import TTSBackend
 from ..utils.audio import normalize_audio, load_audio
 from ..utils.progress import get_progress_manager
-from ..utils.hf_progress import HFProgressTracker, create_hf_progress_callback
 from ..utils.tasks import get_task_manager
 
 logger = logging.getLogger(__name__)
@@ -110,63 +109,59 @@ class ChatterboxTTSBackend:
 
         is_cached = self._is_model_cached()
 
-        try:
-            progress_callback = create_hf_progress_callback(model_name, progress_manager)
-            tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
+        if not is_cached:
+            task_manager.start_download(model_name)
+            progress_manager.update_progress(
+                model_name=model_name,
+                current=0,
+                total=0,
+                filename="Downloading Chatterbox model...",
+                status="downloading",
+            )
 
-            if not is_cached:
-                task_manager.start_download(model_name)
-                progress_manager.update_progress(
-                    model_name=model_name,
-                    current=0,
-                    total=0,
-                    filename="Downloading Chatterbox model...",
-                    status="downloading",
+        try:
+            device = self._get_device()
+            self._device = device
+
+            logger.info(f"Loading Chatterbox Multilingual TTS on {device}...")
+
+            import torch
+            from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+
+            # Monkey-patch torch.load for CPU loading. The model's .pt files
+            # were saved on CUDA; from_pretrained() doesn't pass map_location
+            # so loading on CPU fails without this.
+            if device == "cpu":
+                _orig_torch_load = torch.load
+
+                def _patched_load(*args, **kwargs):
+                    kwargs.setdefault("map_location", "cpu")
+                    return _orig_torch_load(*args, **kwargs)
+
+                with ChatterboxTTSBackend._load_lock:
+                    torch.load = _patched_load
+                    try:
+                        self.model = ChatterboxMultilingualTTS.from_pretrained(
+                            device=device,
+                        )
+                    finally:
+                        torch.load = _orig_torch_load
+            else:
+                self.model = ChatterboxMultilingualTTS.from_pretrained(
+                    device=device,
                 )
 
-            with tracker.patch_download():
-                device = self._get_device()
-                self._device = device
-
-                logger.info(f"Loading Chatterbox Multilingual TTS on {device}...")
-
-                import torch
-                from chatterbox.mtl_tts import ChatterboxMultilingualTTS
-
-                # Monkey-patch torch.load for CPU loading. The model's .pt files
-                # were saved on CUDA; from_pretrained() doesn't pass map_location
-                # so loading on CPU fails without this.
-                if device == "cpu":
-                    _orig_torch_load = torch.load
-
-                    def _patched_load(*args, **kwargs):
-                        kwargs.setdefault("map_location", "cpu")
-                        return _orig_torch_load(*args, **kwargs)
-
-                    with ChatterboxTTSBackend._load_lock:
-                        torch.load = _patched_load
-                        try:
-                            self.model = ChatterboxMultilingualTTS.from_pretrained(
-                                device=device,
-                            )
-                        finally:
-                            torch.load = _orig_torch_load
-                else:
-                    self.model = ChatterboxMultilingualTTS.from_pretrained(
-                        device=device,
-                    )
-
-                # Fix: transformers >= 4.36 defaults LlamaModel to sdpa attention
-                # which doesn't support output_attentions=True (needed by
-                # Chatterbox's AlignmentStreamAnalyzer). Force eager attention.
-                t3_tfmr = self.model.t3.tfmr
-                if hasattr(t3_tfmr, "config") and hasattr(
-                    t3_tfmr.config, "_attn_implementation"
-                ):
-                    t3_tfmr.config._attn_implementation = "eager"
-                    for layer in getattr(t3_tfmr, "layers", []):
-                        if hasattr(layer, "self_attn"):
-                            layer.self_attn._attn_implementation = "eager"
+            # Fix: transformers >= 4.36 defaults LlamaModel to sdpa attention
+            # which doesn't support output_attentions=True (needed by
+            # Chatterbox's AlignmentStreamAnalyzer). Force eager attention.
+            t3_tfmr = self.model.t3.tfmr
+            if hasattr(t3_tfmr, "config") and hasattr(
+                t3_tfmr.config, "_attn_implementation"
+            ):
+                t3_tfmr.config._attn_implementation = "eager"
+                for layer in getattr(t3_tfmr, "layers", []):
+                    if hasattr(layer, "self_attn"):
+                        layer.self_attn._attn_implementation = "eager"
 
             if not is_cached:
                 progress_manager.mark_complete(model_name)
@@ -179,13 +174,15 @@ class ChatterboxTTSBackend:
                 "chatterbox-tts package not found. "
                 "Install with: pip install chatterbox-tts"
             )
-            progress_manager.mark_error(model_name, str(e))
-            task_manager.error_download(model_name, str(e))
+            if not is_cached:
+                progress_manager.mark_error(model_name, str(e))
+                task_manager.error_download(model_name, str(e))
             raise
         except Exception as e:
             logger.error(f"Failed to load Chatterbox: {e}")
-            progress_manager.mark_error(model_name, str(e))
-            task_manager.error_download(model_name, str(e))
+            if not is_cached:
+                progress_manager.mark_error(model_name, str(e))
+                task_manager.error_download(model_name, str(e))
             raise
 
     def unload_model(self) -> None:

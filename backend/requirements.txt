@@ -21,8 +21,17 @@ qwen-tts>=0.0.5
 linacodec @ git+https://github.com/ysharma3501/LinaCodec.git
 Zipvoice @ git+https://github.com/ysharma3501/LuxTTS.git
 
-# Chatterbox TTS (multilingual voice cloning, includes Hebrew)
-chatterbox-tts>=0.1.0
+# Chatterbox TTS sub-dependencies (chatterbox-tts itself is installed
+# --no-deps in the setup script because it pins numpy<1.26 / torch==2.6
+# which are incompatible with Python 3.12+)
+conformer>=0.3.2
+diffusers>=0.29.0
+omegaconf
+pykakasi
+resemble-perth>=1.0.1
+s3tokenizer
+spacy-pkuseg
+pyloudnorm
 
 # Audio processing
 librosa>=0.10.0
