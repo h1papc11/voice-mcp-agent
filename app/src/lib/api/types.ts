@@ -34,6 +34,8 @@ export interface GenerationRequest {
   language: LanguageCode;
   seed?: number;
   model_size?: '1.7B' | '0.6B';
+  engine?: 'qwen' | 'luxtts';
+  instruct?: string;
 }
 
 export interface GenerationResponse {

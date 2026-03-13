@@ -32,7 +32,26 @@ Thank you for your interest in contributing to Voicebox! This document provides 
 
 ### Development Setup
 
-**Using the Makefile (recommended for macOS/Linux):** Run `make setup` to install all dependencies, then `make dev` to start development servers. See `make help` for all available commands.
+**Using `just` (recommended):**
+
+Install [just](https://github.com/casey/just) (`brew install just` or `cargo install just`), then:
+
+```bash
+just setup   # creates venv, installs Python + JS deps
+just dev     # starts backend + desktop app in one terminal
+```
+
+Other useful commands:
+
+```bash
+just dev-web       # backend + web app (no Tauri/Rust build)
+just dev-backend   # backend only
+just kill          # stop all dev processes
+just clean-all     # nuke everything and start fresh
+just --list        # see all available commands
+```
+
+**Using the Makefile:** Run `make setup` then `make dev`. See `make help` for all commands.
 
 **Manual setup (required for Windows):**
 
