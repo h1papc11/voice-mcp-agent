@@ -20,6 +20,7 @@ import { useAddStoryItem, useStory } from '@/lib/hooks/useStories';
 import { cn } from '@/lib/utils/cn';
 import { useStoryStore } from '@/stores/storyStore';
 import { useUIStore } from '@/stores/uiStore';
+import { ParalinguisticInput } from './ParalinguisticInput';
 
 interface FloatingGenerateBoxProps {
   isPlayerOpen?: boolean;
@@ -219,34 +220,57 @@ export function FloatingGenerateBox({
                             transition={{ duration: 0.15, ease: 'easeOut' }}
                             style={{ overflow: 'hidden' }}
                           >
-                            <Textarea
-                              {...field}
-                              ref={(node: HTMLTextAreaElement | null) => {
-                                // Store ref for auto-resize (only for active field)
-                                if (!isInstructMode) {
-                                  textareaRef.current = node;
+                            {form.watch('engine') === 'chatterbox_turbo' ? (
+                              <ParalinguisticInput
+                                value={field.value}
+                                onChange={field.onChange}
+                                placeholder={
+                                  isStoriesRoute && currentStory
+                                    ? `Generate speech for "${currentStory.name}"... (type / for effects)`
+                                    : selectedProfile
+                                      ? `Type / for effects like [laugh], [sigh]...`
+                                      : 'Select a voice profile above...'
                                 }
-                                // Forward ref to react-hook-form
-                                if (typeof field.ref === 'function') {
-                                  field.ref(node);
+                                className="px-3 py-2 resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm w-full"
+                                style={{
+                                  minHeight: isExpanded ? '100px' : '32px',
+                                  maxHeight: '300px',
+                                  overflowY: 'auto',
+                                }}
+                                disabled={!selectedProfileId}
+                                onClick={() => setIsExpanded(true)}
+                                onFocus={() => setIsExpanded(true)}
+                              />
+                            ) : (
+                              <Textarea
+                                {...field}
+                                ref={(node: HTMLTextAreaElement | null) => {
+                                  // Store ref for auto-resize (only for active field)
+                                  if (!isInstructMode) {
+                                    textareaRef.current = node;
+                                  }
+                                  // Forward ref to react-hook-form
+                                  if (typeof field.ref === 'function') {
+                                    field.ref(node);
+                                  }
+                                }}
+                                placeholder={
+                                  isStoriesRoute && currentStory
+                                    ? `Generate speech for "${currentStory.name}"...`
+                                    : selectedProfile
+                                      ? `Generate speech using ${selectedProfile.name}...`
+                                      : 'Select a voice profile above...'
                                 }
-                              }}
-                              placeholder={
-                                isStoriesRoute && currentStory
-                                  ? `Generate speech for "${currentStory.name}"...`
-                                  : selectedProfile
-                                    ? `Generate speech using ${selectedProfile.name}...`
-                                    : 'Select a voice profile above...'
-                              }
-                              className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full"
-                              style={{
-                                minHeight: isExpanded ? '100px' : '32px',
-                                maxHeight: '300px',
-                              }}
-                              disabled={!selectedProfileId}
-                              onClick={() => setIsExpanded(true)}
-                              onFocus={() => setIsExpanded(true)}
-                            />
+                                className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full"
+                                style={{
+                                  minHeight: isExpanded ? '100px' : '32px',
+                                  maxHeight: '300px',
+                                }}
+                                disabled={!selectedProfileId}
+                                onClick={() => setIsExpanded(true)}
+                                onFocus={() => setIsExpanded(true)}
+                              />
+                            )}
                           </motion.div>
                         </FormControl>
                         <FormMessage className="text-xs" />
