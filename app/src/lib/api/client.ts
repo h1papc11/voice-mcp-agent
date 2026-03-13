@@ -337,6 +337,12 @@ class ApiClient {
     });
   }
 
+  async unloadModel(modelName: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/models/${modelName}/unload`, {
+      method: 'POST',
+    });
+  }
+
   async cancelDownload(modelName: string): Promise<{ message: string }> {
     return this.request<{ message: string }>('/models/download/cancel', {
       method: 'POST',

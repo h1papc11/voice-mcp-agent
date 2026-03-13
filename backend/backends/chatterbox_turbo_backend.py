@@ -154,6 +154,8 @@ class ChatterboxTurboTTSBackend:
             # Monkey-patch torch.load for CPU loading. The model's .pt files
             # were saved on CUDA; from_local() doesn't pass map_location
             # so loading on CPU fails without this.
+            # Load into a local var, apply patches, then publish to
+            # self.model so a failed patch doesn't leave us half-initialised.
             if device == "cpu":
                 _orig_torch_load = torch.load
 
@@ -164,19 +166,55 @@ class ChatterboxTurboTTSBackend:
                 with ChatterboxTurboTTSBackend._load_lock:
                     torch.load = _patched_load
                     try:
-                        self.model = ChatterboxTurboTTS.from_local(
+                        model = ChatterboxTurboTTS.from_local(
                             local_path, device,
                         )
                     finally:
                         torch.load = _orig_torch_load
             else:
-                self.model = ChatterboxTurboTTS.from_local(
+                model = ChatterboxTurboTTS.from_local(
                     local_path, device,
                 )
 
             if not is_cached:
                 progress_manager.mark_complete(model_name)
                 task_manager.complete_download(model_name)
+
+            # Patch float64 → float32 dtype mismatches in upstream chatterbox.
+            # librosa.load returns float64 numpy; multiple upstream code paths
+            # convert it to a torch tensor via torch.from_numpy() without
+            # casting, then matmul it against float32 model weights.
+            # We patch the two known entry points:
+            #
+            # 1. S3Tokenizer.log_mel_spectrogram — the audio tensor from
+            #    librosa hits _mel_filters (float32) in a matmul.
+            # 2. VoiceEncoder.forward — float64 mel spectrograms hit the
+            #    float32 LSTM weights.
+            import types
+
+            # Patch S3Tokenizer (used by s3gen.tokenizer)
+            _tokzr = model.s3gen.tokenizer
+            _orig_log_mel = _tokzr.log_mel_spectrogram.__func__
+
+            def _f32_log_mel(self_tokzr, audio, padding=0):
+                import torch as _torch
+                if _torch.is_tensor(audio):
+                    audio = audio.float()
+                return _orig_log_mel(self_tokzr, audio, padding)
+
+            _tokzr.log_mel_spectrogram = types.MethodType(_f32_log_mel, _tokzr)
+
+            # Patch VoiceEncoder
+            _ve = model.ve
+            _orig_ve_forward = _ve.forward.__func__
+
+            def _f32_ve_forward(self_ve, mels):
+                return _orig_ve_forward(self_ve, mels.float())
+
+            _ve.forward = types.MethodType(_f32_ve_forward, _ve)
+
+            # Only publish after all patches succeed
+            self.model = model
 
             logger.info("Chatterbox Turbo TTS loaded successfully")
 
