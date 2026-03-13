@@ -101,30 +101,33 @@ export function GenerationForm() {
             )}
 
             <div className="grid gap-4 md:grid-cols-3">
-              <FormField
-                control={form.control}
-                name="engine"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>TTS Engine</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="qwen">Qwen TTS</SelectItem>
-                        <SelectItem value="luxtts">LuxTTS</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      {field.value === 'luxtts' ? 'Fast, English-focused' : 'Multi-language'}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormItem>
+                <FormLabel>Model</FormLabel>
+                <Select
+                  value={`${form.watch('engine') || 'qwen'}:${form.watch('modelSize') || '1.7B'}`}
+                  onValueChange={(value) => {
+                    const [engine, modelSize] = value.split(':');
+                    form.setValue('engine', engine as 'qwen' | 'luxtts');
+                    if (modelSize) form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="qwen:1.7B">Qwen3-TTS 1.7B</SelectItem>
+                    <SelectItem value="qwen:0.6B">Qwen3-TTS 0.6B</SelectItem>
+                    <SelectItem value="luxtts:default">LuxTTS</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  {form.watch('engine') === 'luxtts'
+                    ? 'Fast, English-focused'
+                    : 'Multi-language, two sizes'}
+                </FormDescription>
+              </FormItem>
 
               <FormField
                 control={form.control}
@@ -173,31 +176,6 @@ export function GenerationForm() {
                 )}
               />
             </div>
-
-            {form.watch('engine') !== 'luxtts' && (
-              <FormField
-                control={form.control}
-                name="modelSize"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Model Size</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="1.7B">Qwen TTS 1.7B (Higher Quality)</SelectItem>
-                        <SelectItem value="0.6B">Qwen TTS 0.6B (Faster)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>Larger models produce better quality</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
 
             <Button type="submit" className="w-full" disabled={isPending || !selectedProfileId}>
               {isPending ? (

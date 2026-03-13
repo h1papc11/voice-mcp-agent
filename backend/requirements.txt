@@ -17,6 +17,8 @@ qwen-tts>=0.0.5
 # LuxTTS (voice cloning engine)
 # piper-phonemize needs custom index (no PyPI wheels)
 --find-links https://k2-fsa.github.io/icefall/piper_phonemize.html
+# linacodec is a git-only dep of Zipvoice (uv-only source, pip can't resolve it)
+linacodec @ git+https://github.com/ysharma3501/LinaCodec.git
 Zipvoice @ git+https://github.com/ysharma3501/LuxTTS.git
 
 # Audio processing
