@@ -121,6 +121,7 @@ _stt_backend: Optional[STTBackend] = None
 TTS_ENGINES = {
     "qwen": "Qwen TTS",
     "luxtts": "LuxTTS",
+    "chatterbox": "Chatterbox TTS",
 }
 
 
@@ -167,6 +168,9 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
         elif engine == "luxtts":
             from .luxtts_backend import LuxTTSBackend
             backend = LuxTTSBackend()
+        elif engine == "chatterbox":
+            from .chatterbox_backend import ChatterboxTTSBackend
+            backend = ChatterboxTTSBackend()
         else:
             raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
         

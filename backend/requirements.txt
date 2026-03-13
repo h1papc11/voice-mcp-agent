@@ -21,6 +21,9 @@ qwen-tts>=0.0.5
 linacodec @ git+https://github.com/ysharma3501/LinaCodec.git
 Zipvoice @ git+https://github.com/ysharma3501/LuxTTS.git
 
+# Chatterbox TTS (multilingual voice cloning, includes Hebrew)
+chatterbox-tts>=0.1.0
+
 # Audio processing
 librosa>=0.10.0
 soundfile>=0.12.0

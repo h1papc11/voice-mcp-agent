@@ -11,7 +11,7 @@ class VoiceProfileCreate(BaseModel):
     """Request model for creating a voice profile."""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
-    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it)$")
+    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it|he)$")
 
 
 class VoiceProfileResponse(BaseModel):
@@ -53,11 +53,11 @@ class GenerationRequest(BaseModel):
     """Request model for voice generation."""
     profile_id: str
     text: str = Field(..., min_length=1, max_length=5000)
-    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it)$")
+    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it|he)$")
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B)$")
     instruct: Optional[str] = Field(None, max_length=500)
-    engine: Optional[str] = Field(default="qwen", pattern="^(qwen|luxtts)$")
+    engine: Optional[str] = Field(default="qwen", pattern="^(qwen|luxtts|chatterbox)$")
 
 
 class GenerationResponse(BaseModel):
@@ -135,6 +135,7 @@ class ModelStatus(BaseModel):
     """Response model for model status."""
     model_name: str
     display_name: str
+    hf_repo_id: Optional[str] = None  # HuggingFace repository ID
     downloaded: bool
     downloading: bool = False  # True if download is in progress
     size_mb: Optional[float] = None

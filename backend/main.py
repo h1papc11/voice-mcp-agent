@@ -676,6 +676,29 @@ async def generate_speech(
                 )
 
             await tts_model.load_model()
+        elif engine == "chatterbox":
+            if not tts_model._is_model_cached():
+                model_name = "chatterbox-tts"
+
+                async def download_chatterbox_background():
+                    try:
+                        await tts_model.load_model()
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_chatterbox_background())
+
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": "Chatterbox model is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
+
+            await tts_model.load_model()
 
         # Create voice prompt from profile
         voice_prompt = await profiles.create_voice_prompt_for_profile(
@@ -692,6 +715,11 @@ async def generate_speech(
             data.seed,
             data.instruct,
         )
+
+        # Trim trailing silence/hallucination for Chatterbox output
+        if engine == "chatterbox":
+            from .utils.audio import trim_tts_output
+            audio = trim_tts_output(audio, sample_rate)
 
         # Calculate duration
         duration = len(audio) / sample_rate
@@ -763,6 +791,13 @@ async def stream_speech(
                 detail="LuxTTS model is not downloaded yet. Use /generate to trigger a download.",
             )
         await tts_model.load_model()
+    elif engine == "chatterbox":
+        if not tts_model._is_model_cached():
+            raise HTTPException(
+                status_code=400,
+                detail="Chatterbox model is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model()
 
     voice_prompt = await profiles.create_voice_prompt_for_profile(
         data.profile_id, db, engine=engine,
@@ -775,6 +810,11 @@ async def stream_speech(
         data.seed,
         data.instruct,
     )
+
+    # Trim trailing silence/hallucination for Chatterbox output
+    if engine == "chatterbox":
+        from .utils.audio import trim_tts_output
+        audio = trim_tts_output(audio, sample_rate)
 
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
 
@@ -1384,6 +1424,15 @@ async def get_model_status():
         except Exception:
             return False
 
+    # Check if Chatterbox backend is loaded
+    def check_chatterbox_loaded():
+        try:
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("chatterbox")
+            return backend.is_loaded()
+        except Exception:
+            return False
+
     model_configs = [
         {
             "model_name": "qwen-tts-1.7B",
@@ -1405,6 +1454,13 @@ async def get_model_status():
             "hf_repo_id": "YatharthS/LuxTTS",
             "model_size": "default",
             "check_loaded": check_luxtts_loaded,
+        },
+        {
+            "model_name": "chatterbox-tts",
+            "display_name": "Chatterbox TTS (Multilingual)",
+            "hf_repo_id": "ResembleAI/chatterbox",
+            "model_size": "default",
+            "check_loaded": check_chatterbox_loaded,
         },
         {
             "model_name": "whisper-base",
@@ -1557,6 +1613,7 @@ async def get_model_status():
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
+                hf_repo_id=config["hf_repo_id"],
                 downloaded=downloaded,
                 downloading=is_downloading,
                 size_mb=size_mb,
@@ -1575,6 +1632,7 @@ async def get_model_status():
             statuses.append(models.ModelStatus(
                 model_name=config["model_name"],
                 display_name=config["display_name"],
+                hf_repo_id=config["hf_repo_id"],
                 downloaded=False,  # Assume not downloaded if check failed
                 downloading=is_downloading,
                 size_mb=None,
@@ -1605,6 +1663,10 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
         "luxtts": {
             "model_size": "default",
             "load_func": lambda: get_tts_backend_for_engine("luxtts").load_model(),
+        },
+        "chatterbox-tts": {
+            "model_size": "default",
+            "load_func": lambda: get_tts_backend_for_engine("chatterbox").load_model(),
         },
         "whisper-base": {
             "model_size": "base",
@@ -1723,6 +1785,11 @@ async def delete_model(model_name: str):
             "model_size": "default",
             "model_type": "luxtts",
         },
+        "chatterbox-tts": {
+            "hf_repo_id": "ResembleAI/chatterbox",
+            "model_size": "default",
+            "model_type": "chatterbox",
+        },
         "whisper-base": {
             "hf_repo_id": "openai/whisper-base",
             "model_size": "base",
@@ -1762,6 +1829,11 @@ async def delete_model(model_name: str):
             luxtts = get_tts_backend_for_engine("luxtts")
             if luxtts.is_loaded():
                 luxtts.unload_model()
+        elif config["model_type"] == "chatterbox":
+            from .backends import get_tts_backend_for_engine
+            chatterbox = get_tts_backend_for_engine("chatterbox")
+            if chatterbox.is_loaded():
+                chatterbox.unload_model()
         elif config["model_type"] == "whisper":
             whisper_model = transcribe.get_whisper_model()
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:

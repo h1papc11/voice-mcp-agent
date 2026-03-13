@@ -316,7 +316,7 @@ export function FloatingGenerateBox({
                   </span>
                 </div>
                 <AnimatePresence>
-                  {isExpanded && form.watch('engine') !== 'luxtts' && (
+                  {isExpanded && form.watch('engine') === 'qwen' && (
                     <motion.div
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -407,11 +407,15 @@ export function FloatingGenerateBox({
                       value={
                         form.watch('engine') === 'luxtts'
                           ? 'luxtts'
-                          : `qwen:${form.watch('modelSize') || '1.7B'}`
+                          : form.watch('engine') === 'chatterbox'
+                            ? 'chatterbox'
+                            : `qwen:${form.watch('modelSize') || '1.7B'}`
                       }
                       onValueChange={(value) => {
                         if (value === 'luxtts') {
                           form.setValue('engine', 'luxtts');
+                        } else if (value === 'chatterbox') {
+                          form.setValue('engine', 'chatterbox');
                         } else {
                           const [, modelSize] = value.split(':');
                           form.setValue('engine', 'qwen');
@@ -433,6 +437,9 @@ export function FloatingGenerateBox({
                         </SelectItem>
                         <SelectItem value="luxtts" className="text-xs text-muted-foreground">
                           LuxTTS
+                        </SelectItem>
+                        <SelectItem value="chatterbox" className="text-xs text-muted-foreground">
+                          Chatterbox
                         </SelectItem>
                       </SelectContent>
                     </Select>
