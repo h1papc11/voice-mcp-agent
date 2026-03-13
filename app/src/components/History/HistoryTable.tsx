@@ -1,13 +1,15 @@
+import { useQueryClient } from '@tanstack/react-query';
 import {
-  AudioWaveform,
   Download,
   FileArchive,
   Loader2,
   MoreHorizontal,
   Play,
+  RotateCcw,
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import Loader from 'react-loaders';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,7 +38,8 @@ import {
   useImportGeneration,
 } from '@/lib/hooks/useHistory';
 import { cn } from '@/lib/utils/cn';
-import { formatDate, formatDuration } from '@/lib/utils/format';
+import { formatDate, formatDuration, formatEngineName } from '@/lib/utils/format';
+import { useGenerationStore } from '@/stores/generationStore';
 import { usePlayerStore } from '@/stores/playerStore';
 
 // OLD TABLE-BASED COMPONENT - REMOVED (can be found in git history)
@@ -54,9 +57,12 @@ export function HistoryTable() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [generationToDelete, setGenerationToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [generationToDelete, setGenerationToDelete] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const limit = 20;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const {
     data: historyData,
@@ -71,6 +77,7 @@ export function HistoryTable() {
   const exportGeneration = useExportGeneration();
   const exportGenerationAudio = useExportGenerationAudio();
   const importGeneration = useImportGeneration();
+  const addPendingGeneration = useGenerationStore((state) => state.addPendingGeneration);
   const setAudioWithAutoPlay = usePlayerStore((state) => state.setAudioWithAutoPlay);
   const restartCurrentAudio = usePlayerStore((state) => state.restartCurrentAudio);
   const currentAudioId = usePlayerStore((state) => state.audioId);
@@ -194,6 +201,20 @@ export function HistoryTable() {
     }
   };
 
+  const handleRetry = async (generationId: string) => {
+    try {
+      const result = await apiClient.retryGeneration(generationId);
+      addPendingGeneration(result.id);
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    } catch (error) {
+      toast({
+        title: 'Retry failed',
+        description: error instanceof Error ? error.message : 'Could not retry generation',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleImportConfirm = () => {
     if (selectedFile) {
       importGeneration.mutate(selectedFile, {
@@ -250,22 +271,30 @@ export function HistoryTable() {
           >
             {history.map((gen) => {
               const isCurrentlyPlaying = currentAudioId === gen.id && isPlaying;
+              const isGenerating = gen.status === 'generating';
+              const isFailed = gen.status === 'failed';
+              const isPlayable = !isGenerating && !isFailed;
               return (
                 <div
                   key={gen.id}
-                  role="button"
-                  tabIndex={0}
+                  role={isPlayable ? 'button' : undefined}
+                  tabIndex={isPlayable ? 0 : undefined}
                   className={cn(
-                    'flex items-stretch gap-4 h-26 border rounded-md p-3 bg-card hover:bg-muted/70 transition-colors text-left w-full',
+                    'flex items-stretch gap-4 h-26 border rounded-md p-3 bg-card transition-colors text-left w-full',
+                    isPlayable && 'hover:bg-muted/70 cursor-pointer',
                     isCurrentlyPlaying && 'bg-muted/70',
                   )}
                   aria-label={
-                    isCurrentlyPlaying
-                      ? `Sample from ${gen.profile_name}, ${formatDuration(gen.duration)}, ${formatDate(gen.created_at)}. Playing. Press Enter to restart.`
-                      : `Sample from ${gen.profile_name}, ${formatDuration(gen.duration)}, ${formatDate(gen.created_at)}. Press Enter to play.`
+                    isGenerating
+                      ? `Generating speech for ${gen.profile_name}...`
+                      : isFailed
+                        ? `Generation failed for ${gen.profile_name}`
+                        : isCurrentlyPlaying
+                          ? `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Playing. Press Enter to restart.`
+                          : `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Press Enter to play.`
                   }
                   onMouseDown={(e) => {
-                    // Don't trigger play if clicking on textarea or if text is selected
+                    if (!isPlayable) return;
                     const target = e.target as HTMLElement;
                     if (target.closest('textarea') || window.getSelection()?.toString()) {
                       return;
@@ -273,6 +302,7 @@ export function HistoryTable() {
                     handlePlay(gen.id, gen.text, gen.profile_id);
                   }}
                   onKeyDown={(e) => {
+                    if (!isPlayable) return;
                     const target = e.target as HTMLElement;
                     if (target.closest('textarea') || target.closest('button')) return;
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -281,9 +311,14 @@ export function HistoryTable() {
                     }
                   }}
                 >
-                  {/* Waveform icon */}
-                  <div className="flex items-center shrink-0">
-                    <AudioWaveform className="h-5 w-5 text-muted-foreground" />
+                  {/* Status icon */}
+                  <div className="flex items-center shrink-0 w-10 justify-center overflow-hidden">
+                    <div className="scale-50">
+                      <Loader
+                        type={isGenerating ? 'line-scale' : 'line-scale-pulse-out-rapid'}
+                        active={isGenerating || isCurrentlyPlaying}
+                      />
+                    </div>
                   </div>
 
                   {/* Left side - Meta information */}
@@ -294,11 +329,22 @@ export function HistoryTable() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">{gen.language}</span>
                       <span className="text-xs text-muted-foreground">
-                        {formatDuration(gen.duration)}
+                        {formatEngineName(gen.engine, gen.model_size)}
                       </span>
+                      {isFailed ? (
+                        <span className="text-xs text-destructive">Failed</span>
+                      ) : !isGenerating ? (
+                        <span className="text-xs text-muted-foreground">
+                          {formatDuration(gen.duration ?? 0)}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {formatDate(gen.created_at)}
+                      {isGenerating ? (
+                        <span className="text-accent">Generating...</span>
+                      ) : (
+                        formatDate(gen.created_at)
+                      )}
                     </div>
                   </div>
 
@@ -308,58 +354,70 @@ export function HistoryTable() {
                       value={gen.text}
                       className="flex-1 resize-none text-sm text-muted-foreground select-text"
                       readOnly
-                      aria-label={`Transcript for sample from ${gen.profile_name}, ${formatDuration(gen.duration)}`}
+                      aria-label={`Transcript for sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}`}
                     />
                   </div>
 
-                  {/* Far right - Ellipsis actions */}
+                  {/* Far right - Actions */}
                   <div
-                    className="w-10 shrink-0 flex justify-end"
+                    className="w-10 shrink-0 flex justify-end items-center"
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label="Actions"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
-                        >
-                          <Play className="mr-2 h-4 w-4" />
-                          Play
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDownloadAudio(gen.id, gen.text)}
-                          disabled={exportGenerationAudio.isPending}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Export Audio
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleExportPackage(gen.id, gen.text)}
-                          disabled={exportGeneration.isPending}
-                        >
-                          <FileArchive className="mr-2 h-4 w-4" />
-                          Export Package
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
-                          disabled={deleteGeneration.isPending}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {isFailed ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Retry generation"
+                        onClick={() => handleRetry(gen.id)}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    ) : isPlayable ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Actions"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
+                          >
+                            <Play className="mr-2 h-4 w-4" />
+                            Play
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDownloadAudio(gen.id, gen.text)}
+                            disabled={exportGenerationAudio.isPending}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export Audio
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleExportPackage(gen.id, gen.text)}
+                            disabled={exportGeneration.isPending}
+                          >
+                            <FileArchive className="mr-2 h-4 w-4" />
+                            Export Package
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
+                            disabled={deleteGeneration.isPending}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </div>
                 </div>
               );
@@ -387,7 +445,8 @@ export function HistoryTable() {
           <DialogHeader>
             <DialogTitle>Delete Generation</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this generation from "{generationToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete this generation from "{generationToDelete?.name}"?
+              This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

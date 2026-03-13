@@ -62,6 +62,9 @@ from .platform_detect import get_backend_type
 # Keep references to fire-and-forget background tasks to prevent GC
 _background_tasks: set = set()
 
+# Generation queue — serializes TTS inference to avoid GPU contention
+_generation_queue: asyncio.Queue = None  # type: ignore  # initialized at startup
+
 
 def _create_background_task(coro) -> asyncio.Task:
     """Create a background task and prevent it from being garbage collected."""
@@ -69,6 +72,24 @@ def _create_background_task(coro) -> asyncio.Task:
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task
+
+
+async def _generation_worker():
+    """Worker that processes generation tasks one at a time."""
+    while True:
+        coro = await _generation_queue.get()
+        try:
+            await coro
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        finally:
+            _generation_queue.task_done()
+
+
+def _enqueue_generation(coro):
+    """Add a generation coroutine to the serial queue."""
+    _generation_queue.put_nowait(coro)
 
 
 app = FastAPI(
@@ -695,214 +716,255 @@ async def generate_speech(
     data: models.GenerationRequest,
     db: Session = Depends(get_db),
 ):
-    """Generate speech from text using a voice profile."""
+    """Generate speech from text using a voice profile.
+    
+    Creates a history entry immediately with status='generating' and kicks off
+    TTS in the background. The frontend can poll or use SSE to detect completion.
+    """
     task_manager = get_task_manager()
     generation_id = str(uuid.uuid4())
-    
-    try:
-        # Start tracking generation
-        task_manager.start_generation(
-            task_id=generation_id,
-            profile_id=data.profile_id,
-            text=data.text,
-        )
-        
-        # Get profile
-        profile = await profiles.get_profile(data.profile_id, db)
-        if not profile:
-            raise HTTPException(status_code=404, detail="Profile not found")
-        
-        # Generate audio
-        from .backends import get_tts_backend_for_engine
 
-        engine = data.engine or "qwen"
-        tts_model = get_tts_backend_for_engine(engine)
+    # Validate profile exists before creating the record
+    profile = await profiles.get_profile(data.profile_id, db)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
 
-        # Resolve model size (only relevant for Qwen engine)
-        model_size = data.model_size or "1.7B"
+    from .backends import get_tts_backend_for_engine
+    engine = data.engine or "qwen"
+    tts_model = get_tts_backend_for_engine(engine)
+    model_size = data.model_size or "1.7B"
 
-        # Check if model needs to be downloaded first
-        if engine == "qwen":
-            if not tts_model._is_model_cached(model_size):
-                model_name = f"qwen-tts-{model_size}"
+    # Create the history entry immediately with status="generating"
+    generation = await history.create_generation(
+        profile_id=data.profile_id,
+        text=data.text,
+        language=data.language,
+        audio_path="",
+        duration=0,
+        seed=data.seed,
+        db=db,
+        instruct=data.instruct,
+        generation_id=generation_id,
+        status="generating",
+        engine=engine,
+        model_size=model_size if engine == "qwen" else None,
+    )
 
-                async def download_model_background():
-                    try:
-                        await tts_model.load_model_async(model_size)
-                    except Exception as e:
-                        task_manager.error_download(model_name, str(e))
+    # Track in task manager
+    task_manager.start_generation(
+        task_id=generation_id,
+        profile_id=data.profile_id,
+        text=data.text,
+    )
 
-                task_manager.start_download(model_name)
-                _create_background_task(download_model_background())
-
-                raise HTTPException(
-                    status_code=202,
-                    detail={
-                        "message": f"Model {model_size} is being downloaded. Please wait and try again.",
-                        "model_name": model_name,
-                        "downloading": True,
-                    },
-                )
-
-            # Load (or switch to) the requested model
-            await tts_model.load_model_async(model_size)
-        elif engine == "luxtts":
-            if not tts_model._is_model_cached():
-                model_name = "luxtts"
-
-                async def download_luxtts_background():
-                    try:
-                        await tts_model.load_model()
-                    except Exception as e:
-                        task_manager.error_download(model_name, str(e))
-
-                task_manager.start_download(model_name)
-                _create_background_task(download_luxtts_background())
-
-                raise HTTPException(
-                    status_code=202,
-                    detail={
-                        "message": "LuxTTS model is being downloaded. Please wait and try again.",
-                        "model_name": model_name,
-                        "downloading": True,
-                    },
-                )
-
-            await tts_model.load_model()
-        elif engine == "chatterbox":
-            if not tts_model._is_model_cached():
-                model_name = "chatterbox-tts"
-
-                async def download_chatterbox_background():
-                    try:
-                        await tts_model.load_model()
-                    except Exception as e:
-                        task_manager.error_download(model_name, str(e))
-
-                task_manager.start_download(model_name)
-                asyncio.create_task(download_chatterbox_background())
-
-                raise HTTPException(
-                    status_code=202,
-                    detail={
-                        "message": "Chatterbox model is being downloaded. Please wait and try again.",
-                        "model_name": model_name,
-                        "downloading": True,
-                    },
-                )
-
-            await tts_model.load_model()
-        elif engine == "chatterbox_turbo":
-            if not tts_model._is_model_cached():
-                model_name = "chatterbox-turbo"
-
-                async def download_chatterbox_turbo_background():
-                    try:
-                        await tts_model.load_model()
-                    except Exception as e:
-                        task_manager.error_download(model_name, str(e))
-
-                task_manager.start_download(model_name)
-                asyncio.create_task(download_chatterbox_turbo_background())
-
-                raise HTTPException(
-                    status_code=202,
-                    detail={
-                        "message": "Chatterbox Turbo model is being downloaded. Please wait and try again.",
-                        "model_name": model_name,
-                        "downloading": True,
-                    },
-                )
-
-            await tts_model.load_model()
-
-        # Create voice prompt from profile
-        voice_prompt = await profiles.create_voice_prompt_for_profile(
-            data.profile_id,
-            db,
-            use_cache=True,
-            engine=engine,
-        )
-
-        from .utils.chunked_tts import generate_chunked
-
-        # Resolve per-chunk trim function for engines that need it
-        trim_fn = None
-        if engine in ("chatterbox", "chatterbox_turbo"):
-            from .utils.audio import trim_tts_output
-            trim_fn = trim_tts_output
-
-        audio, sample_rate = await generate_chunked(
-            tts_model,
-            data.text,
-            voice_prompt,
-            language=data.language,
-            seed=data.seed,
-            instruct=data.instruct,
-            max_chunk_chars=data.max_chunk_chars,
-            crossfade_ms=data.crossfade_ms,
-            trim_fn=trim_fn,
-        )
-
-        if data.normalize:
-            from .utils.audio import normalize_audio
-            audio = normalize_audio(audio)
-
-        # Calculate duration
-        duration = len(audio) / sample_rate
-
-        # Save audio
-        audio_path = config.get_generations_dir() / f"{generation_id}.wav"
-
-        from .utils.audio import save_audio
-        import errno
-
+    # Kick off TTS in background
+    async def _run_generation():
+        bg_db = next(get_db())
         try:
-            save_audio(audio, str(audio_path), sample_rate)
-        except BrokenPipeError:
-            raise HTTPException(
-                status_code=500,
-                detail="Audio save failed: broken pipe (the output stream was closed unexpectedly)",
-            )
-        except OSError as save_err:
-            err_no = getattr(save_err, "errno", None) or (
-                getattr(save_err.__cause__, "errno", None)
-                if save_err.__cause__
-                else None
-            )
-            if err_no == errno.ENOENT:
-                msg = f"Audio save failed: directory not found — {audio_path.parent}"
-            elif err_no == errno.EACCES:
-                msg = f"Audio save failed: permission denied — {audio_path.parent}"
-            elif err_no == errno.ENOSPC:
-                msg = "Audio save failed: no disk space remaining"
+            # Load model
+            if engine == "qwen":
+                await tts_model.load_model_async(model_size)
             else:
-                msg = f"Audio save failed: {save_err}"
-            raise HTTPException(status_code=500, detail=msg)
+                await tts_model.load_model()
 
-        # Create history entry
-        generation = await history.create_generation(
-            profile_id=data.profile_id,
-            text=data.text,
-            language=data.language,
-            audio_path=str(audio_path),
-            duration=duration,
-            seed=data.seed,
-            db=db,
-            instruct=data.instruct,
-        )
-        
-        # Mark generation as complete
-        task_manager.complete_generation(generation_id)
-        
-        return generation
-        
-    except ValueError as e:
-        task_manager.complete_generation(generation_id)
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        task_manager.complete_generation(generation_id)
-        raise HTTPException(status_code=500, detail=str(e))
+            # Create voice prompt
+            voice_prompt = await profiles.create_voice_prompt_for_profile(
+                data.profile_id,
+                bg_db,
+                use_cache=True,
+                engine=engine,
+            )
+
+            from .utils.chunked_tts import generate_chunked
+
+            trim_fn = None
+            if engine in ("chatterbox", "chatterbox_turbo"):
+                from .utils.audio import trim_tts_output
+                trim_fn = trim_tts_output
+
+            audio, sample_rate = await generate_chunked(
+                tts_model,
+                data.text,
+                voice_prompt,
+                language=data.language,
+                seed=data.seed,
+                instruct=data.instruct,
+                max_chunk_chars=data.max_chunk_chars,
+                crossfade_ms=data.crossfade_ms,
+                trim_fn=trim_fn,
+            )
+
+            if data.normalize:
+                from .utils.audio import normalize_audio
+                audio = normalize_audio(audio)
+
+            duration = len(audio) / sample_rate
+            audio_path = config.get_generations_dir() / f"{generation_id}.wav"
+
+            from .utils.audio import save_audio
+            save_audio(audio, str(audio_path), sample_rate)
+
+            # Update the record to completed
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="completed",
+                db=bg_db,
+                audio_path=str(audio_path),
+                duration=duration,
+            )
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="failed",
+                db=bg_db,
+                error=str(e),
+            )
+        finally:
+            task_manager.complete_generation(generation_id)
+            bg_db.close()
+
+    _enqueue_generation(_run_generation())
+
+    return generation
+
+
+@app.post("/generate/{generation_id}/retry", response_model=models.GenerationResponse)
+async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
+    """Retry a failed generation using the same parameters."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+
+    if (gen.status or "completed") != "failed":
+        raise HTTPException(status_code=400, detail="Only failed generations can be retried")
+
+    # Reset the record to generating
+    gen.status = "generating"
+    gen.error = None
+    gen.audio_path = ""
+    gen.duration = 0
+    db.commit()
+    db.refresh(gen)
+
+    task_manager = get_task_manager()
+    task_manager.start_generation(
+        task_id=generation_id,
+        profile_id=gen.profile_id,
+        text=gen.text,
+    )
+
+    # Resolve engine/model from stored values
+    retry_engine = gen.engine or "qwen"
+    retry_model_size = gen.model_size or "1.7B"
+
+    from .backends import get_tts_backend_for_engine
+    tts_model = get_tts_backend_for_engine(retry_engine)
+
+    async def _run_retry():
+        bg_db = next(get_db())
+        try:
+            if retry_engine == "qwen":
+                await tts_model.load_model_async(retry_model_size)
+            else:
+                await tts_model.load_model()
+
+            voice_prompt = await profiles.create_voice_prompt_for_profile(
+                gen.profile_id,
+                bg_db,
+                use_cache=True,
+                engine=retry_engine,
+            )
+
+            from .utils.chunked_tts import generate_chunked
+
+            trim_fn = None
+            if retry_engine in ("chatterbox", "chatterbox_turbo"):
+                from .utils.audio import trim_tts_output
+                trim_fn = trim_tts_output
+
+            audio, sample_rate = await generate_chunked(
+                tts_model,
+                gen.text,
+                voice_prompt,
+                language=gen.language,
+                seed=gen.seed,
+                instruct=gen.instruct,
+                trim_fn=trim_fn,
+            )
+
+            duration = len(audio) / sample_rate
+            audio_path = config.get_generations_dir() / f"{generation_id}.wav"
+
+            from .utils.audio import save_audio
+            save_audio(audio, str(audio_path), sample_rate)
+
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="completed",
+                db=bg_db,
+                audio_path=str(audio_path),
+                duration=duration,
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="failed",
+                db=bg_db,
+                error=str(e),
+            )
+        finally:
+            task_manager.complete_generation(generation_id)
+            bg_db.close()
+
+    _enqueue_generation(_run_retry())
+
+    return models.GenerationResponse.model_validate(gen)
+
+
+@app.get("/generate/{generation_id}/status")
+async def get_generation_status(generation_id: str, db: Session = Depends(get_db)):
+    """SSE endpoint that streams generation status updates.
+    
+    Polls the DB every second and yields the current status. Closes when
+    the generation reaches 'completed' or 'failed'.
+    """
+    import json
+
+    async def event_stream():
+        while True:
+            db.expire_all()
+            gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+            if not gen:
+                yield f"data: {json.dumps({'status': 'not_found', 'id': generation_id})}\n\n"
+                return
+
+            payload = {
+                "id": gen.id,
+                "status": gen.status or "completed",
+                "duration": gen.duration,
+                "error": gen.error,
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+
+            if (gen.status or "completed") in ("completed", "failed"):
+                return
+
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/generate/stream")
@@ -2480,9 +2542,29 @@ def _get_gpu_status() -> str:
 @app.on_event("startup")
 async def startup_event():
     """Run on application startup."""
+    global _generation_queue
     print("voicebox API starting up...")
     database.init_db()
     print(f"Database initialized at {database._db_path}")
+
+    # Start the serial generation worker
+    _generation_queue = asyncio.Queue()
+    _create_background_task(_generation_worker())
+
+    # Mark any stale "generating" records as failed — these are leftovers
+    # from a previous process that was killed mid-generation
+    try:
+        from sqlalchemy import text as sa_text
+        db = next(get_db())
+        result = db.execute(
+            sa_text("UPDATE generations SET status = 'failed', error = 'Server was shut down during generation' WHERE status = 'generating'")
+        )
+        if result.rowcount > 0:
+            print(f"Marked {result.rowcount} stale generation(s) as failed")
+        db.commit()
+        db.close()
+    except Exception as e:
+        print(f"Warning: Could not clean up stale generations: {e}")
     backend_type = get_backend_type()
     print(f"Backend: {backend_type.upper()}")
     print(f"GPU available: {_get_gpu_status()}")

@@ -69,10 +69,14 @@ class GenerationResponse(BaseModel):
     profile_id: str
     text: str
     language: str
-    audio_path: str
-    duration: float
-    seed: Optional[int]
-    instruct: Optional[str]
+    audio_path: Optional[str] = None
+    duration: Optional[float] = None
+    seed: Optional[int] = None
+    instruct: Optional[str] = None
+    engine: Optional[str] = "qwen"
+    model_size: Optional[str] = None
+    status: str = "completed"
+    error: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -94,10 +98,14 @@ class HistoryResponse(BaseModel):
     profile_name: str
     text: str
     language: str
-    audio_path: str
-    duration: float
-    seed: Optional[int]
-    instruct: Optional[str]
+    audio_path: Optional[str] = None
+    duration: Optional[float] = None
+    seed: Optional[int] = None
+    instruct: Optional[str] = None
+    engine: Optional[str] = "qwen"
+    model_size: Optional[str] = None
+    status: str = "completed"
+    error: Optional[str] = None
     created_at: datetime
 
     class Config:

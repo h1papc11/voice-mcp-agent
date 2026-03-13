@@ -46,9 +46,14 @@ export interface GenerationResponse {
   profile_id: string;
   text: string;
   language: string;
-  audio_path: string;
-  duration: number;
+  audio_path?: string;
+  duration?: number;
   seed?: number;
+  instruct?: string;
+  engine?: string;
+  model_size?: string;
+  status: 'generating' | 'completed' | 'failed';
+  error?: string;
   created_at: string;
 }
 

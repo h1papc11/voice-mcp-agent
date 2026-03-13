@@ -17,6 +17,7 @@ export function useRestoreActiveTasks() {
   const [activeDownloads, setActiveDownloads] = useState<ActiveDownloadTask[]>([]);
   const setIsGenerating = useGenerationStore((state) => state.setIsGenerating);
   const setActiveGenerationId = useGenerationStore((state) => state.setActiveGenerationId);
+  const addPendingGeneration = useGenerationStore((state) => state.addPendingGeneration);
 
   // Track which downloads we've seen to detect new ones
   const seenDownloadsRef = useRef<Set<string>>(new Set());
@@ -25,10 +26,13 @@ export function useRestoreActiveTasks() {
     try {
       const tasks = await apiClient.getActiveTasks();
 
-      // Update generation state
+      // Update generation state — restore pending generations (e.g., after page refresh)
       if (tasks.generations.length > 0) {
         setIsGenerating(true);
         setActiveGenerationId(tasks.generations[0].task_id);
+        for (const gen of tasks.generations) {
+          addPendingGeneration(gen.task_id);
+        }
       } else {
         // Only clear if we were tracking a generation
         const currentId = useGenerationStore.getState().activeGenerationId;

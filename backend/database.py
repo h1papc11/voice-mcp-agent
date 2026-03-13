@@ -45,10 +45,14 @@ class Generation(Base):
     profile_id = Column(String, ForeignKey("profiles.id"), nullable=False)
     text = Column(Text, nullable=False)
     language = Column(String, default="en")
-    audio_path = Column(String, nullable=False)
-    duration = Column(Float, nullable=False)
+    audio_path = Column(String, nullable=True)
+    duration = Column(Float, nullable=True)
     seed = Column(Integer)
     instruct = Column(Text)
+    engine = Column(String, default="qwen")
+    model_size = Column(String, nullable=True)
+    status = Column(String, default="completed")  # generating, completed, failed
+    error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -287,6 +291,36 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE profiles ADD COLUMN avatar_path VARCHAR"))
                 conn.commit()
                 print("Added avatar_path column to profiles")
+
+    # Migration: Add status and error columns to generations table
+    if 'generations' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('generations')}
+        if 'status' not in columns:
+            print("Migrating generations: adding status column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN status VARCHAR DEFAULT 'completed'"))
+                conn.commit()
+                print("Added status column to generations")
+        if 'error' not in columns:
+            print("Migrating generations: adding error column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN error TEXT"))
+                conn.commit()
+                print("Added error column to generations")
+        if 'engine' not in columns:
+            print("Migrating generations: adding engine column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN engine VARCHAR DEFAULT 'qwen'"))
+                conn.commit()
+                print("Added engine column to generations")
+        # Re-read columns after engine migration (variable name shadows outer `engine`)
+        columns = {col['name'] for col in inspector.get_columns('generations')}
+        if 'model_size' not in columns:
+            print("Migrating generations: adding model_size column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN model_size VARCHAR"))
+                conn.commit()
+                print("Added model_size column to generations")
 
 
 def get_db():

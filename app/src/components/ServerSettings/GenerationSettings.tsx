@@ -10,6 +10,8 @@ export function GenerationSettings() {
   const setCrossfadeMs = useServerStore((state) => state.setCrossfadeMs);
   const normalizeAudio = useServerStore((state) => state.normalizeAudio);
   const setNormalizeAudio = useServerStore((state) => state.setNormalizeAudio);
+  const autoplayOnGenerate = useServerStore((state) => state.autoplayOnGenerate);
+  const setAutoplayOnGenerate = useServerStore((state) => state.setAutoplayOnGenerate);
 
   return (
     <Card role="region" aria-label="Generation Settings" tabIndex={0}>
@@ -35,7 +37,7 @@ export function GenerationSettings() {
               value={[maxChunkChars]}
               onValueChange={([value]) => setMaxChunkChars(value)}
               min={100}
-              max={2000}
+              max={5000}
               step={50}
               aria-label="Auto-chunking character limit"
             />
@@ -73,6 +75,7 @@ export function GenerationSettings() {
               id="normalizeAudio"
               checked={normalizeAudio}
               onCheckedChange={setNormalizeAudio}
+              className="mt-[6px]"
             />
             <div className="space-y-1">
               <label
@@ -83,6 +86,26 @@ export function GenerationSettings() {
               </label>
               <p className="text-sm text-muted-foreground">
                 Adjusts output volume to a consistent level across generations.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="autoplayOnGenerate"
+              checked={autoplayOnGenerate}
+              onCheckedChange={setAutoplayOnGenerate}
+              className="mt-[6px]"
+            />
+            <div className="space-y-1">
+              <label
+                htmlFor="autoplayOnGenerate"
+                className="text-sm font-medium leading-none cursor-pointer"
+              >
+                Autoplay on generate
+              </label>
+              <p className="text-sm text-muted-foreground">
+                Automatically play audio when a generation completes.
               </p>
             </div>
           </div>
