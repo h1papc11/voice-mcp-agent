@@ -374,6 +374,7 @@ WHISPER_HF_REPOS = {
     "small": "openai/whisper-small",
     "medium": "openai/whisper-medium",
     "large": "openai/whisper-large-v3",
+    "turbo": "openai/whisper-large-v3-turbo",
 }
 
 
@@ -591,21 +592,20 @@ class PyTorchSTTBackend:
             )
             inputs = inputs.to(self.device)
             
-            # Set language if provided
-            forced_decoder_ids = None
+            # Generate transcription
+            # If language is provided, force it; otherwise let Whisper auto-detect
+            generate_kwargs = {}
             if language:
-                # Support all languages from frontend: en, zh, ja, ko, de, fr, ru, pt, es, it
-                # Whisper supports these and many more
                 forced_decoder_ids = self.processor.get_decoder_prompt_ids(
                     language=language,
                     task="transcribe",
                 )
+                generate_kwargs["forced_decoder_ids"] = forced_decoder_ids
             
-            # Generate transcription
             with torch.no_grad():
                 predicted_ids = self.model.generate(
                     inputs["input_features"],
-                    forced_decoder_ids=forced_decoder_ids,
+                    **generate_kwargs,
                 )
             
             # Decode

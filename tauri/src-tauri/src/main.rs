@@ -792,7 +792,9 @@ pub fn run() {
                 });
 
                 // Wait for frontend response or timeout
-                tokio::spawn(async move {
+                // Use tauri::async_runtime::spawn instead of tokio::spawn to avoid
+                // panics when the Tokio runtime is being dropped during app shutdown
+                tauri::async_runtime::spawn(async move {
                     tokio::select! {
                         _ = rx.recv() => {
                             // Frontend responded, close window

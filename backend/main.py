@@ -14,7 +14,6 @@ from datetime import datetime
 import asyncio
 import uvicorn
 import argparse
-import torch
 import tempfile
 import io
 from pathlib import Path
@@ -22,6 +21,18 @@ import uuid
 import asyncio
 import signal
 import os
+
+# Set HSA_OVERRIDE_GFX_VERSION for AMD GPUs that aren't officially listed in ROCm
+# (e.g., RX 6600 is gfx1032 which maps to gfx1030 target)
+# This must be set BEFORE any torch.cuda calls
+if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
+    os.environ["HSA_OVERRIDE_GFX_VERSION"] = "10.3.0"
+
+# Suppress noisy MIOpen workspace warnings on AMD GPUs
+if not os.environ.get("MIOPEN_LOG_LEVEL"):
+    os.environ["MIOPEN_LOG_LEVEL"] = "4"
+
+import torch
 from urllib.parse import quote
 
 
@@ -1022,11 +1033,12 @@ async def transcribe_audio(
         # Transcribe
         whisper_model = transcribe.get_whisper_model()
 
-        # Check if Whisper model is downloaded (uses default size "base")
+        # Check if Whisper model is downloaded
         model_size = whisper_model.model_size
-        # Map model sizes to HF repo IDs (whisper-large needs -v3 suffix)
+        # Map model sizes to HF repo IDs (some need special suffixes)
         whisper_hf_repos = {
             "large": "openai/whisper-large-v3",
+            "turbo": "openai/whisper-large-v3-turbo",
         }
         model_name = whisper_hf_repos.get(model_size, f"openai/whisper-{model_size}")
 
@@ -1490,6 +1502,13 @@ async def get_model_status():
             "model_size": "large",
             "check_loaded": lambda: check_whisper_loaded("large"),
         },
+        {
+            "model_name": "whisper-turbo",
+            "display_name": "Whisper Turbo",
+            "hf_repo_id": "openai/whisper-large-v3-turbo",
+            "model_size": "turbo",
+            "check_loaded": lambda: check_whisper_loaded("turbo"),
+        },
     ]
     
     # Build a mapping of model_name -> hf_repo_id so we can check if shared repos are downloading
@@ -1684,6 +1703,10 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
             "model_size": "large",
             "load_func": lambda: transcribe.get_whisper_model().load_model("large"),
         },
+        "whisper-turbo": {
+            "model_size": "turbo",
+            "load_func": lambda: transcribe.get_whisper_model().load_model("turbo"),
+        },
     }
     
     if request.model_name not in model_configs:
@@ -1808,6 +1831,11 @@ async def delete_model(model_name: str):
         "whisper-large": {
             "hf_repo_id": "openai/whisper-large-v3",
             "model_size": "large",
+            "model_type": "whisper",
+        },
+        "whisper-turbo": {
+            "hf_repo_id": "openai/whisper-large-v3-turbo",
+            "model_size": "turbo",
             "model_type": "whisper",
         },
     }
@@ -2044,7 +2072,12 @@ def _get_gpu_status() -> str:
     """Get GPU availability status."""
     backend_type = get_backend_type()
     if torch.cuda.is_available():
-        return f"CUDA ({torch.cuda.get_device_name(0)})"
+        device_name = torch.cuda.get_device_name(0)
+        # Check if this is ROCm (AMD) or CUDA (NVIDIA)
+        is_rocm = hasattr(torch.version, 'hip') and torch.version.hip is not None
+        if is_rocm:
+            return f"ROCm ({device_name})"
+        return f"CUDA ({device_name})"
     elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
         return "MPS (Apple Silicon)"
     elif backend_type == "mlx":
