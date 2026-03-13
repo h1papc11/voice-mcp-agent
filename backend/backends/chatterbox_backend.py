@@ -178,20 +178,32 @@ class ChatterboxTTSBackend:
                 progress_manager.mark_complete(model_name)
                 task_manager.complete_download(model_name)
 
-            # Monkey-patch VoiceEncoder.forward to cast input to float32.
-            # The upstream melspectrogram returns float64 numpy arrays when
-            # hp.normalized_mels is False (the default).  pack() preserves
-            # the dtype, so double tensors hit float32 LSTM weights →
-            # "expected m1 and m2 to have the same dtype: float != double".
-            _ve = self.model.ve
-            _orig_ve_forward = _ve.forward.__func__ if hasattr(_ve.forward, '__func__') else _ve.forward
-
+            # Patch float64 → float32 dtype mismatches in upstream chatterbox.
+            # librosa.load returns float64 numpy; multiple upstream code paths
+            # convert it to a torch tensor via torch.from_numpy() without
+            # casting, then matmul it against float32 model weights.
             import types
 
-            def _f32_forward(self_ve, mels):
+            # Patch S3Tokenizer (used by s3gen.tokenizer)
+            _tokzr = self.model.s3gen.tokenizer
+            _orig_log_mel = _tokzr.log_mel_spectrogram.__func__
+
+            def _f32_log_mel(self_tokzr, audio, padding=0):
+                import torch as _torch
+                if _torch.is_tensor(audio):
+                    audio = audio.float()
+                return _orig_log_mel(self_tokzr, audio, padding)
+
+            _tokzr.log_mel_spectrogram = types.MethodType(_f32_log_mel, _tokzr)
+
+            # Patch VoiceEncoder
+            _ve = self.model.ve
+            _orig_ve_forward = _ve.forward.__func__
+
+            def _f32_ve_forward(self_ve, mels):
                 return _orig_ve_forward(self_ve, mels.float())
 
-            _ve.forward = types.MethodType(_f32_forward, _ve)
+            _ve.forward = types.MethodType(_f32_ve_forward, _ve)
 
             logger.info("Chatterbox Multilingual TTS loaded successfully")
 
