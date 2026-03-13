@@ -10,6 +10,8 @@ export interface FileFilter {
 
 export interface PlatformFilesystem {
   saveFile(filename: string, blob: Blob, filters?: FileFilter[]): Promise<void>;
+  openPath(path: string): Promise<void>;
+  pickDirectory(title: string): Promise<string | null>;
 }
 
 export interface UpdateStatus {

@@ -446,8 +446,7 @@ export function ModelManagement() {
                 className="text-xs text-muted-foreground h-7 px-2"
                 onClick={async () => {
                   try {
-                    const { open } = await import('@tauri-apps/plugin-shell');
-                    await open(cacheDir.path);
+                    await platform.filesystem.openPath(cacheDir.path);
                   } catch {
                     toast({ title: 'Failed to open model folder', variant: 'destructive' });
                   }
@@ -462,14 +461,9 @@ export function ModelManagement() {
                 className="text-xs text-muted-foreground h-7 px-2"
                 onClick={async () => {
                   try {
-                    const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
-                    const selected = await openDialog({
-                      directory: true,
-                      title: 'Choose model storage folder',
-                    });
-                    if (!selected) return;
-                    const newDir =
-                      typeof selected === 'string' ? selected : (selected as { path: string }).path;
+                    const newDir = await platform.filesystem.pickDirectory(
+                      'Choose model storage folder',
+                    );
                     if (!newDir) return;
                     setPendingMigrateDir(newDir);
                   } catch {
