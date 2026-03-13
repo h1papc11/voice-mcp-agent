@@ -32,7 +32,7 @@ export function GpuAcceleration() {
   } = useQuery({
     queryKey: ['cuda-status', serverUrl],
     queryFn: () => apiClient.getCudaStatus(),
-    refetchInterval: cudaStatusLoading ? false : 10000,
+    refetchInterval: (query) => (query.state.status === 'pending' ? false : 10000),
     retry: 1,
     enabled: !!health, // Only fetch when backend is reachable
   });

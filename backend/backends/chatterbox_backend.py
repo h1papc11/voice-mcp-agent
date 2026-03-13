@@ -103,11 +103,19 @@ class ChatterboxTTSBackend:
 
     def _load_model_sync(self):
         """Synchronous model loading."""
+        from ..utils.hf_progress import HFProgressTracker, create_hf_progress_callback
+
         progress_manager = get_progress_manager()
         task_manager = get_task_manager()
         model_name = "chatterbox-tts"
 
         is_cached = self._is_model_cached()
+
+        # Set up HF progress tracking (intercepts tqdm for file-level progress)
+        progress_callback = create_hf_progress_callback(model_name, progress_manager)
+        tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
+        tracker_context = tracker.patch_download()
+        tracker_context.__enter__()
 
         if not is_cached:
             task_manager.start_download(model_name)
@@ -115,7 +123,7 @@ class ChatterboxTTSBackend:
                 model_name=model_name,
                 current=0,
                 total=0,
-                filename="Downloading Chatterbox model...",
+                filename="Connecting to HuggingFace...",
                 status="downloading",
             )
 
@@ -131,25 +139,28 @@ class ChatterboxTTSBackend:
             # Monkey-patch torch.load for CPU loading. The model's .pt files
             # were saved on CUDA; from_pretrained() doesn't pass map_location
             # so loading on CPU fails without this.
-            if device == "cpu":
-                _orig_torch_load = torch.load
+            try:
+                if device == "cpu":
+                    _orig_torch_load = torch.load
 
-                def _patched_load(*args, **kwargs):
-                    kwargs.setdefault("map_location", "cpu")
-                    return _orig_torch_load(*args, **kwargs)
+                    def _patched_load(*args, **kwargs):
+                        kwargs.setdefault("map_location", "cpu")
+                        return _orig_torch_load(*args, **kwargs)
 
-                with ChatterboxTTSBackend._load_lock:
-                    torch.load = _patched_load
-                    try:
-                        self.model = ChatterboxMultilingualTTS.from_pretrained(
-                            device=device,
-                        )
-                    finally:
-                        torch.load = _orig_torch_load
-            else:
-                self.model = ChatterboxMultilingualTTS.from_pretrained(
-                    device=device,
-                )
+                    with ChatterboxTTSBackend._load_lock:
+                        torch.load = _patched_load
+                        try:
+                            self.model = ChatterboxMultilingualTTS.from_pretrained(
+                                device=device,
+                            )
+                        finally:
+                            torch.load = _orig_torch_load
+                else:
+                    self.model = ChatterboxMultilingualTTS.from_pretrained(
+                        device=device,
+                    )
+            finally:
+                tracker_context.__exit__(None, None, None)
 
             # Fix: transformers >= 4.36 defaults LlamaModel to sdpa attention
             # which doesn't support output_attentions=True (needed by

@@ -1912,11 +1912,22 @@ async def get_active_tasks():
                     pm_data = progress_manager._progress.get(model_name)
                     if pm_data:
                         error = pm_data.get("error")
+            # Include progress data if available
+            prog = progress or {}
+            if not prog:
+                with progress_manager._lock:
+                    pm_data = progress_manager._progress.get(model_name)
+                    if pm_data:
+                        prog = pm_data
             active_downloads.append(models.ActiveDownloadTask(
                 model_name=model_name,
                 status=task.status,
                 started_at=task.started_at,
                 error=error,
+                progress=prog.get("progress"),
+                current=prog.get("current"),
+                total=prog.get("total"),
+                filename=prog.get("filename"),
             ))
         elif progress:
             # Progress exists but no task - create from progress data
@@ -1934,6 +1945,10 @@ async def get_active_tasks():
                 status=progress.get("status", "downloading"),
                 started_at=started_at,
                 error=progress.get("error"),
+                progress=progress.get("progress"),
+                current=progress.get("current"),
+                total=progress.get("total"),
+                filename=progress.get("filename"),
             ))
     
     # Get active generations

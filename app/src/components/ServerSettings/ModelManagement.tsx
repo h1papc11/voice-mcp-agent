@@ -16,7 +16,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import type { ActiveDownloadTask, HuggingFaceModelInfo, ModelStatus } from '@/lib/api/types';
@@ -73,6 +74,14 @@ function formatPipelineTag(tag: string): string {
     .join(' ');
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / k ** i).toFixed(1)} ${sizes[i]}`;
+}
+
 export function ModelManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -98,7 +107,11 @@ export function ModelManagement() {
   const { data: activeTasks } = useQuery({
     queryKey: ['activeTasks'],
     queryFn: () => apiClient.getActiveTasks(),
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const hasActive = data?.downloads.some((d) => d.status === 'downloading');
+      return hasActive ? 1000 : 5000;
+    },
   });
 
   // HuggingFace model card query - only fetches when modal is open and model has a repo ID
@@ -132,6 +145,19 @@ export function ModelManagement() {
   }
 
   const errorCount = erroredDownloads.size;
+
+  // Build progress map from active tasks for inline display
+  const downloadProgressMap = useMemo(() => {
+    const map = new Map<string, ActiveDownloadTask>();
+    if (activeTasks?.downloads) {
+      for (const dl of activeTasks.downloads) {
+        if (dl.status === 'downloading') {
+          map.set(dl.model_name, dl);
+        }
+      }
+    }
+    return map;
+  }, [activeTasks]);
 
   const handleDownloadComplete = useCallback(() => {
     setDownloadingModel(null);
@@ -371,16 +397,29 @@ export function ModelManagement() {
                         )}
                       </div>
 
-                      {/* Name + meta */}
+                      {/* Name + inline progress */}
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium">{model.display_name}</span>
+                        {isDownloading &&
+                          (() => {
+                            const dl = downloadProgressMap.get(model.model_name);
+                            const pct = dl?.progress ?? 0;
+                            const hasProgress = dl && dl.total && dl.total > 0;
+                            return (
+                              <div className="mt-1 space-y-0.5">
+                                <Progress value={hasProgress ? pct : undefined} className="h-1" />
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {hasProgress
+                                    ? `${formatBytes(dl.current ?? 0)} / ${formatBytes(dl.total!)} (${pct.toFixed(0)}%)`
+                                    : dl?.filename || 'Connecting...'}
+                                </div>
+                              </div>
+                            );
+                          })()}
                       </div>
 
                       {/* Right side info */}
                       <div className="shrink-0 flex items-center gap-2">
-                        {isDownloading && (
-                          <span className="text-xs text-muted-foreground">Downloading...</span>
-                        )}
                         {hasError && (
                           <Badge variant="destructive" className="text-[10px] h-5">
                             Error
@@ -510,12 +549,6 @@ export function ModelManagement() {
                       Downloaded
                     </Badge>
                   )}
-                  {selectedState?.isDownloading && (
-                    <Badge variant="outline" className="text-xs">
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Downloading
-                    </Badge>
-                  )}
                   {selectedState?.hasError && (
                     <Badge variant="destructive" className="text-xs">
                       <CircleX className="h-3 w-3 mr-1" />
@@ -633,10 +666,25 @@ export function ModelManagement() {
                     </>
                   ) : selectedState?.isDownloading ? (
                     <>
-                      <Button size="sm" variant="outline" disabled className="flex-1">
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Downloading...
-                      </Button>
+                      <div className="flex-1 space-y-2">
+                        {(() => {
+                          const dl = freshSelectedModel
+                            ? downloadProgressMap.get(freshSelectedModel.model_name)
+                            : undefined;
+                          const pct = dl?.progress ?? 0;
+                          const hasProgress = dl && dl.total && dl.total > 0;
+                          return (
+                            <>
+                              <Progress value={hasProgress ? pct : undefined} className="h-2" />
+                              <div className="text-xs text-muted-foreground">
+                                {hasProgress
+                                  ? `${formatBytes(dl.current ?? 0)} / ${formatBytes(dl.total!)} (${pct.toFixed(1)}%)`
+                                  : dl?.filename || 'Connecting to HuggingFace...'}
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
                       <Button
                         size="sm"
                         onClick={() => handleCancel(freshSelectedModel.model_name)}

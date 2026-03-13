@@ -94,11 +94,19 @@ class LuxTTSBackend:
 
     def _load_model_sync(self):
         """Synchronous model loading."""
+        from ..utils.hf_progress import HFProgressTracker, create_hf_progress_callback
+
         progress_manager = get_progress_manager()
         task_manager = get_task_manager()
         model_name = "luxtts"
 
         is_cached = self._is_model_cached()
+
+        # Set up HF progress tracking (intercepts tqdm for file-level progress)
+        progress_callback = create_hf_progress_callback(model_name, progress_manager)
+        tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
+        tracker_context = tracker.patch_download()
+        tracker_context.__enter__()
 
         if not is_cached:
             task_manager.start_download(model_name)
@@ -106,7 +114,7 @@ class LuxTTSBackend:
                 model_name=model_name,
                 current=0,
                 total=0,
-                filename="Downloading LuxTTS model...",
+                filename="Connecting to HuggingFace...",
                 status="downloading",
             )
 
@@ -117,19 +125,22 @@ class LuxTTSBackend:
             logger.info(f"Loading LuxTTS on {device}...")
 
             # LuxTTS constructor downloads model and loads everything
-            if device == "cpu":
-                import os
-                threads = os.cpu_count() or 4
-                self.model = LuxTTS(
-                    model_path=LUXTTS_HF_REPO,
-                    device="cpu",
-                    threads=min(threads, 8),
-                )
-            else:
-                self.model = LuxTTS(
-                    model_path=LUXTTS_HF_REPO,
-                    device=device,
-                )
+            try:
+                if device == "cpu":
+                    import os
+                    threads = os.cpu_count() or 4
+                    self.model = LuxTTS(
+                        model_path=LUXTTS_HF_REPO,
+                        device="cpu",
+                        threads=min(threads, 8),
+                    )
+                else:
+                    self.model = LuxTTS(
+                        model_path=LUXTTS_HF_REPO,
+                        device=device,
+                    )
+            finally:
+                tracker_context.__exit__(None, None, None)
 
             if not is_cached:
                 progress_manager.mark_complete(model_name)

@@ -155,6 +155,10 @@ export interface ActiveDownloadTask {
   status: string;
   started_at: string;
   error?: string;
+  progress?: number; // 0-100 percentage
+  current?: number; // bytes downloaded
+  total?: number; // total bytes
+  filename?: string; // current file being downloaded
 }
 
 export interface ActiveGenerationTask {

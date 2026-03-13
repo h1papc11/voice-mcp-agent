@@ -158,6 +158,10 @@ class ActiveDownloadTask(BaseModel):
     status: str
     started_at: datetime
     error: Optional[str] = None
+    progress: Optional[float] = None  # 0-100 percentage
+    current: Optional[int] = None     # bytes downloaded
+    total: Optional[int] = None       # total bytes
+    filename: Optional[str] = None    # current file being downloaded
 
 
 class ActiveGenerationTask(BaseModel):
