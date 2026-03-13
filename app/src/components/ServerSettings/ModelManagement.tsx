@@ -342,17 +342,18 @@ export function ModelManagement() {
     setDetailOpen(true);
   };
 
-  const ttsModels = modelStatus?.models.filter((m) => m.model_name.startsWith('qwen-tts')) ?? [];
-  const otherTtsModels =
+  const voiceModels =
     modelStatus?.models.filter(
-      (m) => m.model_name.startsWith('luxtts') || m.model_name.startsWith('chatterbox'),
+      (m) =>
+        m.model_name.startsWith('qwen-tts') ||
+        m.model_name.startsWith('luxtts') ||
+        m.model_name.startsWith('chatterbox'),
     ) ?? [];
   const whisperModels = modelStatus?.models.filter((m) => m.model_name.startsWith('whisper')) ?? [];
 
   // Build sections
   const sections: { label: string; models: ModelStatus[] }[] = [
-    { label: 'Voice Generation', models: ttsModels },
-    ...(otherTtsModels.length > 0 ? [{ label: 'Other Voice Models', models: otherTtsModels }] : []),
+    { label: 'Voice Generation', models: voiceModels },
     { label: 'Transcription', models: whisperModels },
   ];
 
@@ -564,12 +565,6 @@ export function ModelManagement() {
                       Loaded
                     </Badge>
                   )}
-                  {freshSelectedModel.downloaded && !freshSelectedModel.loaded && (
-                    <Badge variant="secondary" className="text-xs">
-                      <CircleCheck className="h-3 w-3 mr-1" />
-                      Downloaded
-                    </Badge>
-                  )}
                   {selectedState?.hasError && (
                     <Badge variant="destructive" className="text-xs">
                       <CircleX className="h-3 w-3 mr-1" />
@@ -595,24 +590,6 @@ export function ModelManagement() {
 
                 {hfModelInfo && (
                   <div className="space-y-3">
-                    {/* Stats row */}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1" title="Downloads">
-                        <Download className="h-3.5 w-3.5" />
-                        {formatDownloads(hfModelInfo.downloads)}
-                      </span>
-                      <span className="flex items-center gap-1" title="Likes">
-                        <Heart className="h-3.5 w-3.5" />
-                        {formatDownloads(hfModelInfo.likes)}
-                      </span>
-                      {license && (
-                        <span className="flex items-center gap-1" title="License">
-                          <Scale className="h-3.5 w-3.5" />
-                          {formatLicense(license)}
-                        </span>
-                      )}
-                    </div>
-
                     {/* Pipeline tag + author */}
                     <div className="flex flex-wrap gap-1.5">
                       {hfModelInfo.pipeline_tag && (
@@ -632,6 +609,24 @@ export function ModelManagement() {
                       )}
                     </div>
 
+                    {/* Stats row */}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1" title="Downloads">
+                        <Download className="h-3.5 w-3.5" />
+                        {formatDownloads(hfModelInfo.downloads)}
+                      </span>
+                      <span className="flex items-center gap-1" title="Likes">
+                        <Heart className="h-3.5 w-3.5" />
+                        {formatDownloads(hfModelInfo.likes)}
+                      </span>
+                      {license && (
+                        <span className="flex items-center gap-1" title="License">
+                          <Scale className="h-3.5 w-3.5" />
+                          {formatLicense(license)}
+                        </span>
+                      )}
+                    </div>
+
                     {/* Languages */}
                     {hfModelInfo.cardData?.language && hfModelInfo.cardData.language.length > 0 && (
                       <div>
@@ -647,8 +642,8 @@ export function ModelManagement() {
 
                 {/* Disk size */}
                 {freshSelectedModel.downloaded && freshSelectedModel.size_mb && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <HardDrive className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <HardDrive className="h-3.5 w-3.5" />
                     <span>{formatSize(freshSelectedModel.size_mb)} on disk</span>
                   </div>
                 )}
@@ -661,7 +656,7 @@ export function ModelManagement() {
                 )}
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t">
+                <div className="flex items-center gap-2 pt-2">
                   {selectedState?.hasError ? (
                     <>
                       <Button

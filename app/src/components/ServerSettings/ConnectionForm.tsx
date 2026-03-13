@@ -1,7 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2, XCircle } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,8 +17,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/components/ui/use-toast';
+import { useServerHealth } from '@/lib/hooks/useServer';
 import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
 
@@ -34,11 +36,8 @@ export function ConnectionForm() {
   const setKeepServerRunningOnClose = useServerStore((state) => state.setKeepServerRunningOnClose);
   const mode = useServerStore((state) => state.mode);
   const setMode = useServerStore((state) => state.setMode);
-  const maxChunkChars = useServerStore((state) => state.maxChunkChars);
-  const setMaxChunkChars = useServerStore((state) => state.setMaxChunkChars);
-  const crossfadeMs = useServerStore((state) => state.crossfadeMs);
-  const setCrossfadeMs = useServerStore((state) => state.setCrossfadeMs);
   const { toast } = useToast();
+  const { data: health, isLoading, error: healthError } = useServerHealth();
 
   const form = useForm<ConnectionFormValues>({
     resolver: zodResolver(connectionSchema),
@@ -56,7 +55,7 @@ export function ConnectionForm() {
 
   function onSubmit(data: ConnectionFormValues) {
     setServerUrl(data.serverUrl);
-    form.reset(data); // Reset form state after successful submission
+    form.reset(data);
     toast({
       title: 'Server URL updated',
       description: `Connected to ${data.serverUrl}`,
@@ -89,6 +88,37 @@ export function ConnectionForm() {
             {isDirty && <Button type="submit">Update Connection</Button>}
           </form>
         </Form>
+
+        {/* Connection status */}
+        <div className="mt-4">
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Checking connection...</span>
+            </div>
+          ) : healthError ? (
+            <div className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-destructive" />
+              <span className="text-sm text-destructive">
+                Connection failed: {healthError.message}
+              </span>
+            </div>
+          ) : health ? (
+            <div className="flex flex-wrap gap-2">
+              <Badge
+                variant={health.model_loaded || health.model_downloaded ? 'default' : 'secondary'}
+              >
+                {health.model_loaded || health.model_downloaded ? 'Model Ready' : 'No Model'}
+              </Badge>
+              <Badge variant={health.gpu_available ? 'default' : 'secondary'}>
+                GPU: {health.gpu_available ? 'Available' : 'Not Available'}
+              </Badge>
+              {health.vram_used_mb && (
+                <Badge variant="outline">VRAM: {health.vram_used_mb.toFixed(0)} MB</Badge>
+              )}
+            </div>
+          ) : null}
+        </div>
 
         <div className="mt-6 pt-6 border-t">
           <div className="flex items-start space-x-3">
@@ -154,55 +184,6 @@ export function ConnectionForm() {
             </div>
           </div>
         )}
-
-        <div className="mt-6 pt-6 border-t">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label htmlFor="maxChunkChars" className="text-sm font-medium leading-none">
-                Auto-chunking limit
-              </label>
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {maxChunkChars} chars
-              </span>
-            </div>
-            <Slider
-              id="maxChunkChars"
-              value={[maxChunkChars]}
-              onValueChange={([value]) => setMaxChunkChars(value)}
-              min={100}
-              max={2000}
-              step={50}
-              aria-label="Auto-chunking character limit"
-            />
-            <p className="text-sm text-muted-foreground">
-              Long text is split into chunks at sentence boundaries before generating. Lower values
-              can improve quality for long outputs. Default is 800.
-            </p>
-          </div>
-
-          <div className="space-y-3 mt-4">
-            <div className="flex items-center justify-between">
-              <label htmlFor="crossfadeMs" className="text-sm font-medium leading-none">
-                Chunk crossfade
-              </label>
-              <span className="text-sm tabular-nums text-muted-foreground">
-                {crossfadeMs === 0 ? 'Cut' : `${crossfadeMs}ms`}
-              </span>
-            </div>
-            <Slider
-              id="crossfadeMs"
-              value={[crossfadeMs]}
-              onValueChange={([value]) => setCrossfadeMs(value)}
-              min={0}
-              max={200}
-              step={10}
-              aria-label="Chunk crossfade duration"
-            />
-            <p className="text-sm text-muted-foreground">
-              Blends audio between chunks to smooth transitions. Set to 0 for a hard cut.
-            </p>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
