@@ -92,8 +92,9 @@ def save_audio(
         # Ensure parent directory exists
         Path(path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Write to temporary file first
-        sf.write(temp_path, audio, sample_rate)
+        # Write to temporary file first (explicit format since .tmp
+        # extension is not recognised by soundfile)
+        sf.write(temp_path, audio, sample_rate, format='WAV')
 
         # Atomic rename to final path
         os.replace(temp_path, path)
