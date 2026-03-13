@@ -38,6 +38,8 @@ setup-python:
     echo "Installing Python dependencies..."
     {{ pip }} install --upgrade pip -q
     {{ pip }} install -r {{ backend_dir }}/requirements.txt
+    # Chatterbox pins numpy<1.26 / torch==2.6 which break on Python 3.12+
+    {{ pip }} install --no-deps chatterbox-tts
     # Apple Silicon: install MLX backend
     if [ "$(uname -m)" = "arm64" ] && [ "$(uname)" = "Darwin" ]; then
         echo "Detected Apple Silicon — installing MLX dependencies..."

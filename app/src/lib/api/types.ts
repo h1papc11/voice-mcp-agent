@@ -34,7 +34,7 @@ export interface GenerationRequest {
   language: LanguageCode;
   seed?: number;
   model_size?: '1.7B' | '0.6B';
-  engine?: 'qwen' | 'luxtts';
+  engine?: 'qwen' | 'luxtts' | 'chatterbox';
   instruct?: string;
 }
 
@@ -119,10 +119,27 @@ export interface ModelProgress {
 export interface ModelStatus {
   model_name: string;
   display_name: string;
+  hf_repo_id?: string; // HuggingFace repository ID
   downloaded: boolean;
   downloading: boolean; // True if download is in progress
   size_mb?: number;
   loaded: boolean;
+}
+
+export interface HuggingFaceModelInfo {
+  id: string;
+  author: string;
+  lastModified: string;
+  pipeline_tag?: string;
+  library_name?: string;
+  downloads: number;
+  likes: number;
+  tags: string[];
+  cardData?: {
+    license?: string;
+    language?: string[];
+    pipeline_tag?: string;
+  };
 }
 
 export interface ModelStatusListResponse {
@@ -138,6 +155,10 @@ export interface ActiveDownloadTask {
   status: string;
   started_at: string;
   error?: string;
+  progress?: number; // 0-100 percentage
+  current?: number; // bytes downloaded
+  total?: number; // total bytes
+  filename?: string; // current file being downloaded
 }
 
 export interface ActiveGenerationTask {

@@ -16,7 +16,7 @@ const generationSchema = z.object({
   seed: z.number().int().optional(),
   modelSize: z.enum(['1.7B', '0.6B']).optional(),
   instruct: z.string().max(500).optional(),
-  engine: z.enum(['qwen', 'luxtts']).optional(),
+  engine: z.enum(['qwen', 'luxtts', 'chatterbox']).optional(),
 });
 
 export type GenerationFormValues = z.infer<typeof generationSchema>;
@@ -70,13 +70,20 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
       setIsGenerating(true);
 
       const engine = data.engine || 'qwen';
-      const modelName = engine === 'luxtts' ? 'luxtts' : `qwen-tts-${data.modelSize}`;
+      const modelName =
+        engine === 'luxtts'
+          ? 'luxtts'
+          : engine === 'chatterbox'
+            ? 'chatterbox-tts'
+            : `qwen-tts-${data.modelSize}`;
       const displayName =
         engine === 'luxtts'
           ? 'LuxTTS'
-          : data.modelSize === '1.7B'
-            ? 'Qwen TTS 1.7B'
-            : 'Qwen TTS 0.6B';
+          : engine === 'chatterbox'
+            ? 'Chatterbox TTS'
+            : data.modelSize === '1.7B'
+              ? 'Qwen TTS 1.7B'
+              : 'Qwen TTS 0.6B';
 
       try {
         const modelStatus = await apiClient.getModelStatus();
@@ -90,14 +97,15 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         console.error('Failed to check model status:', error);
       }
 
+      const isQwen = engine === 'qwen';
       const result = await generation.mutateAsync({
         profile_id: selectedProfileId,
         text: data.text,
         language: data.language,
         seed: data.seed,
-        model_size: engine === 'luxtts' ? undefined : data.modelSize,
+        model_size: isQwen ? data.modelSize : undefined,
         engine,
-        instruct: engine === 'luxtts' ? undefined : data.instruct || undefined,
+        instruct: isQwen ? data.instruct || undefined : undefined,
       });
 
       toast({

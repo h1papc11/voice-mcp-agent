@@ -76,7 +76,7 @@ export function GenerationForm() {
               )}
             />
 
-            {form.watch('engine') !== 'luxtts' && (
+            {form.watch('engine') === 'qwen' && (
               <FormField
                 control={form.control}
                 name="instruct"
@@ -107,11 +107,15 @@ export function GenerationForm() {
                   value={
                     form.watch('engine') === 'luxtts'
                       ? 'luxtts'
-                      : `qwen:${form.watch('modelSize') || '1.7B'}`
+                      : form.watch('engine') === 'chatterbox'
+                        ? 'chatterbox'
+                        : `qwen:${form.watch('modelSize') || '1.7B'}`
                   }
                   onValueChange={(value) => {
                     if (value === 'luxtts') {
                       form.setValue('engine', 'luxtts');
+                    } else if (value === 'chatterbox') {
+                      form.setValue('engine', 'chatterbox');
                     } else {
                       const [, modelSize] = value.split(':');
                       form.setValue('engine', 'qwen');
@@ -128,12 +132,15 @@ export function GenerationForm() {
                     <SelectItem value="qwen:1.7B">Qwen3-TTS 1.7B</SelectItem>
                     <SelectItem value="qwen:0.6B">Qwen3-TTS 0.6B</SelectItem>
                     <SelectItem value="luxtts">LuxTTS</SelectItem>
+                    <SelectItem value="chatterbox">Chatterbox</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
                   {form.watch('engine') === 'luxtts'
                     ? 'Fast, English-focused'
-                    : 'Multi-language, two sizes'}
+                    : form.watch('engine') === 'chatterbox'
+                      ? 'Multilingual, incl. Hebrew'
+                      : 'Multi-language, two sizes'}
                 </FormDescription>
               </FormItem>
 

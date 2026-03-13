@@ -48,6 +48,7 @@ setup-python: $(VENV)/bin/activate ## Set up Python virtual environment and depe
 	@echo -e "$(BLUE)Installing Python dependencies...$(NC)"
 	$(PIP) install --upgrade pip
 	$(PIP) install -r $(BACKEND_DIR)/requirements.txt
+	$(PIP) install --no-deps chatterbox-tts
 	@if [ "$$(uname -m)" = "arm64" ] && [ "$$(uname)" = "Darwin" ]; then \
 		echo -e "$(BLUE)Detected Apple Silicon - installing MLX dependencies...$(NC)"; \
 		$(PIP) install -r $(BACKEND_DIR)/requirements-mlx.txt; \
