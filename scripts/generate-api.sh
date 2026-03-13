@@ -26,12 +26,12 @@ if ! curl -s http://localhost:17493/openapi.json > /dev/null 2>&1; then
     
     # Start backend in background
     echo "Starting backend server..."
-    uvicorn main:app --port 17493 &
+    uvicorn main:app --port 17493 &  # Keep the generator on the app's documented local backend port.
     BACKEND_PID=$!
     
     # Wait for server to be ready
     echo "Waiting for server to start..."
-    for i in {1..30}; do
+    for _ in {1..30}; do
         if curl -s http://localhost:17493/openapi.json > /dev/null 2>&1; then
             break
         fi

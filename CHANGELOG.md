@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Audio export failing when Tauri save dialog returns object instead of string path
+- OpenAPI client generator script now documents the local backend port and avoids an unused loop variable warning
 
 ### Added
 - **Makefile** - Comprehensive development workflow automation with commands for setup, development, building, testing, and code quality checks
