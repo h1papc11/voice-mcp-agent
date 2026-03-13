@@ -23,6 +23,7 @@ import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
+import { ParalinguisticInput } from './ParalinguisticInput';
 
 export function GenerationForm() {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
@@ -64,13 +65,26 @@ export function GenerationForm() {
                 <FormItem>
                   <FormLabel>Text to Speak</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Enter the text you want to generate..."
-                      className="min-h-[150px]"
-                      {...field}
-                    />
+                    {form.watch('engine') === 'chatterbox_turbo' ? (
+                      <ParalinguisticInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Enter text... type / for effects like [laugh], [sigh]"
+                        className="min-h-[150px] rounded-md border border-input bg-background px-3 py-2"
+                      />
+                    ) : (
+                      <Textarea
+                        placeholder="Enter the text you want to generate..."
+                        className="min-h-[150px]"
+                        {...field}
+                      />
+                    )}
                   </FormControl>
-                  <FormDescription>Max 5000 characters</FormDescription>
+                  <FormDescription>
+                    {form.watch('engine') === 'chatterbox_turbo'
+                      ? 'Max 5000 characters. Type / to insert sound effects.'
+                      : 'Max 5000 characters'}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
