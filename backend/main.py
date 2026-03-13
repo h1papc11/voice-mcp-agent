@@ -699,6 +699,29 @@ async def generate_speech(
                 )
 
             await tts_model.load_model()
+        elif engine == "chatterbox_turbo":
+            if not tts_model._is_model_cached():
+                model_name = "chatterbox-turbo"
+
+                async def download_chatterbox_turbo_background():
+                    try:
+                        await tts_model.load_model()
+                    except Exception as e:
+                        task_manager.error_download(model_name, str(e))
+
+                task_manager.start_download(model_name)
+                asyncio.create_task(download_chatterbox_turbo_background())
+
+                raise HTTPException(
+                    status_code=202,
+                    detail={
+                        "message": "Chatterbox Turbo model is being downloaded. Please wait and try again.",
+                        "model_name": model_name,
+                        "downloading": True,
+                    },
+                )
+
+            await tts_model.load_model()
 
         # Create voice prompt from profile
         voice_prompt = await profiles.create_voice_prompt_for_profile(
@@ -717,7 +740,7 @@ async def generate_speech(
         )
 
         # Trim trailing silence/hallucination for Chatterbox output
-        if engine == "chatterbox":
+        if engine in ("chatterbox", "chatterbox_turbo"):
             from .utils.audio import trim_tts_output
             audio = trim_tts_output(audio, sample_rate)
 
@@ -798,6 +821,13 @@ async def stream_speech(
                 detail="Chatterbox model is not downloaded yet. Use /generate to trigger a download.",
             )
         await tts_model.load_model()
+    elif engine == "chatterbox_turbo":
+        if not tts_model._is_model_cached():
+            raise HTTPException(
+                status_code=400,
+                detail="Chatterbox Turbo model is not downloaded yet. Use /generate to trigger a download.",
+            )
+        await tts_model.load_model()
 
     voice_prompt = await profiles.create_voice_prompt_for_profile(
         data.profile_id, db, engine=engine,
@@ -812,7 +842,7 @@ async def stream_speech(
     )
 
     # Trim trailing silence/hallucination for Chatterbox output
-    if engine == "chatterbox":
+    if engine in ("chatterbox", "chatterbox_turbo"):
         from .utils.audio import trim_tts_output
         audio = trim_tts_output(audio, sample_rate)
 
@@ -1433,6 +1463,15 @@ async def get_model_status():
         except Exception:
             return False
 
+    # Check if Chatterbox Turbo backend is loaded
+    def check_chatterbox_turbo_loaded():
+        try:
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("chatterbox_turbo")
+            return backend.is_loaded()
+        except Exception:
+            return False
+
     model_configs = [
         {
             "model_name": "qwen-tts-1.7B",
@@ -1461,6 +1500,13 @@ async def get_model_status():
             "hf_repo_id": "ResembleAI/chatterbox",
             "model_size": "default",
             "check_loaded": check_chatterbox_loaded,
+        },
+        {
+            "model_name": "chatterbox-turbo",
+            "display_name": "Chatterbox Turbo (English, Tags)",
+            "hf_repo_id": "ResembleAI/chatterbox-turbo",
+            "model_size": "default",
+            "check_loaded": check_chatterbox_turbo_loaded,
         },
         {
             "model_name": "whisper-base",
@@ -1668,6 +1714,10 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
             "model_size": "default",
             "load_func": lambda: get_tts_backend_for_engine("chatterbox").load_model(),
         },
+        "chatterbox-turbo": {
+            "model_size": "default",
+            "load_func": lambda: get_tts_backend_for_engine("chatterbox_turbo").load_model(),
+        },
         "whisper-base": {
             "model_size": "base",
             "load_func": lambda: transcribe.get_whisper_model().load_model("base"),
@@ -1790,6 +1840,11 @@ async def delete_model(model_name: str):
             "model_size": "default",
             "model_type": "chatterbox",
         },
+        "chatterbox-turbo": {
+            "hf_repo_id": "ResembleAI/chatterbox-turbo",
+            "model_size": "default",
+            "model_type": "chatterbox_turbo",
+        },
         "whisper-base": {
             "hf_repo_id": "openai/whisper-base",
             "model_size": "base",
@@ -1834,6 +1889,11 @@ async def delete_model(model_name: str):
             chatterbox = get_tts_backend_for_engine("chatterbox")
             if chatterbox.is_loaded():
                 chatterbox.unload_model()
+        elif config["model_type"] == "chatterbox_turbo":
+            from .backends import get_tts_backend_for_engine
+            turbo = get_tts_backend_for_engine("chatterbox_turbo")
+            if turbo.is_loaded():
+                turbo.unload_model()
         elif config["model_type"] == "whisper":
             whisper_model = transcribe.get_whisper_model()
             if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:

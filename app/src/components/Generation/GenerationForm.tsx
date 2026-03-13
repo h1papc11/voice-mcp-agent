@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { LANGUAGE_OPTIONS } from '@/lib/constants/languages';
+import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
@@ -109,13 +109,19 @@ export function GenerationForm() {
                       ? 'luxtts'
                       : form.watch('engine') === 'chatterbox'
                         ? 'chatterbox'
-                        : `qwen:${form.watch('modelSize') || '1.7B'}`
+                        : form.watch('engine') === 'chatterbox_turbo'
+                          ? 'chatterbox_turbo'
+                          : `qwen:${form.watch('modelSize') || '1.7B'}`
                   }
                   onValueChange={(value) => {
                     if (value === 'luxtts') {
                       form.setValue('engine', 'luxtts');
+                      form.setValue('language', 'en');
                     } else if (value === 'chatterbox') {
                       form.setValue('engine', 'chatterbox');
+                    } else if (value === 'chatterbox_turbo') {
+                      form.setValue('engine', 'chatterbox_turbo');
+                      form.setValue('language', 'en');
                     } else {
                       const [, modelSize] = value.split(':');
                       form.setValue('engine', 'qwen');
@@ -133,40 +139,46 @@ export function GenerationForm() {
                     <SelectItem value="qwen:0.6B">Qwen3-TTS 0.6B</SelectItem>
                     <SelectItem value="luxtts">LuxTTS</SelectItem>
                     <SelectItem value="chatterbox">Chatterbox</SelectItem>
+                    <SelectItem value="chatterbox_turbo">Chatterbox Turbo</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormDescription>
                   {form.watch('engine') === 'luxtts'
                     ? 'Fast, English-focused'
                     : form.watch('engine') === 'chatterbox'
-                      ? 'Multilingual, incl. Hebrew'
-                      : 'Multi-language, two sizes'}
+                      ? '23 languages, incl. Hebrew'
+                      : form.watch('engine') === 'chatterbox_turbo'
+                        ? 'English, [laugh] [cough] tags'
+                        : 'Multi-language, two sizes'}
                 </FormDescription>
               </FormItem>
 
               <FormField
                 control={form.control}
                 name="language"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Language</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {LANGUAGE_OPTIONS.map((lang) => (
-                          <SelectItem key={lang.value} value={lang.value}>
-                            {lang.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const engineLangs = getLanguageOptionsForEngine(form.watch('engine') || 'qwen');
+                  return (
+                    <FormItem>
+                      <FormLabel>Language</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {engineLangs.map((lang) => (
+                            <SelectItem key={lang.value} value={lang.value}>
+                              {lang.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
               <FormField
