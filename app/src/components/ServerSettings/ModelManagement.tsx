@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Scale,
   Trash2,
+  Unplug,
   X,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -294,6 +295,27 @@ export function ModelManagement() {
     onError: (error: Error) => {
       toast({
         title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const unloadMutation = useMutation({
+    mutationFn: async (modelName: string) => {
+      return await apiClient.unloadModel(modelName);
+    },
+    onSuccess: async (_data, modelName) => {
+      toast({
+        title: 'Model unloaded',
+        description: `${modelName} has been unloaded from memory.`,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['modelStatus'], refetchType: 'all' });
+      await queryClient.refetchQueries({ queryKey: ['modelStatus'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Unload failed',
         description: error.message,
         variant: 'destructive',
       });
@@ -697,26 +719,46 @@ export function ModelManagement() {
                       </Button>
                     </>
                   ) : freshSelectedModel.downloaded ? (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setModelToDelete({
-                          name: freshSelectedModel.model_name,
-                          displayName: freshSelectedModel.display_name,
-                          sizeMb: freshSelectedModel.size_mb,
-                        });
-                        setDeleteDialogOpen(true);
-                      }}
-                      variant="outline"
-                      disabled={freshSelectedModel.loaded}
-                      title={
-                        freshSelectedModel.loaded ? 'Unload model before deleting' : 'Delete model'
-                      }
-                      className="flex-1"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {freshSelectedModel.loaded ? 'Unload to Delete' : 'Delete Model'}
-                    </Button>
+                    <div className="flex gap-2 flex-1">
+                      {freshSelectedModel.loaded && (
+                        <Button
+                          size="sm"
+                          onClick={() => unloadMutation.mutate(freshSelectedModel.model_name)}
+                          variant="outline"
+                          disabled={unloadMutation.isPending}
+                          className="flex-1"
+                        >
+                          {unloadMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <Unplug className="h-4 w-4 mr-2" />
+                          )}
+                          {unloadMutation.isPending ? 'Unloading...' : 'Unload'}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setModelToDelete({
+                            name: freshSelectedModel.model_name,
+                            displayName: freshSelectedModel.display_name,
+                            sizeMb: freshSelectedModel.size_mb,
+                          });
+                          setDeleteDialogOpen(true);
+                        }}
+                        variant="outline"
+                        disabled={freshSelectedModel.loaded}
+                        title={
+                          freshSelectedModel.loaded
+                            ? 'Unload model before deleting'
+                            : 'Delete model'
+                        }
+                        className="flex-1"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Model
+                      </Button>
+                    </div>
                   ) : (
                     <Button
                       size="sm"

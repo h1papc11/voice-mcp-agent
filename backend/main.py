@@ -1479,10 +1479,72 @@ async def load_model(model_size: str = "1.7B"):
 
 @app.post("/models/unload")
 async def unload_model():
-    """Unload TTS model to free memory."""
+    """Unload the default Qwen TTS model to free memory."""
     try:
         tts.unload_tts_model()
         return {"message": "Model unloaded successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/models/{model_name}/unload")
+async def unload_model_by_name(model_name: str):
+    """Unload a specific model from memory without deleting it from disk."""
+    # Map of model_name -> (model_type, model_size)
+    model_types = {
+        "qwen-tts-1.7B": ("tts", "1.7B"),
+        "qwen-tts-0.6B": ("tts", "0.6B"),
+        "luxtts": ("luxtts", "default"),
+        "chatterbox-tts": ("chatterbox", "default"),
+        "chatterbox-turbo": ("chatterbox_turbo", "default"),
+        "whisper-base": ("whisper", "base"),
+        "whisper-small": ("whisper", "small"),
+        "whisper-medium": ("whisper", "medium"),
+        "whisper-large": ("whisper", "large"),
+        "whisper-turbo": ("whisper", "turbo"),
+    }
+
+    if model_name not in model_types:
+        raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
+
+    model_type, model_size = model_types[model_name]
+
+    try:
+        if model_type == "tts":
+            tts_model = tts.get_tts_model()
+            if tts_model.is_loaded() and tts_model.model_size == model_size:
+                tts.unload_tts_model()
+            else:
+                return {"message": f"Model {model_name} is not loaded"}
+        elif model_type == "luxtts":
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("luxtts")
+            if backend.is_loaded():
+                backend.unload_model()
+            else:
+                return {"message": f"Model {model_name} is not loaded"}
+        elif model_type == "chatterbox":
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("chatterbox")
+            if backend.is_loaded():
+                backend.unload_model()
+            else:
+                return {"message": f"Model {model_name} is not loaded"}
+        elif model_type == "chatterbox_turbo":
+            from .backends import get_tts_backend_for_engine
+            backend = get_tts_backend_for_engine("chatterbox_turbo")
+            if backend.is_loaded():
+                backend.unload_model()
+            else:
+                return {"message": f"Model {model_name} is not loaded"}
+        elif model_type == "whisper":
+            whisper_model = transcribe.get_whisper_model()
+            if whisper_model.is_loaded() and whisper_model.model_size == model_size:
+                transcribe.unload_whisper_model()
+            else:
+                return {"message": f"Model {model_name} is not loaded"}
+
+        return {"message": f"Model {model_name} unloaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
