@@ -21,6 +21,12 @@ from ..utils.progress import get_progress_manager
 from ..utils.hf_progress import HFProgressTracker, create_hf_progress_callback
 from ..utils.tasks import get_task_manager
 
+LANGUAGE_CODE_TO_NAME = {
+    "zh": "chinese", "en": "english", "ja": "japanese", "ko": "korean",
+    "de": "german", "fr": "french", "ru": "russian", "pt": "portuguese",
+    "es": "spanish", "it": "italian",
+}
+
 
 class MLXTTSBackend:
     """MLX-based TTS backend using mlx-audio."""
@@ -343,7 +349,8 @@ class MLXTTSBackend:
             # MLX generate() returns a generator yielding GenerationResult objects
             audio_chunks = []
             sample_rate = 24000
-            
+            lang = LANGUAGE_CODE_TO_NAME.get(language, "auto")
+
             # Set seed if provided (MLX uses numpy random)
             if seed is not None:
                 import mlx.core as mx
@@ -371,23 +378,23 @@ class MLXTTSBackend:
                     sig = inspect.signature(self.model.generate)
                     if "ref_audio" in sig.parameters:
                         # Generate with voice cloning
-                        for result in self.model.generate(text, ref_audio=ref_audio, ref_text=ref_text):
+                        for result in self.model.generate(text, ref_audio=ref_audio, ref_text=ref_text, lang_code=lang):
                             audio_chunks.append(np.array(result.audio))
                             sample_rate = result.sample_rate
                     else:
                         # Fallback: generate without voice cloning
-                        for result in self.model.generate(text):
+                        for result in self.model.generate(text, lang_code=lang):
                             audio_chunks.append(np.array(result.audio))
                             sample_rate = result.sample_rate
                 else:
                     # No voice prompt, generate normally
-                    for result in self.model.generate(text):
+                    for result in self.model.generate(text, lang_code=lang):
                         audio_chunks.append(np.array(result.audio))
                         sample_rate = result.sample_rate
             except Exception as e:
                 # If voice cloning fails, try without it
                 print(f"Warning: Voice cloning failed, generating without voice prompt: {e}")
-                for result in self.model.generate(text):
+                for result in self.model.generate(text, lang_code=lang):
                     audio_chunks.append(np.array(result.audio))
                     sample_rate = result.sample_rate
             
