@@ -41,9 +41,11 @@ export function ProfileList() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 grid-cols-3 auto-rows-auto p-1 pb-[150px]">
+          <div className="flex gap-4 overflow-x-auto p-1 pb-1 lg:grid lg:grid-cols-3 lg:auto-rows-auto lg:overflow-x-visible lg:pb-[150px]">
             {allProfiles.map((profile) => (
-              <ProfileCard key={profile.id} profile={profile} />
+              <div key={profile.id} className="shrink-0 w-[200px] lg:w-auto lg:shrink">
+                <ProfileCard profile={profile} />
+              </div>
             ))}
           </div>
         )}

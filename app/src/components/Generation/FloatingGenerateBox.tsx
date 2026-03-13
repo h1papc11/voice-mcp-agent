@@ -165,7 +165,7 @@ export function FloatingGenerateBox({
         isStoriesRoute
           ? // Position aligned with story list: after sidebar + padding, width 360px
             'left-[calc(5rem+2rem)] w-[360px]'
-          : 'left-[calc(5rem+2rem)] w-[calc((100%-5rem-4rem)/2-1rem)]',
+          : 'left-[calc(5rem+2rem)] right-8 lg:right-auto lg:w-[calc((100%-5rem-4rem)/2-1rem)]',
       )}
       style={{
         // On stories route: offset by track editor height when visible

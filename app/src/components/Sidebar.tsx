@@ -2,6 +2,8 @@ import { Link, useMatchRoute } from '@tanstack/react-router';
 import { BookOpen, Box, Mic, Server, Speaker, Volume2 } from 'lucide-react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
+import { usePlayerStore } from '@/stores/playerStore';
+import { version } from '../../package.json';
 
 interface SidebarProps {
   isMacOS?: boolean;
@@ -18,6 +20,7 @@ const tabs = [
 
 export function Sidebar({ isMacOS }: SidebarProps) {
   const matchRoute = useMatchRoute();
+  const isPlayerOpen = !!usePlayerStore((s) => s.audioUrl);
 
   return (
     <div
@@ -55,6 +58,14 @@ export function Sidebar({ isMacOS }: SidebarProps) {
             </Link>
           );
         })}
+      </div>
+
+      {/* Version */}
+      <div
+        className="mt-auto text-[10px] text-muted-foreground/50 transition-all duration-300"
+        style={{ paddingBottom: isPlayerOpen ? '7rem' : undefined }}
+      >
+        v{version}
       </div>
     </div>
   );

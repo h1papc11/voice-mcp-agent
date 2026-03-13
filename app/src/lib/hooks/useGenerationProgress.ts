@@ -90,12 +90,12 @@ export function useGenerationProgress() {
                   });
                 });
             } else {
-              toast({
-                title: 'Generation complete!',
-                description: data.duration
-                  ? `Audio generated (${data.duration.toFixed(2)}s)`
-                  : 'Audio generated',
-              });
+              // toast({
+              //   title: 'Generation complete!',
+              //   description: data.duration
+              //     ? `Audio generated (${data.duration.toFixed(2)}s)`
+              //     : 'Audio generated',
+              // });
             }
 
             // Auto-play if enabled and nothing is currently playing
