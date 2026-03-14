@@ -1,15 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   Download,
   FileArchive,
+  Layers,
   Loader2,
   MoreHorizontal,
   Play,
   RotateCcw,
   Trash2,
+  Wand2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Loader from 'react-loaders';
+import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -28,7 +32,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
-import type { HistoryResponse } from '@/lib/api/types';
+import type { EffectConfig, HistoryResponse } from '@/lib/api/types';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import {
   useDeleteGeneration,
@@ -60,6 +64,11 @@ export function HistoryTable() {
   const [generationToDelete, setGenerationToDelete] = useState<{ id: string; name: string } | null>(
     null,
   );
+  const [effectsDialogOpen, setEffectsDialogOpen] = useState(false);
+  const [effectsTargetId, setEffectsTargetId] = useState<string | null>(null);
+  const [effectsChain, setEffectsChain] = useState<EffectConfig[]>([]);
+  const [applyingEffects, setApplyingEffects] = useState(false);
+  const [expandedVersionsId, setExpandedVersionsId] = useState<string | null>(null);
   const limit = 20;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -215,6 +224,57 @@ export function HistoryTable() {
     }
   };
 
+  const handleApplyEffects = (generationId: string) => {
+    setEffectsTargetId(generationId);
+    setEffectsChain([]);
+    setEffectsDialogOpen(true);
+  };
+
+  const handleApplyEffectsConfirm = async () => {
+    if (!effectsTargetId || effectsChain.length === 0) return;
+    setApplyingEffects(true);
+    try {
+      await apiClient.applyEffectsToGeneration(effectsTargetId, {
+        effects_chain: effectsChain,
+        set_as_default: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+      setEffectsDialogOpen(false);
+      toast({ title: 'Effects applied', description: 'A new version has been created.' });
+    } catch (error) {
+      toast({
+        title: 'Failed to apply effects',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setApplyingEffects(false);
+    }
+  };
+
+  const handleSwitchVersion = async (generationId: string, versionId: string) => {
+    try {
+      await apiClient.setDefaultVersion(generationId, versionId);
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    } catch (error) {
+      toast({
+        title: 'Failed to switch version',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handlePlayVersion = (
+    generationId: string,
+    versionId: string,
+    text: string,
+    profileId: string,
+  ) => {
+    const audioUrl = apiClient.getVersionAudioUrl(versionId);
+    setAudioWithAutoPlay(audioUrl, generationId, profileId, text.substring(0, 50));
+  };
+
   const handleImportConfirm = () => {
     if (selectedFile) {
       importGeneration.mutate(selectedFile, {
@@ -274,151 +334,224 @@ export function HistoryTable() {
               const isGenerating = gen.status === 'generating';
               const isFailed = gen.status === 'failed';
               const isPlayable = !isGenerating && !isFailed;
+              const hasVersions = gen.versions && gen.versions.length > 1;
+              const isVersionsExpanded = expandedVersionsId === gen.id;
               return (
                 <div
                   key={gen.id}
-                  role={isPlayable ? 'button' : undefined}
-                  tabIndex={isPlayable ? 0 : undefined}
                   className={cn(
-                    'flex items-stretch gap-4 h-26 border rounded-md p-3 bg-card transition-colors text-left w-full',
-                    isPlayable && 'hover:bg-muted/70 cursor-pointer',
+                    'border rounded-md bg-card transition-colors text-left w-full',
                     isCurrentlyPlaying && 'bg-muted/70',
                   )}
-                  aria-label={
-                    isGenerating
-                      ? `Generating speech for ${gen.profile_name}...`
-                      : isFailed
-                        ? `Generation failed for ${gen.profile_name}`
-                        : isCurrentlyPlaying
-                          ? `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Playing. Press Enter to restart.`
-                          : `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Press Enter to play.`
-                  }
-                  onMouseDown={(e) => {
-                    if (!isPlayable) return;
-                    const target = e.target as HTMLElement;
-                    if (target.closest('textarea') || window.getSelection()?.toString()) {
-                      return;
-                    }
-                    handlePlay(gen.id, gen.text, gen.profile_id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (!isPlayable) return;
-                    const target = e.target as HTMLElement;
-                    if (target.closest('textarea') || target.closest('button')) return;
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handlePlay(gen.id, gen.text, gen.profile_id);
-                    }
-                  }}
                 >
-                  {/* Status icon */}
-                  <div className="flex items-center shrink-0 w-10 justify-center overflow-hidden">
-                    <div className="scale-50">
-                      <Loader
-                        type={isGenerating ? 'line-scale' : 'line-scale-pulse-out-rapid'}
-                        active={isGenerating || isCurrentlyPlaying}
+                  {/* Main row */}
+                  <div
+                    role={isPlayable ? 'button' : undefined}
+                    tabIndex={isPlayable ? 0 : undefined}
+                    className={cn(
+                      'flex items-stretch gap-4 h-26 p-3',
+                      isPlayable && 'hover:bg-muted/70 cursor-pointer rounded-md',
+                    )}
+                    aria-label={
+                      isGenerating
+                        ? `Generating speech for ${gen.profile_name}...`
+                        : isFailed
+                          ? `Generation failed for ${gen.profile_name}`
+                          : isCurrentlyPlaying
+                            ? `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Playing. Press Enter to restart.`
+                            : `Sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}, ${formatDate(gen.created_at)}. Press Enter to play.`
+                    }
+                    onMouseDown={(e) => {
+                      if (!isPlayable) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest('textarea') || window.getSelection()?.toString()) {
+                        return;
+                      }
+                      handlePlay(gen.id, gen.text, gen.profile_id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!isPlayable) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest('textarea') || target.closest('button')) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handlePlay(gen.id, gen.text, gen.profile_id);
+                      }
+                    }}
+                  >
+                    {/* Status icon */}
+                    <div className="flex items-center shrink-0 w-10 justify-center overflow-hidden">
+                      <div className="scale-50">
+                        <Loader
+                          type={isGenerating ? 'line-scale' : 'line-scale-pulse-out-rapid'}
+                          active={isGenerating || isCurrentlyPlaying}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Left side - Meta information */}
+                    <div className="flex flex-col gap-1.5 w-48 shrink-0 justify-center">
+                      <div className="font-medium text-sm truncate" title={gen.profile_name}>
+                        {gen.profile_name}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{gen.language}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatEngineName(gen.engine, gen.model_size)}
+                        </span>
+                        {isFailed ? (
+                          <span className="text-xs text-destructive">Failed</span>
+                        ) : !isGenerating ? (
+                          <span className="text-xs text-muted-foreground">
+                            {formatDuration(gen.duration ?? 0)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {isGenerating ? (
+                          <span className="text-accent">Generating...</span>
+                        ) : (
+                          formatDate(gen.created_at)
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right side - Transcript textarea */}
+                    <div className="flex-1 min-w-0 flex">
+                      <Textarea
+                        value={gen.text}
+                        className="flex-1 resize-none text-sm text-muted-foreground select-text"
+                        readOnly
+                        aria-label={`Transcript for sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}`}
                       />
                     </div>
-                  </div>
 
-                  {/* Left side - Meta information */}
-                  <div className="flex flex-col gap-1.5 w-48 shrink-0 justify-center">
-                    <div className="font-medium text-sm truncate" title={gen.profile_name}>
-                      {gen.profile_name}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{gen.language}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatEngineName(gen.engine, gen.model_size)}
-                      </span>
+                    {/* Far right - Actions */}
+                    <div
+                      className="shrink-0 flex flex-col justify-center items-center gap-1"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {isFailed ? (
-                        <span className="text-xs text-destructive">Failed</span>
-                      ) : !isGenerating ? (
-                        <span className="text-xs text-muted-foreground">
-                          {formatDuration(gen.duration ?? 0)}
-                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label="Retry generation"
+                          onClick={() => handleRetry(gen.id)}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      ) : isPlayable ? (
+                        <>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Actions"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
+                              >
+                                <Play className="mr-2 h-4 w-4" />
+                                Play
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDownloadAudio(gen.id, gen.text)}
+                                disabled={exportGenerationAudio.isPending}
+                              >
+                                <Download className="mr-2 h-4 w-4" />
+                                Export Audio
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleExportPackage(gen.id, gen.text)}
+                                disabled={exportGeneration.isPending}
+                              >
+                                <FileArchive className="mr-2 h-4 w-4" />
+                                Export Package
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApplyEffects(gen.id)}>
+                                <Wand2 className="mr-2 h-4 w-4" />
+                                Apply Effects
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
+                                disabled={deleteGeneration.isPending}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          {hasVersions && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn('h-8 w-8', isVersionsExpanded && 'text-accent')}
+                              aria-label="Toggle versions"
+                              onClick={() =>
+                                setExpandedVersionsId(isVersionsExpanded ? null : gen.id)
+                              }
+                            >
+                              <Layers className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </>
                       ) : null}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {isGenerating ? (
-                        <span className="text-accent">Generating...</span>
-                      ) : (
-                        formatDate(gen.created_at)
-                      )}
-                    </div>
                   </div>
 
-                  {/* Right side - Transcript textarea */}
-                  <div className="flex-1 min-w-0 flex">
-                    <Textarea
-                      value={gen.text}
-                      className="flex-1 resize-none text-sm text-muted-foreground select-text"
-                      readOnly
-                      aria-label={`Transcript for sample from ${gen.profile_name}, ${formatDuration(gen.duration ?? 0)}`}
-                    />
-                  </div>
-
-                  {/* Far right - Actions */}
-                  <div
-                    className="w-10 shrink-0 flex justify-end items-center"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {isFailed ? (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label="Retry generation"
-                        onClick={() => handleRetry(gen.id)}
+                  {/* Expandable versions panel */}
+                  <AnimatePresence>
+                    {isVersionsExpanded && gen.versions && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="overflow-hidden"
                       >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    ) : isPlayable ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="Actions"
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
-                          >
-                            <Play className="mr-2 h-4 w-4" />
-                            Play
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDownloadAudio(gen.id, gen.text)}
-                            disabled={exportGenerationAudio.isPending}
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Audio
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleExportPackage(gen.id, gen.text)}
-                            disabled={exportGeneration.isPending}
-                          >
-                            <FileArchive className="mr-2 h-4 w-4" />
-                            Export Package
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
-                            disabled={deleteGeneration.isPending}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : null}
-                  </div>
+                        <div className="border-t border-border/50 px-3 pb-2 pt-2">
+                          <div className="divide-y divide-border/40">
+                            {gen.versions.map((v) => (
+                              <button
+                                key={v.id}
+                                type="button"
+                                className="flex items-center gap-2 w-full h-9 px-2 text-left hover:bg-muted/50 transition-colors"
+                                onClick={() => {
+                                  handlePlayVersion(gen.id, v.id, gen.text, gen.profile_id);
+                                  if (!v.is_default) {
+                                    handleSwitchVersion(gen.id, v.id);
+                                  }
+                                }}
+                              >
+                                <Play className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                <span className="truncate text-xs font-medium">{v.label}</span>
+                                {v.effects_chain && v.effects_chain.length > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {v.effects_chain.length} fx
+                                  </span>
+                                )}
+                                <span className="flex-1" />
+                                {v.is_default && (
+                                  <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded-full">
+                                    active
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
@@ -496,6 +629,32 @@ export function HistoryTable() {
               disabled={importGeneration.isPending || !selectedFile}
             >
               {importGeneration.isPending ? 'Importing...' : 'Import'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={effectsDialogOpen} onOpenChange={setEffectsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply Effects</DialogTitle>
+            <DialogDescription>
+              Configure post-processing effects to apply to this generation. A new version will be
+              created.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 max-h-80 overflow-y-auto">
+            <EffectsChainEditor value={effectsChain} onChange={setEffectsChain} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEffectsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApplyEffectsConfirm}
+              disabled={applyingEffects || effectsChain.length === 0}
+            >
+              {applyingEffects ? 'Applying...' : 'Apply'}
             </Button>
           </DialogFooter>
         </DialogContent>

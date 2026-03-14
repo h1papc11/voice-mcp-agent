@@ -2,9 +2,15 @@ import type { LanguageCode } from '@/lib/constants/languages';
 import { useServerStore } from '@/stores/serverStore';
 import type {
   ActiveTasksResponse,
+  ApplyEffectsRequest,
+  AvailableEffectsResponse,
   CudaStatus,
+  EffectConfig,
+  EffectPresetCreate,
+  EffectPresetResponse,
   GenerationRequest,
   GenerationResponse,
+  GenerationVersionResponse,
   HealthResponse,
   HistoryListResponse,
   HistoryQuery,
@@ -573,6 +579,93 @@ class ApiClient {
   async exportStoryAudio(storyId: string): Promise<Blob> {
     const url = `${this.getBaseUrl()}/stories/${storyId}/export-audio`;
     const response = await fetch(url);
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        detail: response.statusText,
+      }));
+      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+    }
+
+    return response.blob();
+  }
+
+  // Effects & Versions
+  async getAvailableEffects(): Promise<AvailableEffectsResponse> {
+    return this.request<AvailableEffectsResponse>('/effects/available');
+  }
+
+  async listEffectPresets(): Promise<EffectPresetResponse[]> {
+    return this.request<EffectPresetResponse[]>('/effects/presets');
+  }
+
+  async createEffectPreset(data: EffectPresetCreate): Promise<EffectPresetResponse> {
+    return this.request<EffectPresetResponse>('/effects/presets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEffectPreset(presetId: string): Promise<void> {
+    await this.request<void>(`/effects/presets/${presetId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async listGenerationVersions(generationId: string): Promise<GenerationVersionResponse[]> {
+    return this.request<GenerationVersionResponse[]>(`/generations/${generationId}/versions`);
+  }
+
+  async applyEffectsToGeneration(
+    generationId: string,
+    data: ApplyEffectsRequest,
+  ): Promise<GenerationVersionResponse> {
+    return this.request<GenerationVersionResponse>(
+      `/generations/${generationId}/versions/apply-effects`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      },
+    );
+  }
+
+  async setDefaultVersion(
+    generationId: string,
+    versionId: string,
+  ): Promise<GenerationVersionResponse> {
+    return this.request<GenerationVersionResponse>(
+      `/generations/${generationId}/versions/${versionId}/set-default`,
+      { method: 'PUT' },
+    );
+  }
+
+  async deleteGenerationVersion(generationId: string, versionId: string): Promise<void> {
+    await this.request<void>(`/generations/${generationId}/versions/${versionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  getVersionAudioUrl(versionId: string): string {
+    return `${this.getBaseUrl()}/audio/version/${versionId}`;
+  }
+
+  async updateProfileEffects(
+    profileId: string,
+    effectsChain: EffectConfig[] | null,
+  ): Promise<VoiceProfileResponse> {
+    return this.request<VoiceProfileResponse>(`/profiles/${profileId}/effects`, {
+      method: 'PUT',
+      body: JSON.stringify({ effects_chain: effectsChain }),
+    });
+  }
+
+  async previewEffects(generationId: string, effectsChain: EffectConfig[]): Promise<Blob> {
+    const url = `${this.getBaseUrl()}/effects/preview/${generationId}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ effects_chain: effectsChain }),
+    });
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({

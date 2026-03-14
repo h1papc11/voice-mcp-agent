@@ -1,7 +1,8 @@
 import { useMatchRoute } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Loader2, SlidersHorizontal, Sparkles, Wand2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import {
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { EffectConfig } from '@/lib/api/types';
 import { getLanguageOptionsForEngine, type LanguageCode } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
@@ -37,6 +39,8 @@ export function FloatingGenerateBox({
   const { data: profiles } = useProfiles();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isInstructMode, setIsInstructMode] = useState(false);
+  const [isEffectsMode, setIsEffectsMode] = useState(false);
+  const [effectsChain, setEffectsChain] = useState<EffectConfig[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const matchRoute = useMatchRoute();
@@ -57,6 +61,7 @@ export function FloatingGenerateBox({
         addPendingStoryAdd(generationId, selectedStoryId);
       }
     },
+    getEffectsChain: () => (effectsChain.length > 0 ? effectsChain : undefined),
   });
 
   // Click away handler to collapse the box
@@ -369,9 +374,65 @@ export function FloatingGenerateBox({
                       </div>
                     </motion.div>
                   )}
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.8 }}
+                      transition={{ duration: 0.2 }}
+                      className={cn(
+                        'absolute top-0',
+                        form.watch('engine') === 'qwen'
+                          ? 'right-[calc(100%+3.5rem)]'
+                          : 'right-[calc(100%+0.5rem)]',
+                      )}
+                    >
+                      <div className="group relative">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsEffectsMode(!isEffectsMode);
+                            if (isEffectsMode) setIsInstructMode(false);
+                          }}
+                          className={cn(
+                            'h-10 w-10 rounded-full transition-all duration-200',
+                            isEffectsMode || effectsChain.length > 0
+                              ? 'bg-accent text-accent-foreground border border-accent hover:bg-accent/90'
+                              : 'bg-card border border-border hover:bg-background/50',
+                          )}
+                          aria-label={isEffectsMode ? 'Effects, on' : 'Post-processing effects'}
+                        >
+                          <Wand2 className="h-4 w-4" />
+                        </Button>
+                        <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground border border-border opacity-0 transition-opacity group-hover:opacity-100 z-[9999]">
+                          Post-processing effects
+                          {effectsChain.length > 0 && ` (${effectsChain.length} active)`}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Effects chain editor panel */}
+            <AnimatePresence>
+              {isExpanded && isEffectsMode && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden mt-2"
+                >
+                  <div className="border-t border-border/50 pt-2 pb-1">
+                    <EffectsChainEditor value={effectsChain} onChange={setEffectsChain} compact />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               <motion.div

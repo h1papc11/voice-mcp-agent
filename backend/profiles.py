@@ -20,11 +20,34 @@ from .database import (
     VoiceProfile as DBVoiceProfile,
     ProfileSample as DBProfileSample,
 )
+from .models import EffectConfig
 from .utils.audio import validate_reference_audio, load_audio, save_audio
 from .utils.images import validate_image, process_avatar
 from .utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
 from . import config
+import json as _json
+
+
+def _profile_to_response(profile: DBVoiceProfile) -> VoiceProfileResponse:
+    """Convert a DB profile to a VoiceProfileResponse, deserializing effects_chain."""
+    effects_chain = None
+    if profile.effects_chain:
+        try:
+            raw = _json.loads(profile.effects_chain)
+            effects_chain = [EffectConfig(**e) for e in raw]
+        except Exception:
+            pass
+    return VoiceProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        description=profile.description,
+        language=profile.language,
+        avatar_path=profile.avatar_path,
+        effects_chain=effects_chain,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
 
 
 def _get_profiles_dir() -> Path:
@@ -72,7 +95,7 @@ async def create_profile(
     profile_dir = _get_profiles_dir() / db_profile.id
     profile_dir.mkdir(parents=True, exist_ok=True)
 
-    return VoiceProfileResponse.model_validate(db_profile)
+    return _profile_to_response(db_profile)
 
 
 async def add_profile_sample(
@@ -154,7 +177,7 @@ async def get_profile(
     if not profile:
         return None
     
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def get_profile_samples(
@@ -189,7 +212,7 @@ async def list_profiles(db: Session) -> List[VoiceProfileResponse]:
         DBVoiceProfile.created_at.desc()
     ).all()
     
-    return [VoiceProfileResponse.model_validate(p) for p in profiles]
+    return [_profile_to_response(p) for p in profiles]
 
 
 async def update_profile(
@@ -230,7 +253,7 @@ async def update_profile(
     db.commit()
     db.refresh(profile)
 
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def delete_profile(
@@ -472,7 +495,7 @@ async def upload_avatar(
     db.commit()
     db.refresh(profile)
 
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def delete_avatar(

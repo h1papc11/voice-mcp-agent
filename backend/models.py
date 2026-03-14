@@ -21,6 +21,7 @@ class VoiceProfileResponse(BaseModel):
     description: Optional[str]
     language: str
     avatar_path: Optional[str] = None
+    effects_chain: Optional[List["EffectConfig"]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -61,6 +62,7 @@ class GenerationRequest(BaseModel):
     max_chunk_chars: int = Field(default=800, ge=100, le=5000, description="Max characters per chunk for long text splitting")
     crossfade_ms: int = Field(default=50, ge=0, le=500, description="Crossfade duration in ms between chunks (0 for hard cut)")
     normalize: bool = Field(default=True, description="Normalize output audio volume")
+    effects_chain: Optional[List["EffectConfig"]] = Field(None, description="Effects chain to apply after generation (overrides profile default)")
 
 
 class GenerationResponse(BaseModel):
@@ -78,6 +80,8 @@ class GenerationResponse(BaseModel):
     status: str = "completed"
     error: Optional[str] = None
     created_at: datetime
+    versions: Optional[List["GenerationVersionResponse"]] = None
+    active_version_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -107,6 +111,8 @@ class HistoryResponse(BaseModel):
     status: str = "completed"
     error: Optional[str] = None
     created_at: datetime
+    versions: Optional[List["GenerationVersionResponse"]] = None
+    active_version_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -339,3 +345,94 @@ class StoryItemTrim(BaseModel):
 class StoryItemSplit(BaseModel):
     """Request model for splitting a story item."""
     split_time_ms: int = Field(..., ge=0)  # Time within the clip to split at (relative to clip start)
+
+
+# ============================================
+# Effects & Versions
+# ============================================
+
+class EffectConfig(BaseModel):
+    """A single effect in an effects chain."""
+    type: str
+    enabled: bool = True
+    params: dict = Field(default_factory=dict)
+
+
+class EffectsChain(BaseModel):
+    """An ordered list of effects to apply."""
+    effects: List[EffectConfig] = Field(default_factory=list)
+
+
+class EffectPresetCreate(BaseModel):
+    """Request model for creating an effect preset."""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    effects_chain: List[EffectConfig]
+
+
+class EffectPresetUpdate(BaseModel):
+    """Request model for updating an effect preset."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    effects_chain: Optional[List[EffectConfig]] = None
+
+
+class EffectPresetResponse(BaseModel):
+    """Response model for effect preset."""
+    id: str
+    name: str
+    description: Optional[str] = None
+    effects_chain: List[EffectConfig]
+    is_builtin: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class GenerationVersionResponse(BaseModel):
+    """Response model for a generation version."""
+    id: str
+    generation_id: str
+    label: str
+    audio_path: str
+    effects_chain: Optional[List[EffectConfig]] = None
+    is_default: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ApplyEffectsRequest(BaseModel):
+    """Request to apply effects to an existing generation."""
+    effects_chain: List[EffectConfig]
+    label: Optional[str] = Field(None, max_length=100, description="Label for this version (auto-generated if omitted)")
+    set_as_default: bool = Field(default=True, description="Set this version as the default")
+
+
+class ProfileEffectsUpdate(BaseModel):
+    """Request to update the default effects chain on a profile."""
+    effects_chain: Optional[List[EffectConfig]] = Field(None, description="Effects chain (null to remove)")
+
+
+class AvailableEffectParam(BaseModel):
+    """Description of a single effect parameter."""
+    default: float
+    min: float
+    max: float
+    step: float
+    description: str
+
+
+class AvailableEffect(BaseModel):
+    """Description of an available effect type."""
+    type: str
+    label: str
+    description: str
+    params: dict  # param_name -> AvailableEffectParam
+
+
+class AvailableEffectsResponse(BaseModel):
+    """Response listing all available effect types."""
+    effects: List[AvailableEffect]

@@ -13,6 +13,7 @@ export interface VoiceProfileResponse {
   description?: string;
   language: string;
   avatar_path?: string;
+  effects_chain?: EffectConfig[];
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,12 @@ export interface ProfileSampleResponse {
   reference_text: string;
 }
 
+export interface EffectConfig {
+  type: string;
+  enabled: boolean;
+  params: Record<string, number>;
+}
+
 export interface GenerationRequest {
   profile_id: string;
   text: string;
@@ -39,6 +46,17 @@ export interface GenerationRequest {
   max_chunk_chars?: number;
   crossfade_ms?: number;
   normalize?: boolean;
+  effects_chain?: EffectConfig[];
+}
+
+export interface GenerationVersionResponse {
+  id: string;
+  generation_id: string;
+  label: string;
+  audio_path: string;
+  effects_chain?: EffectConfig[];
+  is_default: boolean;
+  created_at: string;
 }
 
 export interface GenerationResponse {
@@ -55,6 +73,8 @@ export interface GenerationResponse {
   status: 'generating' | 'completed' | 'failed';
   error?: string;
   created_at: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
 }
 
 export interface HistoryQuery {
@@ -66,6 +86,8 @@ export interface HistoryQuery {
 
 export interface HistoryResponse extends GenerationResponse {
   profile_name: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
 }
 
 export interface HistoryListResponse {
@@ -255,4 +277,46 @@ export interface StoryItemTrim {
 
 export interface StoryItemSplit {
   split_time_ms: number;
+}
+
+// Effects
+
+export interface EffectPresetResponse {
+  id: string;
+  name: string;
+  description?: string;
+  effects_chain: EffectConfig[];
+  is_builtin: boolean;
+  created_at: string;
+}
+
+export interface EffectPresetCreate {
+  name: string;
+  description?: string;
+  effects_chain: EffectConfig[];
+}
+
+export interface AvailableEffectParam {
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+  description: string;
+}
+
+export interface AvailableEffect {
+  type: string;
+  label: string;
+  description: string;
+  params: Record<string, AvailableEffectParam>;
+}
+
+export interface AvailableEffectsResponse {
+  effects: AvailableEffect[];
+}
+
+export interface ApplyEffectsRequest {
+  effects_chain: EffectConfig[];
+  label?: string;
+  set_as_default?: boolean;
 }
