@@ -23,7 +23,7 @@ jobs:
             python-version: "3.12"
             backend: "pytorch"
           - platform: "ubuntu-22.04"
-            args: ""
+            args: "--bundles deb,rpm"
             python-version: "3.12"
             backend: "pytorch"
           - platform: "windows-latest"
