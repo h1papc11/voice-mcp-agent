@@ -8,7 +8,7 @@ import uuid
 import shutil
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .models import (
     VoiceProfileCreate,
@@ -19,12 +19,43 @@ from .models import (
 from .database import (
     VoiceProfile as DBVoiceProfile,
     ProfileSample as DBProfileSample,
+    Generation as DBGeneration,
 )
+from .models import EffectConfig
 from .utils.audio import validate_reference_audio, load_audio, save_audio
 from .utils.images import validate_image, process_avatar
 from .utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
 from . import config
+import json as _json
+
+
+def _profile_to_response(
+    profile: DBVoiceProfile,
+    generation_count: int = 0,
+    sample_count: int = 0,
+) -> VoiceProfileResponse:
+    """Convert a DB profile to a VoiceProfileResponse, deserializing effects_chain."""
+    effects_chain = None
+    if profile.effects_chain:
+        try:
+            raw = _json.loads(profile.effects_chain)
+            effects_chain = [EffectConfig(**e) for e in raw]
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
+    return VoiceProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        description=profile.description,
+        language=profile.language,
+        avatar_path=profile.avatar_path,
+        effects_chain=effects_chain,
+        generation_count=generation_count,
+        sample_count=sample_count,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
 
 
 def _get_profiles_dir() -> Path:
@@ -72,7 +103,7 @@ async def create_profile(
     profile_dir = _get_profiles_dir() / db_profile.id
     profile_dir.mkdir(parents=True, exist_ok=True)
 
-    return VoiceProfileResponse.model_validate(db_profile)
+    return _profile_to_response(db_profile)
 
 
 async def add_profile_sample(
@@ -154,7 +185,7 @@ async def get_profile(
     if not profile:
         return None
     
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def get_profile_samples(
@@ -177,7 +208,7 @@ async def get_profile_samples(
 
 async def list_profiles(db: Session) -> List[VoiceProfileResponse]:
     """
-    List all voice profiles.
+    List all voice profiles with generation and sample counts.
     
     Args:
         db: Database session
@@ -188,8 +219,34 @@ async def list_profiles(db: Session) -> List[VoiceProfileResponse]:
     profiles = db.query(DBVoiceProfile).order_by(
         DBVoiceProfile.created_at.desc()
     ).all()
-    
-    return [VoiceProfileResponse.model_validate(p) for p in profiles]
+
+    if not profiles:
+        return []
+
+    # Batch-fetch generation counts
+    gen_counts_rows = (
+        db.query(DBGeneration.profile_id, func.count(DBGeneration.id))
+        .group_by(DBGeneration.profile_id)
+        .all()
+    )
+    gen_counts = {row[0]: row[1] for row in gen_counts_rows}
+
+    # Batch-fetch sample counts
+    sample_counts_rows = (
+        db.query(DBProfileSample.profile_id, func.count(DBProfileSample.id))
+        .group_by(DBProfileSample.profile_id)
+        .all()
+    )
+    sample_counts = {row[0]: row[1] for row in sample_counts_rows}
+
+    return [
+        _profile_to_response(
+            p,
+            generation_count=gen_counts.get(p.id, 0),
+            sample_count=sample_counts.get(p.id, 0),
+        )
+        for p in profiles
+    ]
 
 
 async def update_profile(
@@ -230,7 +287,7 @@ async def update_profile(
     db.commit()
     db.refresh(profile)
 
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def delete_profile(
@@ -472,7 +529,7 @@ async def upload_avatar(
     db.commit()
     db.refresh(profile)
 
-    return VoiceProfileResponse.model_validate(profile)
+    return _profile_to_response(profile)
 
 
 async def delete_avatar(

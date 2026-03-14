@@ -13,6 +13,9 @@ export interface VoiceProfileResponse {
   description?: string;
   language: string;
   avatar_path?: string;
+  effects_chain?: EffectConfig[];
+  generation_count: number;
+  sample_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +31,12 @@ export interface ProfileSampleResponse {
   reference_text: string;
 }
 
+export interface EffectConfig {
+  type: string;
+  enabled: boolean;
+  params: Record<string, number>;
+}
+
 export interface GenerationRequest {
   profile_id: string;
   text: string;
@@ -39,6 +48,18 @@ export interface GenerationRequest {
   max_chunk_chars?: number;
   crossfade_ms?: number;
   normalize?: boolean;
+  effects_chain?: EffectConfig[];
+}
+
+export interface GenerationVersionResponse {
+  id: string;
+  generation_id: string;
+  label: string;
+  audio_path: string;
+  effects_chain?: EffectConfig[];
+  source_version_id?: string;
+  is_default: boolean;
+  created_at: string;
 }
 
 export interface GenerationResponse {
@@ -54,7 +75,10 @@ export interface GenerationResponse {
   model_size?: string;
   status: 'generating' | 'completed' | 'failed';
   error?: string;
+  is_favorited?: boolean;
   created_at: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
 }
 
 export interface HistoryQuery {
@@ -66,6 +90,8 @@ export interface HistoryQuery {
 
 export interface HistoryResponse extends GenerationResponse {
   profile_name: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
 }
 
 export interface HistoryListResponse {
@@ -199,6 +225,7 @@ export interface StoryItemDetail {
   id: string;
   story_id: string;
   generation_id: string;
+  version_id?: string;
   start_time_ms: number;
   track: number;
   trim_start_ms: number;
@@ -213,6 +240,12 @@ export interface StoryItemDetail {
   seed?: number;
   instruct?: string;
   generation_created_at: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
+}
+
+export interface StoryItemVersionUpdate {
+  version_id: string | null;
 }
 
 export interface StoryDetailResponse {
@@ -255,4 +288,53 @@ export interface StoryItemTrim {
 
 export interface StoryItemSplit {
   split_time_ms: number;
+}
+
+// Effects
+
+export interface EffectPresetResponse {
+  id: string;
+  name: string;
+  description?: string;
+  effects_chain: EffectConfig[];
+  is_builtin: boolean;
+  created_at: string;
+}
+
+export interface EffectPresetCreate {
+  name: string;
+  description?: string;
+  effects_chain: EffectConfig[];
+}
+
+export interface EffectPresetUpdate {
+  name?: string;
+  description?: string;
+  effects_chain?: EffectConfig[];
+}
+
+export interface AvailableEffectParam {
+  default: number;
+  min: number;
+  max: number;
+  step: number;
+  description: string;
+}
+
+export interface AvailableEffect {
+  type: string;
+  label: string;
+  description: string;
+  params: Record<string, AvailableEffectParam>;
+}
+
+export interface AvailableEffectsResponse {
+  effects: AvailableEffect[];
+}
+
+export interface ApplyEffectsRequest {
+  effects_chain: EffectConfig[];
+  source_version_id?: string;
+  label?: string;
+  set_as_default?: boolean;
 }

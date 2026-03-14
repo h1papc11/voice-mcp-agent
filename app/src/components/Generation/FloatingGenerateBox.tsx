@@ -2,6 +2,7 @@ import { useMatchRoute } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import {
@@ -12,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import type { EffectConfig } from '@/lib/api/types';
 import { getLanguageOptionsForEngine, type LanguageCode } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile, useProfiles } from '@/lib/hooks/useProfiles';
@@ -37,6 +39,7 @@ export function FloatingGenerateBox({
   const { data: profiles } = useProfiles();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isInstructMode, setIsInstructMode] = useState(false);
+  const [effectsChain, setEffectsChain] = useState<EffectConfig[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const matchRoute = useMatchRoute();
@@ -57,6 +60,7 @@ export function FloatingGenerateBox({
         addPendingStoryAdd(generationId, selectedStoryId);
       }
     },
+    getEffectsChain: () => (effectsChain.length > 0 ? effectsChain : undefined),
   });
 
   // Click away handler to collapse the box
@@ -355,7 +359,9 @@ export function FloatingGenerateBox({
                             'h-10 w-10 rounded-full transition-all duration-200',
                             isInstructMode
                               ? 'bg-accent text-accent-foreground border border-accent hover:bg-accent/90'
-                              : 'bg-card border border-border hover:bg-background/50',
+                              : effectsChain.length > 0
+                                ? 'bg-accent/50 text-accent-foreground border border-accent/50 hover:bg-accent/70'
+                                : 'bg-card border border-border hover:bg-background/50',
                           )}
                           aria-label={
                             isInstructMode ? 'Fine tune instructions, on' : 'Fine tune instructions'
@@ -364,7 +370,7 @@ export function FloatingGenerateBox({
                           <SlidersHorizontal className="h-4 w-4" />
                         </Button>
                         <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground border border-border opacity-0 transition-opacity group-hover:opacity-100 z-[9999]">
-                          Fine tune instructions
+                          Fine tune instructions & effects
                         </span>
                       </div>
                     </motion.div>
@@ -372,6 +378,23 @@ export function FloatingGenerateBox({
                 </AnimatePresence>
               </div>
             </div>
+
+            {/* Effects chain editor panel - shown alongside instruct */}
+            <AnimatePresence>
+              {isExpanded && isInstructMode && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden mt-2"
+                >
+                  <div className="border-t border-border/50 pt-2 pb-1">
+                    <EffectsChainEditor value={effectsChain} onChange={setEffectsChain} compact />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               <motion.div

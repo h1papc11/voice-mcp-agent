@@ -757,6 +757,20 @@ async def generate_speech(
         text=data.text,
     )
 
+    # Resolve effects chain: explicit request > profile default > none
+    effects_chain_config = None
+    if data.effects_chain is not None:
+        effects_chain_config = [e.model_dump() for e in data.effects_chain]
+    else:
+        # Check profile default
+        import json as _json
+        profile_obj = db.query(DBVoiceProfile).filter_by(id=data.profile_id).first()
+        if profile_obj and profile_obj.effects_chain:
+            try:
+                effects_chain_config = _json.loads(profile_obj.effects_chain)
+            except Exception:
+                pass
+
     # Kick off TTS in background
     async def _run_generation():
         bg_db = next(get_db())
@@ -799,17 +813,55 @@ async def generate_speech(
                 audio = normalize_audio(audio)
 
             duration = len(audio) / sample_rate
-            audio_path = config.get_generations_dir() / f"{generation_id}.wav"
 
+            # Always save clean version first
+            clean_audio_path = config.get_generations_dir() / f"{generation_id}.wav"
             from .utils.audio import save_audio
-            save_audio(audio, str(audio_path), sample_rate)
+            save_audio(audio, str(clean_audio_path), sample_rate)
+
+            from . import versions as versions_mod
+
+            has_effects = effects_chain_config and any(
+                e.get("enabled", True) for e in effects_chain_config
+            )
+
+            # Create clean version entry
+            versions_mod.create_version(
+                generation_id=generation_id,
+                label="original",
+                audio_path=str(clean_audio_path),
+                db=bg_db,
+                effects_chain=None,
+                is_default=not has_effects,
+            )
+
+            # Apply effects and create processed version if configured
+            final_audio_path = str(clean_audio_path)
+            if has_effects:
+                from .utils.effects import apply_effects, validate_effects_chain
+                error_msg = validate_effects_chain(effects_chain_config)
+                if error_msg:
+                    print(f"Warning: invalid effects chain, skipping: {error_msg}")
+                else:
+                    processed_audio = apply_effects(audio, sample_rate, effects_chain_config)
+                    processed_path = config.get_generations_dir() / f"{generation_id}_processed.wav"
+                    save_audio(processed_audio, str(processed_path), sample_rate)
+                    final_audio_path = str(processed_path)
+                    versions_mod.create_version(
+                        generation_id=generation_id,
+                        label="version-2",
+                        audio_path=str(processed_path),
+                        db=bg_db,
+                        effects_chain=effects_chain_config,
+                        is_default=True,
+                    )
 
             # Update the record to completed
             await history.update_generation_status(
                 generation_id=generation_id,
                 status="completed",
                 db=bg_db,
-                audio_path=str(audio_path),
+                audio_path=final_audio_path,
                 duration=duration,
             )
 
@@ -922,6 +974,118 @@ async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
             bg_db.close()
 
     _enqueue_generation(_run_retry())
+
+    return models.GenerationResponse.model_validate(gen)
+
+
+@app.post(
+    "/generate/{generation_id}/regenerate",
+    response_model=models.GenerationResponse,
+)
+async def regenerate_generation(generation_id: str, db: Session = Depends(get_db)):
+    """Re-run TTS with the same parameters and save the result as a new version."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    if (gen.status or "completed") != "completed":
+        raise HTTPException(status_code=400, detail="Generation must be completed to regenerate")
+
+    from .backends import get_tts_backend_for_engine
+    from . import versions as versions_mod
+
+    regen_engine = gen.engine or "qwen"
+    regen_model_size = gen.model_size or "1.7B"
+    tts_model = get_tts_backend_for_engine(regen_engine)
+
+    # Set to generating so the UI shows the loader and SSE picks it up
+    gen.status = "generating"
+    gen.error = None
+    db.commit()
+    db.refresh(gen)
+
+    task_manager = get_task_manager()
+    task_manager.start_generation(
+        task_id=generation_id,
+        profile_id=gen.profile_id,
+        text=gen.text,
+    )
+
+    version_id = str(uuid.uuid4())
+
+    async def _run_regenerate():
+        bg_db = next(get_db())
+        try:
+            if regen_engine == "qwen":
+                await tts_model.load_model_async(regen_model_size)
+            else:
+                await tts_model.load_model()
+
+            voice_prompt = await profiles.create_voice_prompt_for_profile(
+                gen.profile_id,
+                bg_db,
+                use_cache=True,
+                engine=regen_engine,
+            )
+
+            from .utils.chunked_tts import generate_chunked
+
+            trim_fn = None
+            if regen_engine in ("chatterbox", "chatterbox_turbo"):
+                from .utils.audio import trim_tts_output
+                trim_fn = trim_tts_output
+
+            audio, sample_rate = await generate_chunked(
+                tts_model,
+                gen.text,
+                voice_prompt,
+                language=gen.language,
+                seed=None,  # New seed for variation
+                instruct=gen.instruct,
+                trim_fn=trim_fn,
+            )
+
+            from .utils.audio import normalize_audio, save_audio
+            audio = normalize_audio(audio)
+
+            duration = len(audio) / sample_rate
+            audio_path = config.get_generations_dir() / f"{generation_id}_{version_id[:8]}.wav"
+
+            save_audio(audio, str(audio_path), sample_rate)
+
+            # Count existing versions to auto-label
+            existing = versions_mod.list_versions(generation_id, bg_db)
+            label = f"take-{len(existing) + 1}"
+
+            versions_mod.create_version(
+                generation_id=generation_id,
+                label=label,
+                audio_path=str(audio_path),
+                db=bg_db,
+                effects_chain=None,
+                is_default=True,
+            )
+
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="completed",
+                db=bg_db,
+                audio_path=str(audio_path),
+                duration=duration,
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="failed",
+                db=bg_db,
+                error=str(e),
+            )
+        finally:
+            task_manager.complete_generation(generation_id)
+            bg_db.close()
+
+    _enqueue_generation(_run_regenerate())
 
     return models.GenerationResponse.model_validate(gen)
 
@@ -1150,6 +1314,20 @@ async def get_generation(
     )
 
 
+@app.post("/history/{generation_id}/favorite")
+async def toggle_favorite(
+    generation_id: str,
+    db: Session = Depends(get_db),
+):
+    """Toggle the favorite status of a generation."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    gen.is_favorited = not gen.is_favorited
+    db.commit()
+    return {"is_favorited": gen.is_favorited}
+
+
 @app.delete("/history/{generation_id}")
 async def delete_generation(
     generation_id: str,
@@ -1245,7 +1423,7 @@ async def transcribe_audio(
     try:
         # Get audio duration
         from .utils.audio import load_audio
-        audio, sr = load_audio(tmp_path)
+        audio, sr = await asyncio.to_thread(load_audio, tmp_path)
         duration = len(audio) / sr
         
         # Transcribe
@@ -1466,6 +1644,20 @@ async def duplicate_story_item(
     return item
 
 
+@app.put("/stories/{story_id}/items/{item_id}/version", response_model=models.StoryItemDetail)
+async def set_story_item_version(
+    story_id: str,
+    item_id: str,
+    data: models.StoryItemVersionUpdate,
+    db: Session = Depends(get_db),
+):
+    """Pin a story item to a specific generation version."""
+    item = await stories.set_story_item_version(story_id, item_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item or version not found")
+    return item
+
+
 @app.get("/stories/{story_id}/export-audio")
 async def export_story_audio(
     story_id: str,
@@ -1504,12 +1696,346 @@ async def export_story_audio(
 
 
 # ============================================
+# EFFECTS & VERSIONS
+# ============================================
+
+@app.post("/effects/preview/{generation_id}")
+async def preview_effects(
+    generation_id: str,
+    data: models.ApplyEffectsRequest,
+    db: Session = Depends(get_db),
+):
+    """Apply effects to a generation's clean audio and stream back the result without saving.
+
+    Used for ephemeral preview/auditioning of effects chains.
+    """
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    if (gen.status or "completed") != "completed":
+        raise HTTPException(status_code=400, detail="Generation is not completed")
+
+    from . import versions as versions_mod
+    from .utils.effects import apply_effects, validate_effects_chain
+    from .utils.audio import load_audio
+
+    # Validate chain
+    chain_dicts = [e.model_dump() for e in data.effects_chain]
+    error = validate_effects_chain(chain_dicts)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Find the original unprocessed version (no effects applied)
+    all_versions = versions_mod.list_versions(generation_id, db)
+    clean_version = next((v for v in all_versions if v.effects_chain is None), None)
+    source_path = clean_version.audio_path if clean_version else gen.audio_path
+    if not source_path or not Path(source_path).exists():
+        raise HTTPException(status_code=404, detail="Source audio file not found")
+
+    # Process in memory (off the event loop)
+    audio, sample_rate = await asyncio.to_thread(load_audio, source_path)
+    processed = await asyncio.to_thread(apply_effects, audio, sample_rate, chain_dicts)
+
+    # Write to in-memory buffer
+    import soundfile as sf
+    buf = io.BytesIO()
+    await asyncio.to_thread(lambda: sf.write(buf, processed, sample_rate, format="WAV"))
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": f'inline; filename="preview_{generation_id}.wav"',
+            "Cache-Control": "no-cache, no-store",
+        },
+    )
+
+
+@app.get("/effects/available", response_model=models.AvailableEffectsResponse)
+async def get_available_effects():
+    """List all available effect types with parameter definitions."""
+    from .utils.effects import get_available_effects as _get_effects
+    return models.AvailableEffectsResponse(effects=[
+        models.AvailableEffect(**e) for e in _get_effects()
+    ])
+
+
+@app.get("/effects/presets", response_model=List[models.EffectPresetResponse])
+async def list_effect_presets(db: Session = Depends(get_db)):
+    """List all effect presets (built-in + user-created)."""
+    from . import effects as effects_mod
+    return effects_mod.list_presets(db)
+
+
+@app.get("/effects/presets/{preset_id}", response_model=models.EffectPresetResponse)
+async def get_effect_preset(preset_id: str, db: Session = Depends(get_db)):
+    """Get a specific effect preset."""
+    from . import effects as effects_mod
+    preset = effects_mod.get_preset(preset_id, db)
+    if not preset:
+        raise HTTPException(status_code=404, detail="Preset not found")
+    return preset
+
+
+@app.post("/effects/presets", response_model=models.EffectPresetResponse)
+async def create_effect_preset(
+    data: models.EffectPresetCreate,
+    db: Session = Depends(get_db),
+):
+    """Create a new effect preset."""
+    from . import effects as effects_mod
+    try:
+        return effects_mod.create_preset(data, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/effects/presets/{preset_id}", response_model=models.EffectPresetResponse)
+async def update_effect_preset(
+    preset_id: str,
+    data: models.EffectPresetUpdate,
+    db: Session = Depends(get_db),
+):
+    """Update an effect preset."""
+    from . import effects as effects_mod
+    try:
+        result = effects_mod.update_preset(preset_id, data, db)
+        if not result:
+            raise HTTPException(status_code=404, detail="Preset not found")
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/effects/presets/{preset_id}")
+async def delete_effect_preset(preset_id: str, db: Session = Depends(get_db)):
+    """Delete a user effect preset."""
+    from . import effects as effects_mod
+    try:
+        if not effects_mod.delete_preset(preset_id, db):
+            raise HTTPException(status_code=404, detail="Preset not found")
+        return {"status": "deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get(
+    "/generations/{generation_id}/versions",
+    response_model=List[models.GenerationVersionResponse],
+)
+async def list_generation_versions(
+    generation_id: str,
+    db: Session = Depends(get_db),
+):
+    """List all versions for a generation."""
+    gen = await history.get_generation(generation_id, db)
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+
+    from . import versions as versions_mod
+    return versions_mod.list_versions(generation_id, db)
+
+
+@app.post(
+    "/generations/{generation_id}/versions/apply-effects",
+    response_model=models.GenerationVersionResponse,
+)
+async def apply_effects_to_generation(
+    generation_id: str,
+    data: models.ApplyEffectsRequest,
+    db: Session = Depends(get_db),
+):
+    """Apply an effects chain to an existing generation, creating a new version."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    if (gen.status or "completed") != "completed":
+        raise HTTPException(status_code=400, detail="Generation is not completed")
+
+    from . import versions as versions_mod
+    from .utils.effects import apply_effects, validate_effects_chain
+    from .utils.audio import load_audio, save_audio
+
+    # Validate effects chain
+    chain_dicts = [e.model_dump() for e in data.effects_chain]
+    error = validate_effects_chain(chain_dicts)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+
+    # Determine source audio: use specified version, or fall back to clean/original
+    all_versions = versions_mod.list_versions(generation_id, db)
+    source_version_id = data.source_version_id
+    if source_version_id:
+        source_version = next(
+            (v for v in all_versions if v.id == source_version_id), None
+        )
+        if not source_version:
+            raise HTTPException(status_code=404, detail="Source version not found")
+        source_path = source_version.audio_path
+    else:
+        clean_version = next(
+            (v for v in all_versions if v.effects_chain is None), None
+        )
+        if not clean_version:
+            source_path = gen.audio_path
+        else:
+            source_path = clean_version.audio_path
+            source_version_id = clean_version.id
+
+    if not source_path or not Path(source_path).exists():
+        raise HTTPException(status_code=404, detail="Source audio file not found")
+
+    # Load, process, save (off the event loop)
+    audio, sample_rate = await asyncio.to_thread(load_audio, source_path)
+    processed_audio = await asyncio.to_thread(apply_effects, audio, sample_rate, chain_dicts)
+
+    # Generate a unique filename
+    version_id = str(uuid.uuid4())
+    processed_path = config.get_generations_dir() / f"{generation_id}_{version_id[:8]}.wav"
+    await asyncio.to_thread(save_audio, processed_audio, str(processed_path), sample_rate)
+
+    # Auto-label
+    label = data.label or f"version-{len(all_versions) + 1}"
+
+    version = versions_mod.create_version(
+        generation_id=generation_id,
+        label=label,
+        audio_path=str(processed_path),
+        db=db,
+        effects_chain=chain_dicts,
+        is_default=data.set_as_default,
+        source_version_id=source_version_id,
+    )
+
+    return version
+
+
+@app.put(
+    "/generations/{generation_id}/versions/{version_id}/set-default",
+    response_model=models.GenerationVersionResponse,
+)
+async def set_default_version(
+    generation_id: str,
+    version_id: str,
+    db: Session = Depends(get_db),
+):
+    """Set a specific version as the default for a generation."""
+    from . import versions as versions_mod
+
+    version = versions_mod.get_version(version_id, db)
+    if not version or version.generation_id != generation_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    result = versions_mod.set_default_version(version_id, db)
+    if not result:
+        raise HTTPException(status_code=404, detail="Version not found")
+    return result
+
+
+@app.delete("/generations/{generation_id}/versions/{version_id}")
+async def delete_generation_version(
+    generation_id: str,
+    version_id: str,
+    db: Session = Depends(get_db),
+):
+    """Delete a version. Cannot delete the last remaining version."""
+    from . import versions as versions_mod
+
+    version = versions_mod.get_version(version_id, db)
+    if not version or version.generation_id != generation_id:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    if not versions_mod.delete_version(version_id, db):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete the last remaining version",
+        )
+    return {"status": "deleted"}
+
+
+@app.get("/audio/version/{version_id}")
+async def get_version_audio(version_id: str, db: Session = Depends(get_db)):
+    """Serve audio for a specific version."""
+    from . import versions as versions_mod
+
+    version = versions_mod.get_version(version_id, db)
+    if not version:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    audio_path = Path(version.audio_path)
+    if not audio_path.exists():
+        raise HTTPException(status_code=404, detail="Audio file not found")
+
+    return FileResponse(
+        audio_path,
+        media_type="audio/wav",
+        filename=f"generation_{version.generation_id}_{version.label}.wav",
+    )
+
+
+@app.put("/profiles/{profile_id}/effects", response_model=models.VoiceProfileResponse)
+async def update_profile_effects(
+    profile_id: str,
+    data: models.ProfileEffectsUpdate,
+    db: Session = Depends(get_db),
+):
+    """Set or clear the default effects chain for a voice profile."""
+    import json as _json
+
+    profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    if data.effects_chain is not None:
+        from .utils.effects import validate_effects_chain
+        chain_dicts = [e.model_dump() for e in data.effects_chain]
+        error = validate_effects_chain(chain_dicts)
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        profile.effects_chain = _json.dumps(chain_dicts)
+    else:
+        profile.effects_chain = None
+
+    profile.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(profile)
+
+    return _profile_to_response(profile)
+
+
+def _profile_to_response(profile) -> models.VoiceProfileResponse:
+    """Convert a DB profile to a VoiceProfileResponse with parsed effects_chain."""
+    import json as _json
+    import logging
+
+    effects_chain = None
+    if profile.effects_chain:
+        try:
+            raw = _json.loads(profile.effects_chain)
+            effects_chain = [models.EffectConfig(**e) for e in raw]
+        except Exception as e:
+            logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
+
+    return models.VoiceProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        description=profile.description,
+        language=profile.language,
+        avatar_path=profile.avatar_path,
+        effects_chain=effects_chain,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
+
+
+# ============================================
 # FILE SERVING
 # ============================================
 
 @app.get("/audio/{generation_id}")
 async def get_audio(generation_id: str, db: Session = Depends(get_db)):
-    """Serve generated audio file."""
+    """Serve generated audio file (serves the default version)."""
     generation = await history.get_generation(generation_id, db)
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")

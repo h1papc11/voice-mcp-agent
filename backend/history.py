@@ -10,14 +10,51 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
-from .models import GenerationRequest, GenerationResponse, HistoryQuery, HistoryResponse, HistoryListResponse
-from .database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile
+from .models import GenerationRequest, GenerationResponse, HistoryQuery, HistoryResponse, HistoryListResponse, GenerationVersionResponse, EffectConfig
+from .database import Generation as DBGeneration, GenerationVersion as DBGenerationVersion, VoiceProfile as DBVoiceProfile
 from . import config
 
 
 def _get_generations_dir() -> Path:
     """Get generations directory from config."""
     return config.get_generations_dir()
+
+
+def _get_versions_for_generation(generation_id: str, db: Session) -> tuple:
+    """Get versions list and active version ID for a generation."""
+    import json
+    versions_rows = (
+        db.query(DBGenerationVersion)
+        .filter_by(generation_id=generation_id)
+        .order_by(DBGenerationVersion.created_at)
+        .all()
+    )
+    if not versions_rows:
+        return None, None
+
+    versions = []
+    active_version_id = None
+    for v in versions_rows:
+        effects_chain = None
+        if v.effects_chain:
+            try:
+                raw = json.loads(v.effects_chain)
+                effects_chain = [EffectConfig(**e) for e in raw]
+            except Exception:
+                pass
+        versions.append(GenerationVersionResponse(
+            id=v.id,
+            generation_id=v.generation_id,
+            label=v.label,
+            audio_path=v.audio_path,
+            effects_chain=effects_chain,
+            is_default=v.is_default,
+            created_at=v.created_at,
+        ))
+        if v.is_default:
+            active_version_id = v.id
+
+    return versions, active_version_id
 
 
 async def create_generation(
@@ -170,6 +207,7 @@ async def list_generations(
     # Convert to HistoryResponse with profile_name
     items = []
     for generation, profile_name in results:
+        versions, active_version_id = _get_versions_for_generation(generation.id, db)
         items.append(HistoryResponse(
             id=generation.id,
             profile_id=generation.profile_id,
@@ -184,7 +222,10 @@ async def list_generations(
             model_size=generation.model_size,
             status=generation.status or "completed",
             error=generation.error,
+            is_favorited=bool(generation.is_favorited),
             created_at=generation.created_at,
+            versions=versions,
+            active_version_id=active_version_id,
         ))
     
     return HistoryListResponse(
@@ -210,12 +251,17 @@ async def delete_generation(
     generation = db.query(DBGeneration).filter_by(id=generation_id).first()
     if not generation:
         return False
-    
-    # Delete audio file
-    audio_path = Path(generation.audio_path)
-    if audio_path.exists():
-        audio_path.unlink()
-    
+
+    # Delete all version files and records
+    from . import versions as versions_mod
+    versions_mod.delete_versions_for_generation(generation_id, db)
+
+    # Delete main audio file (if not already removed by version cleanup)
+    if generation.audio_path:
+        audio_path = Path(generation.audio_path)
+        if audio_path.exists():
+            audio_path.unlink()
+
     # Delete from database
     db.delete(generation)
     db.commit()

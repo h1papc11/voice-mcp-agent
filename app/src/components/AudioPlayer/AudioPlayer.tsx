@@ -157,8 +157,21 @@ export function AudioPlayer() {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer) return;
 
-      // Update store when time changes
+      // Update store when time changes, stop if past duration
       wavesurfer.on('timeupdate', (time) => {
+        const dur = usePlayerStore.getState().duration;
+        if (dur > 0 && time >= dur) {
+          setCurrentTime(dur);
+          const loop = usePlayerStore.getState().isLooping;
+          if (loop) {
+            wavesurfer.seekTo(0);
+            wavesurfer.play();
+          } else {
+            wavesurfer.pause();
+            setIsPlaying(false);
+          }
+          return;
+        }
         setCurrentTime(time);
       });
 

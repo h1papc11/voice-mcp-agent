@@ -3,6 +3,7 @@ import { Edit2, Mic, Monitor, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,6 +31,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api/client';
+import type { EffectConfig } from '@/lib/api/types';
 import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
@@ -125,6 +128,8 @@ export function ProfileForm() {
   const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
   const isCreating = !editingProfileId;
   const serverUrl = useServerStore((state) => state.serverUrl);
+  const [profileEffectsChain, setProfileEffectsChain] = useState<EffectConfig[]>([]);
+  const [effectsDirty, setEffectsDirty] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -280,6 +285,8 @@ export function ProfileForm() {
         referenceText: undefined,
         avatarFile: undefined,
       });
+      setProfileEffectsChain(editingProfile.effects_chain ?? []);
+      setEffectsDirty(false);
     } else if (profileFormDraft && open) {
       // Restore from draft when opening in create mode
       form.reset({
@@ -432,6 +439,24 @@ export function ProfileForm() {
                 avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
               variant: 'destructive',
             });
+          }
+        }
+
+        // Save effects chain if changed
+        if (effectsDirty) {
+          try {
+            await apiClient.updateProfileEffects(
+              editingProfileId,
+              profileEffectsChain.length > 0 ? profileEffectsChain : null,
+            );
+          } catch (fxError) {
+            toast({
+              title: 'Effects update failed',
+              description:
+                fxError instanceof Error ? fxError.message : 'Failed to save effects chain',
+              variant: 'destructive',
+            });
+            return;
           }
         }
 
@@ -898,6 +923,23 @@ export function ProfileForm() {
                       </FormItem>
                     )}
                   />
+
+                  {editingProfileId && (
+                    <div className="space-y-2">
+                      <FormLabel>Default Effects</FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Effects applied automatically to all new generations with this voice.
+                      </p>
+                      <EffectsChainEditor
+                        value={profileEffectsChain}
+                        onChange={(chain) => {
+                          setProfileEffectsChain(chain);
+                          setEffectsDirty(true);
+                        }}
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

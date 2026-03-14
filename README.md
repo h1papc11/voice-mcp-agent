@@ -85,7 +85,7 @@ Voicebox is available now for macOS and Windows.
 | Windows (MSI) | [Latest Windows MSI](https://github.com/jamiepine/voicebox/releases/latest) |
 | Windows (Setup) | [Latest Windows Setup](https://github.com/jamiepine/voicebox/releases/latest) |
 
-> **Linux builds coming soon** — Currently blocked by GitHub runner disk space limitations.
+> **Linux** — Pre-built binaries are not yet available. Linux users can compile from source, see [Development](#development) below.
 
 ---
 

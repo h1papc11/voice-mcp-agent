@@ -35,10 +35,7 @@ target/
 Thumbs.db
 
 # Data (user-generated)
-data/profiles/*
-data/generations/*
-data/projects/*
-data/voicebox.db
+data/
 !data/.gitkeep
 
 # Logs

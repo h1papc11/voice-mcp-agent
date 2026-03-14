@@ -23,6 +23,7 @@ class VoiceProfile(Base):
     description = Column(Text)
     language = Column(String, default="en")
     avatar_path = Column(String, nullable=True)
+    effects_chain = Column(Text, nullable=True)  # JSON-serialized default effects chain
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -53,6 +54,7 @@ class Generation(Base):
     model_size = Column(String, nullable=True)
     status = Column(String, default="completed")  # generating, completed, failed
     error = Column(Text, nullable=True)
+    is_favorited = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -74,6 +76,7 @@ class StoryItem(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     story_id = Column(String, ForeignKey("stories.id"), nullable=False)
     generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
+    version_id = Column(String, ForeignKey("generation_versions.id"), nullable=True)  # Pin to specific version, null = use generation default
     start_time_ms = Column(Integer, nullable=False, default=0)  # Milliseconds from story start
     track = Column(Integer, nullable=False, default=0)  # Track number (0 = main track)
     trim_start_ms = Column(Integer, nullable=False, default=0)  # Milliseconds trimmed from start
@@ -90,6 +93,33 @@ class Project(Base):
     data = Column(Text)  # JSON string
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GenerationVersion(Base):
+    """A version of a generation's audio (clean, processed, alternate takes)."""
+    __tablename__ = "generation_versions"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
+    label = Column(String, nullable=False)  # "clean", "processed", or user-defined
+    audio_path = Column(String, nullable=False)
+    effects_chain = Column(Text, nullable=True)  # JSON-serialized effects config, null for clean
+    source_version_id = Column(String, ForeignKey("generation_versions.id"), nullable=True)  # Which version was used as input
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class EffectPreset(Base):
+    """Saved effect chain preset."""
+    __tablename__ = "effect_presets"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, unique=True, nullable=False)
+    description = Column(Text, nullable=True)
+    effects_chain = Column(Text, nullable=False)  # JSON-serialized effects config
+    is_builtin = Column(Boolean, default=False)
+    sort_order = Column(Integer, default=100)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class AudioChannel(Base):
@@ -168,6 +198,12 @@ def init_db():
             db.commit()
     finally:
         db.close()
+
+    # Backfill: create "clean" GenerationVersion entries for existing generations
+    _backfill_generation_versions()
+
+    # Seed built-in effect presets
+    _seed_builtin_presets()
 
 
 def _run_migrations(engine):
@@ -321,6 +357,125 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE generations ADD COLUMN model_size VARCHAR"))
                 conn.commit()
                 print("Added model_size column to generations")
+
+    # Migration: Add effects_chain to profiles table
+    if 'profiles' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('profiles')}
+        if 'effects_chain' not in columns:
+            print("Migrating profiles: adding effects_chain column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE profiles ADD COLUMN effects_chain TEXT"))
+                conn.commit()
+                print("Added effects_chain column to profiles")
+
+    # Migration: Add sort_order to effect_presets table
+    if 'effect_presets' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('effect_presets')}
+        if 'sort_order' not in columns:
+            print("Migrating effect_presets: adding sort_order column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE effect_presets ADD COLUMN sort_order INTEGER DEFAULT 100"))
+                conn.commit()
+                print("Added sort_order column to effect_presets")
+
+    # Migration: Add version_id column to story_items table
+    if 'story_items' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('story_items')}
+        if 'version_id' not in columns:
+            print("Migrating story_items: adding version_id column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE story_items ADD COLUMN version_id VARCHAR"))
+                conn.commit()
+                print("Added version_id column to story_items")
+
+    # Migration: Add source_version_id to generation_versions table
+    if 'generation_versions' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('generation_versions')}
+        if 'source_version_id' not in columns:
+            print("Migrating generation_versions: adding source_version_id column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generation_versions ADD COLUMN source_version_id VARCHAR"))
+                conn.commit()
+                print("Added source_version_id column to generation_versions")
+
+    if 'generations' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('generations')}
+        if 'is_favorited' not in columns:
+            print("Migrating generations: adding is_favorited column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN is_favorited BOOLEAN DEFAULT 0"))
+                conn.commit()
+                print("Added is_favorited column to generations")
+
+    # Migration: Create generation_versions for existing generations
+    # (populate after tables are created, handled in init_db)
+
+
+def _backfill_generation_versions():
+    """Create 'clean' version entries for existing generations that don't have any."""
+    db = SessionLocal()
+    try:
+        from pathlib import Path as _Path
+
+        # Find generations that have no version entries
+        existing_version_gen_ids = {
+            row[0] for row in db.query(GenerationVersion.generation_id).all()
+        }
+        generations = db.query(Generation).filter(
+            Generation.status == "completed",
+            Generation.audio_path.isnot(None),
+            Generation.audio_path != "",
+        ).all()
+
+        count = 0
+        for gen in generations:
+            if gen.id in existing_version_gen_ids:
+                continue
+            if not _Path(gen.audio_path).exists():
+                continue
+            version = GenerationVersion(
+                id=str(uuid.uuid4()),
+                generation_id=gen.id,
+                label="clean",
+                audio_path=gen.audio_path,
+                effects_chain=None,
+                is_default=True,
+            )
+            db.add(version)
+            count += 1
+
+        if count > 0:
+            db.commit()
+            print(f"Backfilled {count} generation version entries")
+    finally:
+        db.close()
+
+
+def _seed_builtin_presets():
+    """Ensure built-in effect presets exist in the database."""
+    import json
+    from .utils.effects import BUILTIN_PRESETS
+
+    db = SessionLocal()
+    try:
+        for idx, (key, preset_data) in enumerate(BUILTIN_PRESETS.items()):
+            sort_order = preset_data.get("sort_order", idx)
+            existing = db.query(EffectPreset).filter_by(name=preset_data["name"]).first()
+            if not existing:
+                preset = EffectPreset(
+                    id=str(uuid.uuid4()),
+                    name=preset_data["name"],
+                    description=preset_data.get("description"),
+                    effects_chain=json.dumps(preset_data["effects_chain"]),
+                    is_builtin=True,
+                    sort_order=sort_order,
+                )
+                db.add(preset)
+            elif existing.sort_order != sort_order:
+                existing.sort_order = sort_order
+        db.commit()
+    finally:
+        db.close()
 
 
 def get_db():
