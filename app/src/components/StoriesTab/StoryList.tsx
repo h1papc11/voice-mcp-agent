@@ -1,5 +1,5 @@
 import { BookOpen, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,13 @@ export function StoryList() {
   const [newStoryName, setNewStoryName] = useState('');
   const [newStoryDescription, setNewStoryDescription] = useState('');
   const { toast } = useToast();
+
+  // Auto-select the first story when the list loads with no selection
+  useEffect(() => {
+    if (!selectedStoryId && stories && stories.length > 0) {
+      setSelectedStoryId(stories[0].id);
+    }
+  }, [selectedStoryId, stories, setSelectedStoryId]);
 
   const handleCreateStory = () => {
     if (!newStoryName.trim()) {
