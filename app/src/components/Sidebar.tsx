@@ -32,7 +32,15 @@ export function Sidebar({ isMacOS }: SidebarProps) {
     >
       {/* Logo */}
       <div className="mb-2">
-        <img src={voiceboxLogo} alt="Voicebox" className="w-12 h-12 object-contain" />
+        <img
+          src={voiceboxLogo}
+          alt="Voicebox"
+          className="w-12 h-12 object-contain"
+          style={{
+            filter:
+              'drop-shadow(0 0 6px hsl(var(--accent) / 0.5)) drop-shadow(0 0 14px hsl(var(--accent) / 0.35)) drop-shadow(0 0 28px hsl(var(--accent) / 0.2))',
+          }}
+        />
       </div>
 
       {/* Navigation Buttons */}
@@ -48,14 +56,25 @@ export function Sidebar({ isMacOS }: SidebarProps) {
               key={tab.id}
               to={tab.path}
               className={cn(
-                'w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200',
-                'hover:bg-muted/50',
-                isActive ? 'bg-muted/50 text-foreground shadow-lg' : 'text-muted-foreground',
+                'relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200 overflow-hidden',
+                isActive
+                  ? 'bg-white/[0.07] text-foreground shadow-lg backdrop-blur-sm border border-white/[0.08]'
+                  : 'text-muted-foreground hover:bg-muted/50',
               )}
               title={tab.label}
               aria-label={tab.label}
             >
-              <Icon className="h-5 w-5" />
+              {isActive && (
+                <div
+                  className="absolute inset-0 rounded-full pointer-events-none"
+                  style={{
+                    maskImage: 'linear-gradient(to bottom, black, transparent 60%)',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black, transparent 60%)',
+                    border: '1px solid hsl(var(--accent) / 0.5)',
+                  }}
+                />
+              )}
+              <Icon className="h-5 w-5 relative z-10" />
             </Link>
           );
         })}
