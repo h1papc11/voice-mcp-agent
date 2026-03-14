@@ -22,10 +22,6 @@ jobs:
             args: "--target x86_64-apple-darwin"
             python-version: "3.12"
             backend: "pytorch"
-          - platform: "ubuntu-22.04"
-            args: "--bundles deb,rpm"
-            python-version: "3.12"
-            backend: "pytorch"
           - platform: "windows-latest"
             args: ""
             python-version: "3.12"
@@ -150,7 +146,7 @@ jobs:
             - **macOS (Apple Silicon)**: Download the `aarch64.dmg` file - uses MLX for fast native inference
             - **macOS (Intel)**: Download the `x64.dmg` file - uses PyTorch
             - **Windows**: Download the `.msi` installer
-            - **Linux**: Download the `.AppImage` or `.deb` package
+            - **Linux**: Compile from source (see README)
 
             The app includes automatic updates - future updates will be installed automatically.
           releaseDraft: true
