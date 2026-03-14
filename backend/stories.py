@@ -20,10 +20,53 @@ from .models import (
     StoryItemMove,
     StoryItemTrim,
     StoryItemSplit,
+    StoryItemVersionUpdate,
 )
 from .database import Story as DBStory, StoryItem as DBStoryItem, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
+from .history import _get_versions_for_generation
 from .utils.audio import load_audio, save_audio
 import numpy as np
+
+
+def _build_item_detail(
+    item: DBStoryItem,
+    generation: DBGeneration,
+    profile_name: str,
+    db: Session,
+) -> StoryItemDetail:
+    """Build a StoryItemDetail with version info from a story item and its generation."""
+    versions, active_version_id = _get_versions_for_generation(generation.id, db)
+
+    # Resolve the audio path: if version_id is set, use that version's audio
+    audio_path = generation.audio_path
+    if item.version_id and versions:
+        for v in versions:
+            if v.id == item.version_id:
+                audio_path = v.audio_path
+                break
+
+    return StoryItemDetail(
+        id=item.id,
+        story_id=item.story_id,
+        generation_id=item.generation_id,
+        version_id=getattr(item, 'version_id', None),
+        start_time_ms=item.start_time_ms,
+        track=item.track,
+        trim_start_ms=getattr(item, 'trim_start_ms', 0),
+        trim_end_ms=getattr(item, 'trim_end_ms', 0),
+        created_at=item.created_at,
+        profile_id=generation.profile_id,
+        profile_name=profile_name,
+        text=generation.text,
+        language=generation.language,
+        audio_path=audio_path,
+        duration=generation.duration,
+        seed=generation.seed,
+        instruct=generation.instruct,
+        generation_created_at=generation.created_at,
+        versions=versions,
+        active_version_id=active_version_id,
+    )
 
 
 async def create_story(
@@ -125,26 +168,7 @@ async def get_story(
     # Build item details
     item_details = []
     for item, generation, profile_name in items:
-        item_detail = StoryItemDetail(
-            id=item.id,
-            story_id=item.story_id,
-            generation_id=item.generation_id,
-            start_time_ms=item.start_time_ms,
-            track=item.track,
-            trim_start_ms=getattr(item, 'trim_start_ms', 0),
-            trim_end_ms=getattr(item, 'trim_end_ms', 0),
-            created_at=item.created_at,
-            profile_id=generation.profile_id,
-            profile_name=profile_name,
-            text=generation.text,
-            language=generation.language,
-            audio_path=generation.audio_path,
-            duration=generation.duration,
-            seed=generation.seed,
-            instruct=generation.instruct,
-            generation_created_at=generation.created_at,
-        )
-        item_details.append(item_detail)
+        item_details.append(_build_item_detail(item, generation, profile_name, db))
 
     response = StoryDetailResponse.model_validate(story)
     response.items = item_details
@@ -250,25 +274,7 @@ async def add_item_to_story(
     if existing:
         # Return existing item
         profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
-        return StoryItemDetail(
-            id=existing.id,
-            story_id=existing.story_id,
-            generation_id=existing.generation_id,
-            start_time_ms=existing.start_time_ms,
-            track=existing.track,
-            trim_start_ms=getattr(existing, 'trim_start_ms', 0),
-            trim_end_ms=getattr(existing, 'trim_end_ms', 0),
-            created_at=existing.created_at,
-            profile_id=generation.profile_id,
-            profile_name=profile.name if profile else "Unknown",
-            text=generation.text,
-            language=generation.language,
-            audio_path=generation.audio_path,
-            duration=generation.duration,
-            seed=generation.seed,
-            instruct=generation.instruct,
-            generation_created_at=generation.created_at,
-        )
+        return _build_item_detail(existing, generation, profile.name if profile else "Unknown", db)
 
     # Get track from data or default to 0
     track = data.track if data.track is not None else 0
@@ -321,25 +327,7 @@ async def add_item_to_story(
     # Get profile name
     profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
 
-    return StoryItemDetail(
-        id=item.id,
-        story_id=item.story_id,
-        generation_id=item.generation_id,
-        start_time_ms=item.start_time_ms,
-        track=item.track,
-        trim_start_ms=getattr(item, 'trim_start_ms', 0),
-        trim_end_ms=getattr(item, 'trim_end_ms', 0),
-        created_at=item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile.name if profile else "Unknown",
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
+    return _build_item_detail(item, generation, profile.name if profile else "Unknown", db)
 
 
 async def move_story_item(
@@ -388,25 +376,7 @@ async def move_story_item(
     # Get profile name
     profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
 
-    return StoryItemDetail(
-        id=item.id,
-        story_id=item.story_id,
-        generation_id=item.generation_id,
-        start_time_ms=item.start_time_ms,
-        track=item.track,
-        trim_start_ms=getattr(item, 'trim_start_ms', 0),
-        trim_end_ms=getattr(item, 'trim_end_ms', 0),
-        created_at=item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile.name if profile else "Unknown",
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
+    return _build_item_detail(item, generation, profile.name if profile else "Unknown", db)
 
 
 async def remove_item_from_story(
@@ -495,25 +465,7 @@ async def trim_story_item(
     # Get profile name
     profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
 
-    return StoryItemDetail(
-        id=item.id,
-        story_id=item.story_id,
-        generation_id=item.generation_id,
-        start_time_ms=item.start_time_ms,
-        track=item.track,
-        trim_start_ms=item.trim_start_ms,
-        trim_end_ms=item.trim_end_ms,
-        created_at=item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile.name if profile else "Unknown",
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
+    return _build_item_detail(item, generation, profile.name if profile else "Unknown", db)
 
 
 async def split_story_item(
@@ -568,6 +520,7 @@ async def split_story_item(
         id=str(uuid.uuid4()),
         story_id=story_id,
         generation_id=item.generation_id,  # Same generation, different trim
+        version_id=getattr(item, 'version_id', None),  # Preserve pinned version
         start_time_ms=item.start_time_ms + data.split_time_ms,
         track=item.track,
         trim_start_ms=absolute_split_ms,
@@ -590,48 +543,10 @@ async def split_story_item(
     profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
     profile_name = profile.name if profile else "Unknown"
 
-    # Build response items
-    original_item_detail = StoryItemDetail(
-        id=item.id,
-        story_id=item.story_id,
-        generation_id=item.generation_id,
-        start_time_ms=item.start_time_ms,
-        track=item.track,
-        trim_start_ms=item.trim_start_ms,
-        trim_end_ms=item.trim_end_ms,
-        created_at=item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile_name,
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
-
-    new_item_detail = StoryItemDetail(
-        id=new_item.id,
-        story_id=new_item.story_id,
-        generation_id=new_item.generation_id,
-        start_time_ms=new_item.start_time_ms,
-        track=new_item.track,
-        trim_start_ms=new_item.trim_start_ms,
-        trim_end_ms=new_item.trim_end_ms,
-        created_at=new_item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile_name,
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
-
-    return [original_item_detail, new_item_detail]
+    return [
+        _build_item_detail(item, generation, profile_name, db),
+        _build_item_detail(new_item, generation, profile_name, db),
+    ]
 
 
 async def duplicate_story_item(
@@ -674,6 +589,7 @@ async def duplicate_story_item(
         id=str(uuid.uuid4()),
         story_id=story_id,
         generation_id=original_item.generation_id,  # Same generation as original
+        version_id=getattr(original_item, 'version_id', None),  # Preserve pinned version
         start_time_ms=original_item.start_time_ms + effective_duration_ms + 200,  # 200ms gap
         track=original_item.track,
         trim_start_ms=current_trim_start,
@@ -694,25 +610,7 @@ async def duplicate_story_item(
     # Get profile name
     profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
 
-    return StoryItemDetail(
-        id=new_item.id,
-        story_id=new_item.story_id,
-        generation_id=new_item.generation_id,
-        start_time_ms=new_item.start_time_ms,
-        track=new_item.track,
-        trim_start_ms=new_item.trim_start_ms,
-        trim_end_ms=new_item.trim_end_ms,
-        created_at=new_item.created_at,
-        profile_id=generation.profile_id,
-        profile_name=profile.name if profile else "Unknown",
-        text=generation.text,
-        language=generation.language,
-        audio_path=generation.audio_path,
-        duration=generation.duration,
-        seed=generation.seed,
-        instruct=generation.instruct,
-        generation_created_at=generation.created_at,
-    )
+    return _build_item_detail(new_item, generation, profile.name if profile else "Unknown", db)
 
 
 async def update_story_item_times(
@@ -813,31 +711,67 @@ async def reorder_story_items(
         current_time_ms += duration_ms + gap_ms
 
         # Build the response item
-        updated_items.append(StoryItemDetail(
-            id=item.id,
-            story_id=item.story_id,
-            generation_id=item.generation_id,
-            start_time_ms=item.start_time_ms,
-            track=item.track,
-            trim_start_ms=getattr(item, 'trim_start_ms', 0),
-            trim_end_ms=getattr(item, 'trim_end_ms', 0),
-            created_at=item.created_at,
-            profile_id=generation.profile_id,
-            profile_name=profile_name,
-            text=generation.text,
-            language=generation.language,
-            audio_path=generation.audio_path,
-            duration=generation.duration,
-            seed=generation.seed,
-            instruct=generation.instruct,
-            generation_created_at=generation.created_at,
-        ))
+        updated_items.append(_build_item_detail(item, generation, profile_name, db))
 
     # Update story updated_at
     story.updated_at = datetime.utcnow()
 
     db.commit()
     return updated_items
+
+
+async def set_story_item_version(
+    story_id: str,
+    item_id: str,
+    data: StoryItemVersionUpdate,
+    db: Session,
+) -> Optional[StoryItemDetail]:
+    """
+    Pin a story item to a specific generation version.
+
+    Args:
+        story_id: Story ID
+        item_id: Story item ID
+        data: Version update data (version_id or null for default)
+        db: Database session
+
+    Returns:
+        Updated item detail or None if not found
+    """
+    item = db.query(DBStoryItem).filter_by(
+        id=item_id,
+        story_id=story_id,
+    ).first()
+    if not item:
+        return None
+
+    generation = db.query(DBGeneration).filter_by(id=item.generation_id).first()
+    if not generation:
+        return None
+
+    # Validate version_id belongs to this generation if provided
+    if data.version_id:
+        from .database import GenerationVersion as DBGenerationVersion
+        version = db.query(DBGenerationVersion).filter_by(
+            id=data.version_id,
+            generation_id=item.generation_id,
+        ).first()
+        if not version:
+            return None
+
+    item.version_id = data.version_id
+
+    # Update story updated_at
+    story = db.query(DBStory).filter_by(id=story_id).first()
+    if story:
+        story.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(item)
+
+    profile = db.query(DBVoiceProfile).filter_by(id=generation.profile_id).first()
+
+    return _build_item_detail(item, generation, profile.name if profile else "Unknown", db)
 
 
 async def export_story_audio(
@@ -877,7 +811,15 @@ async def export_story_audio(
     sample_rate = 24000  # Default sample rate
 
     for item, generation in items:
-        audio_path = Path(generation.audio_path)
+        # Resolve audio path: use pinned version if set, otherwise generation default
+        resolved_audio_path = generation.audio_path
+        if getattr(item, 'version_id', None):
+            from .database import GenerationVersion as DBGenerationVersion
+            version = db.query(DBGenerationVersion).filter_by(id=item.version_id).first()
+            if version:
+                resolved_audio_path = version.audio_path
+
+        audio_path = Path(resolved_audio_path)
         if not audio_path.exists():
             continue
 

@@ -276,6 +276,7 @@ class StoryItemDetail(BaseModel):
     id: str
     story_id: str
     generation_id: str
+    version_id: Optional[str] = None
     start_time_ms: int
     track: int = 0
     trim_start_ms: int = 0
@@ -291,6 +292,9 @@ class StoryItemDetail(BaseModel):
     seed: Optional[int]
     instruct: Optional[str]
     generation_created_at: datetime
+    # Versions available for this generation
+    versions: Optional[List["GenerationVersionResponse"]] = None
+    active_version_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -347,6 +351,11 @@ class StoryItemTrim(BaseModel):
 class StoryItemSplit(BaseModel):
     """Request model for splitting a story item."""
     split_time_ms: int = Field(..., ge=0)  # Time within the clip to split at (relative to clip start)
+
+
+class StoryItemVersionUpdate(BaseModel):
+    """Request model for setting a story item's pinned version."""
+    version_id: Optional[str] = None  # null = use generation default
 
 
 # ============================================

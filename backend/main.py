@@ -1644,6 +1644,20 @@ async def duplicate_story_item(
     return item
 
 
+@app.put("/stories/{story_id}/items/{item_id}/version", response_model=models.StoryItemDetail)
+async def set_story_item_version(
+    story_id: str,
+    item_id: str,
+    data: models.StoryItemVersionUpdate,
+    db: Session = Depends(get_db),
+):
+    """Pin a story item to a specific generation version."""
+    item = await stories.set_story_item_version(story_id, item_id, data, db)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Story item or version not found")
+    return item
+
+
 @app.get("/stories/{story_id}/export-audio")
 async def export_story_audio(
     story_id: str,

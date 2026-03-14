@@ -76,6 +76,7 @@ class StoryItem(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     story_id = Column(String, ForeignKey("stories.id"), nullable=False)
     generation_id = Column(String, ForeignKey("generations.id"), nullable=False)
+    version_id = Column(String, ForeignKey("generation_versions.id"), nullable=True)  # Pin to specific version, null = use generation default
     start_time_ms = Column(Integer, nullable=False, default=0)  # Milliseconds from story start
     track = Column(Integer, nullable=False, default=0)  # Track number (0 = main track)
     trim_start_ms = Column(Integer, nullable=False, default=0)  # Milliseconds trimmed from start
@@ -375,6 +376,16 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE effect_presets ADD COLUMN sort_order INTEGER DEFAULT 100"))
                 conn.commit()
                 print("Added sort_order column to effect_presets")
+
+    # Migration: Add version_id column to story_items table
+    if 'story_items' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('story_items')}
+        if 'version_id' not in columns:
+            print("Migrating story_items: adding version_id column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE story_items ADD COLUMN version_id VARCHAR"))
+                conn.commit()
+                print("Added version_id column to story_items")
 
     if 'generations' in inspector.get_table_names():
         columns = {col['name'] for col in inspector.get_columns('generations')}

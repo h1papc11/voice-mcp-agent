@@ -27,6 +27,7 @@ import type {
   StoryItemReorder,
   StoryItemSplit,
   StoryItemTrim,
+  StoryItemVersionUpdate,
   StoryResponse,
   TranscriptionResponse,
   VoiceProfileCreate,
@@ -585,6 +586,17 @@ class ApiClient {
   async duplicateStoryItem(storyId: string, itemId: string): Promise<StoryItemDetail> {
     return this.request<StoryItemDetail>(`/stories/${storyId}/items/${itemId}/duplicate`, {
       method: 'POST',
+    });
+  }
+
+  async setStoryItemVersion(
+    storyId: string,
+    itemId: string,
+    data: StoryItemVersionUpdate,
+  ): Promise<StoryItemDetail> {
+    return this.request<StoryItemDetail>(`/stories/${storyId}/items/${itemId}/version`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 

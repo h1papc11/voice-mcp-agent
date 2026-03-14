@@ -222,6 +222,7 @@ export interface StoryItemDetail {
   id: string;
   story_id: string;
   generation_id: string;
+  version_id?: string;
   start_time_ms: number;
   track: number;
   trim_start_ms: number;
@@ -236,6 +237,12 @@ export interface StoryItemDetail {
   seed?: number;
   instruct?: string;
   generation_created_at: string;
+  versions?: GenerationVersionResponse[];
+  active_version_id?: string;
+}
+
+export interface StoryItemVersionUpdate {
+  version_id: string | null;
 }
 
 export interface StoryDetailResponse {

@@ -1,5 +1,7 @@
 import {
+  Check,
   Copy,
+  GalleryVerticalEnd,
   GripHorizontal,
   Minus,
   Pause,
@@ -12,6 +14,12 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
 import type { StoryItemDetail } from '@/lib/api/types';
@@ -19,6 +27,7 @@ import {
   useDuplicateStoryItem,
   useMoveStoryItem,
   useRemoveStoryItem,
+  useSetStoryItemVersion,
   useSplitStoryItem,
   useTrimStoryItem,
 } from '@/lib/hooks/useStories';
@@ -28,12 +37,14 @@ import { useStoryStore } from '@/stores/storyStore';
 // Clip waveform component with trim support
 function ClipWaveform({
   generationId,
+  versionId,
   width,
   trimStartMs,
   trimEndMs,
   duration,
 }: {
   generationId: string;
+  versionId?: string;
   width: number;
   trimStartMs: number;
   trimEndMs: number;
@@ -79,7 +90,9 @@ function ClipWaveform({
 
     wavesurferRef.current = wavesurfer;
 
-    const audioUrl = apiClient.getAudioUrl(generationId);
+    const audioUrl = versionId
+      ? apiClient.getVersionAudioUrl(versionId)
+      : apiClient.getAudioUrl(generationId);
     wavesurfer.load(audioUrl).catch(() => {
       // Ignore load errors
     });
@@ -88,7 +101,7 @@ function ClipWaveform({
       wavesurfer.destroy();
       wavesurferRef.current = null;
     };
-  }, [generationId, fullWaveformWidth]);
+  }, [generationId, versionId, fullWaveformWidth]);
 
   return (
     <div className="w-full h-full opacity-60 overflow-hidden">
@@ -135,11 +148,56 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
   const splitItem = useSplitStoryItem();
   const duplicateItem = useDuplicateStoryItem();
   const removeItem = useRemoveStoryItem();
+  const setItemVersion = useSetStoryItemVersion();
   const { toast } = useToast();
 
   // Selection state
   const selectedClipId = useStoryStore((state) => state.selectedClipId);
   const setSelectedClipId = useStoryStore((state) => state.setSelectedClipId);
+
+  // Selected clip item (for version picker)
+  const selectedItem = useMemo(
+    () => (selectedClipId ? items.find((i) => i.id === selectedClipId) : undefined),
+    [selectedClipId, items],
+  );
+  const selectedItemVersions = selectedItem?.versions;
+  const hasMultipleVersions = selectedItemVersions && selectedItemVersions.length > 1;
+
+  // Determine which version label is active for the selected clip
+  const activeVersionLabel = useMemo(() => {
+    if (!selectedItem || !selectedItemVersions) return null;
+    // If the item has a pinned version_id, find its label
+    if (selectedItem.version_id) {
+      const pinned = selectedItemVersions.find((v) => v.id === selectedItem.version_id);
+      return pinned?.label ?? null;
+    }
+    // Otherwise use the generation's default version
+    const defaultVersion = selectedItemVersions.find((v) => v.is_default);
+    return defaultVersion?.label ?? null;
+  }, [selectedItem, selectedItemVersions]);
+
+  const handleSetVersion = useCallback(
+    (versionId: string | null) => {
+      if (!selectedClipId) return;
+      setItemVersion.mutate(
+        {
+          storyId,
+          itemId: selectedClipId,
+          data: { version_id: versionId },
+        },
+        {
+          onError: (error) => {
+            toast({
+              title: 'Failed to set version',
+              description: error instanceof Error ? error.message : String(error),
+              variant: 'destructive',
+            });
+          },
+        },
+      );
+    },
+    [selectedClipId, storyId, setItemVersion, toast],
+  );
 
   // Trim state
   const [trimmingItem, setTrimmingItem] = useState<string | null>(null);
@@ -788,6 +846,49 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
+              {hasMultipleVersions && (
+                <>
+                  <div className="w-px h-4 bg-border mx-1" />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-7 gap-1.5 px-2 text-xs"
+                        title="Change version/take"
+                      >
+                        <GalleryVerticalEnd className="h-3.5 w-3.5" />
+                        <span className="max-w-[80px] truncate">
+                          {activeVersionLabel ?? 'default'}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" className="min-w-[160px]">
+                      {selectedItemVersions.map((version) => {
+                        const isActive = selectedItem?.version_id
+                          ? version.id === selectedItem.version_id
+                          : version.is_default;
+                        return (
+                          <DropdownMenuItem
+                            key={version.id}
+                            onClick={() => handleSetVersion(version.id)}
+                            className="gap-2 text-xs"
+                          >
+                            <Check
+                              className={cn('h-3 w-3', isActive ? 'opacity-100' : 'opacity-0')}
+                            />
+                            <span className="truncate">{version.label}</span>
+                            {version.effects_chain && version.effects_chain.length > 0 && (
+                              <span className="text-muted-foreground ml-auto text-[10px]">
+                                {version.effects_chain.length} fx
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
             </div>
           )}
 
@@ -958,6 +1059,7 @@ export function StoryTrackEditor({ storyId, items }: StoryTrackEditorProps) {
                       <div className="absolute inset-0 top-3">
                         <ClipWaveform
                           generationId={item.generation_id}
+                          versionId={item.version_id}
                           width={clipWidth}
                           trimStartMs={displayTrimStart}
                           trimEndMs={displayTrimEnd}
