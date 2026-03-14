@@ -90,6 +90,18 @@ def build_server(cuda=False):
             '--hidden-import', 'torch.cuda',
             '--hidden-import', 'torch.backends.cudnn',
         ])
+    else:
+        # Exclude NVIDIA CUDA packages from CPU-only builds to keep binary under 4GB.
+        # On Linux, pip may pull CUDA-enabled PyTorch by default which includes ~3GB
+        # of NVIDIA shared libraries that PyInstaller would bundle.
+        nvidia_packages = [
+            'nvidia', 'nvidia.cublas', 'nvidia.cuda_cupti', 'nvidia.cuda_nvrtc',
+            'nvidia.cuda_runtime', 'nvidia.cudnn', 'nvidia.cufft', 'nvidia.curand',
+            'nvidia.cusolver', 'nvidia.cusparse', 'nvidia.nccl', 'nvidia.nvjitlink',
+            'nvidia.nvtx',
+        ]
+        for pkg in nvidia_packages:
+            args.extend(['--exclude-module', pkg])
 
     # Add MLX-specific imports if building on Apple Silicon (never for CUDA builds)
     if is_apple_silicon() and not cuda:

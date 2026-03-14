@@ -61,16 +61,15 @@ jobs:
           pip install pyinstaller
           pip install -r backend/requirements.txt
 
+      - name: Install CPU-only PyTorch (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu --force-reinstall --no-deps
+
       - name: Install MLX dependencies (Apple Silicon only)
         if: matrix.backend == 'mlx'
         run: |
           pip install -r backend/requirements-mlx.txt
-
-      # - name: Install PyTorch with CUDA (Windows only)
-      #   if: matrix.platform == 'windows-latest'
-      #   run: |
-      #     pip install torch --index-url https://download.pytorch.org/whl/cu121 --force-reinstall --no-deps
-      #     pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build Python server (Linux/macOS)
         if: matrix.platform != 'windows-latest'
