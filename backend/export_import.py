@@ -13,7 +13,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .models import VoiceProfileResponse
-from .database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration
+from .database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration, GenerationVersion as DBGenerationVersion
 from .profiles import create_profile, add_profile_sample
 from .models import VoiceProfileCreate
 from . import config
@@ -269,16 +269,33 @@ def export_generation_to_zip(generation_id: str, db: Session) -> bytes:
     if not profile:
         raise ValueError(f"Profile {generation.profile_id} not found")
     
-    # Get audio file
-    audio_path = Path(generation.audio_path)
-    if not audio_path.exists():
-        raise ValueError(f"Audio file not found: {audio_path}")
-    
+    # Get all versions for this generation
+    versions = (
+        db.query(DBGenerationVersion)
+        .filter_by(generation_id=generation_id)
+        .order_by(DBGenerationVersion.created_at)
+        .all()
+    )
+
     # Create ZIP in memory
     zip_buffer = io.BytesIO()
     
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Create manifest.json
+        # Build version manifest entries
+        version_entries = []
+        for v in versions:
+            v_path = Path(v.audio_path)
+            effects_chain = None
+            if v.effects_chain:
+                effects_chain = json.loads(v.effects_chain)
+            version_entries.append({
+                "id": v.id,
+                "label": v.label,
+                "is_default": v.is_default,
+                "effects_chain": effects_chain,
+                "filename": v_path.name,
+            })
+
         manifest = {
             "version": "1.0",
             "generation": {
@@ -295,13 +312,22 @@ def export_generation_to_zip(generation_id: str, db: Session) -> bytes:
                 "name": profile.name,
                 "description": profile.description,
                 "language": profile.language,
-            }
+            },
+            "versions": version_entries,
         }
         zip_file.writestr("manifest.json", json.dumps(manifest, indent=2))
         
-        # Add audio file
-        filename = audio_path.name
-        zip_file.write(audio_path, f"audio/{filename}")
+        # Add all version audio files
+        for v in versions:
+            v_path = Path(v.audio_path)
+            if v_path.exists():
+                zip_file.write(v_path, f"audio/{v_path.name}")
+
+        # Fallback: if no versions exist, include the generation's main audio
+        if not versions:
+            audio_path = Path(generation.audio_path)
+            if audio_path.exists():
+                zip_file.write(audio_path, f"audio/{audio_path.name}")
     
     zip_buffer.seek(0)
     return zip_buffer.read()

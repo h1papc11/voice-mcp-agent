@@ -212,6 +212,12 @@ class ApiClient {
     });
   }
 
+  async regenerateGeneration(generationId: string): Promise<GenerationResponse> {
+    return this.request<GenerationResponse>(`/generate/${generationId}/regenerate`, {
+      method: 'POST',
+    });
+  }
+
   // History
   async listHistory(query?: HistoryQuery): Promise<HistoryListResponse> {
     const params = new URLSearchParams();

@@ -828,7 +828,7 @@ async def generate_speech(
             # Create clean version entry
             versions_mod.create_version(
                 generation_id=generation_id,
-                label="clean",
+                label="original",
                 audio_path=str(clean_audio_path),
                 db=bg_db,
                 effects_chain=None,
@@ -849,7 +849,7 @@ async def generate_speech(
                     final_audio_path = str(processed_path)
                     versions_mod.create_version(
                         generation_id=generation_id,
-                        label="processed",
+                        label="version-2",
                         audio_path=str(processed_path),
                         db=bg_db,
                         effects_chain=effects_chain_config,
@@ -974,6 +974,118 @@ async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
             bg_db.close()
 
     _enqueue_generation(_run_retry())
+
+    return models.GenerationResponse.model_validate(gen)
+
+
+@app.post(
+    "/generate/{generation_id}/regenerate",
+    response_model=models.GenerationResponse,
+)
+async def regenerate_generation(generation_id: str, db: Session = Depends(get_db)):
+    """Re-run TTS with the same parameters and save the result as a new version."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    if (gen.status or "completed") != "completed":
+        raise HTTPException(status_code=400, detail="Generation must be completed to regenerate")
+
+    from .backends import get_tts_backend_for_engine
+    from . import versions as versions_mod
+
+    regen_engine = gen.engine or "qwen"
+    regen_model_size = gen.model_size or "1.7B"
+    tts_model = get_tts_backend_for_engine(regen_engine)
+
+    # Set to generating so the UI shows the loader and SSE picks it up
+    gen.status = "generating"
+    gen.error = None
+    db.commit()
+    db.refresh(gen)
+
+    task_manager = get_task_manager()
+    task_manager.start_generation(
+        task_id=generation_id,
+        profile_id=gen.profile_id,
+        text=gen.text,
+    )
+
+    version_id = str(uuid.uuid4())
+
+    async def _run_regenerate():
+        bg_db = next(get_db())
+        try:
+            if regen_engine == "qwen":
+                await tts_model.load_model_async(regen_model_size)
+            else:
+                await tts_model.load_model()
+
+            voice_prompt = await profiles.create_voice_prompt_for_profile(
+                gen.profile_id,
+                bg_db,
+                use_cache=True,
+                engine=regen_engine,
+            )
+
+            from .utils.chunked_tts import generate_chunked
+
+            trim_fn = None
+            if regen_engine in ("chatterbox", "chatterbox_turbo"):
+                from .utils.audio import trim_tts_output
+                trim_fn = trim_tts_output
+
+            audio, sample_rate = await generate_chunked(
+                tts_model,
+                gen.text,
+                voice_prompt,
+                language=gen.language,
+                seed=None,  # New seed for variation
+                instruct=gen.instruct,
+                trim_fn=trim_fn,
+            )
+
+            from .utils.audio import normalize_audio, save_audio
+            audio = normalize_audio(audio)
+
+            duration = len(audio) / sample_rate
+            audio_path = config.get_generations_dir() / f"{generation_id}_{version_id[:8]}.wav"
+
+            save_audio(audio, str(audio_path), sample_rate)
+
+            # Count existing versions to auto-label
+            existing = versions_mod.list_versions(generation_id, bg_db)
+            label = f"take-{len(existing) + 1}"
+
+            versions_mod.create_version(
+                generation_id=generation_id,
+                label=label,
+                audio_path=str(audio_path),
+                db=bg_db,
+                effects_chain=None,
+                is_default=True,
+            )
+
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="completed",
+                db=bg_db,
+                audio_path=str(audio_path),
+                duration=duration,
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            await history.update_generation_status(
+                generation_id=generation_id,
+                status="failed",
+                db=bg_db,
+                error=str(e),
+            )
+        finally:
+            task_manager.complete_generation(generation_id)
+            bg_db.close()
+
+    _enqueue_generation(_run_regenerate())
 
     return models.GenerationResponse.model_validate(gen)
 
@@ -1599,7 +1711,7 @@ async def preview_effects(
     # Write to in-memory buffer
     import soundfile as sf
     buf = io.BytesIO()
-    await asyncio.to_thread(sf.write, buf, processed, sample_rate, "WAV")
+    await asyncio.to_thread(lambda: sf.write(buf, processed, sample_rate, format="WAV"))
     buf.seek(0)
 
     return StreamingResponse(

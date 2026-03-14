@@ -224,6 +224,20 @@ export function HistoryTable() {
     }
   };
 
+  const handleRegenerate = async (generationId: string) => {
+    try {
+      await apiClient.regenerateGeneration(generationId);
+      addPendingGeneration(generationId);
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    } catch (error) {
+      toast({
+        title: 'Regenerate failed',
+        description: error instanceof Error ? error.message : 'Could not regenerate',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleApplyEffects = (generationId: string) => {
     setEffectsTargetId(generationId);
     setEffectsChain([]);
@@ -457,7 +471,7 @@ export function HistoryTable() {
                         >
                           <RotateCcw className="h-4 w-4" />
                         </Button>
-                      ) : isPlayable ? (
+                      ) : (
                         <>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -466,6 +480,7 @@ export function HistoryTable() {
                                 size="icon"
                                 className="h-8 w-8"
                                 aria-label="Actions"
+                                disabled={isGenerating}
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
@@ -495,6 +510,10 @@ export function HistoryTable() {
                                 <Wand2 className="mr-2 h-4 w-4" />
                                 Apply Effects
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRegenerate(gen.id)}>
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                Regenerate
+                              </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
                                 disabled={deleteGeneration.isPending}
@@ -519,7 +538,7 @@ export function HistoryTable() {
                             </Button>
                           )}
                         </>
-                      ) : null}
+                      )}
                     </div>
                   </div>
 
@@ -533,13 +552,13 @@ export function HistoryTable() {
                         transition={{ duration: 0.2, ease: 'easeOut' }}
                         className="overflow-hidden"
                       >
-                        <div className="border-t border-border/50 px-3 pb-2 pt-2">
+                        <div className="border-t border-border/50">
                           <div className="divide-y divide-border/40">
                             {gen.versions.map((v) => (
                               <button
                                 key={v.id}
                                 type="button"
-                                className="flex items-center gap-2 w-full h-9 px-2 text-left hover:bg-muted/50 transition-colors"
+                                className="flex items-center gap-2 w-full h-9 px-3 text-left hover:bg-muted/50 transition-colors"
                                 onClick={() => {
                                   handlePlayVersion(gen.id, v.id, gen.text, gen.profile_id);
                                   if (!v.is_default) {
@@ -550,8 +569,8 @@ export function HistoryTable() {
                                 <Play className="h-3 w-3 shrink-0 text-muted-foreground" />
                                 <span className="truncate text-xs font-medium">{v.label}</span>
                                 {v.effects_chain && v.effects_chain.length > 0 && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {v.effects_chain.length} fx
+                                  <span className="text-[10px] text-muted-foreground truncate">
+                                    {v.effects_chain.map((e) => e.type).join(' → ')}
                                   </span>
                                 )}
                                 <span className="flex-1" />
