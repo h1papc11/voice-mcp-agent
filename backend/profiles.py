@@ -36,8 +36,9 @@ def _profile_to_response(profile: DBVoiceProfile) -> VoiceProfileResponse:
         try:
             raw = _json.loads(profile.effects_chain)
             effects_chain = [EffectConfig(**e) for e in raw]
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
     return VoiceProfileResponse(
         id=profile.id,
         name=profile.name,

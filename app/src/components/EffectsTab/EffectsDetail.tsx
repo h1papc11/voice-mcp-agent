@@ -142,6 +142,29 @@ export function EffectsDetail() {
     }
   }
 
+  async function handleSaveExisting() {
+    if (!selectedPresetId || !name.trim()) return;
+    setSaving(true);
+    try {
+      await apiClient.updateEffectPreset(selectedPresetId, {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        effects_chain: workingChain,
+      });
+      queryClient.invalidateQueries({ queryKey: ['effect-presets'] });
+      queryClient.invalidateQueries({ queryKey: ['effect-preset', selectedPresetId] });
+      toast({ title: 'Preset updated' });
+    } catch (error) {
+      toast({
+        title: 'Failed to save',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleSaveAsNew() {
     await handleSaveNew();
   }
@@ -186,16 +209,27 @@ export function EffectsDetail() {
         </h2>
         <div className="flex items-center gap-2">
           {!isBuiltIn && !isCreatingNew && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-destructive hover:text-destructive gap-1.5"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-destructive hover:text-destructive gap-1.5"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={handleSaveExisting}
+                disabled={saving || workingChain.length === 0}
+              >
+                <Save className="h-3.5 w-3.5" />
+                {saving ? 'Saving...' : 'Save'}
+              </Button>
+            </>
           )}
           {isCreatingNew && (
             <Button

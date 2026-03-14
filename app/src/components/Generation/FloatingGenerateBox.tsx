@@ -393,8 +393,9 @@ export function FloatingGenerateBox({
                           variant="ghost"
                           size="icon"
                           onClick={() => {
-                            setIsEffectsMode(!isEffectsMode);
-                            if (isEffectsMode) setIsInstructMode(false);
+                            const next = !isEffectsMode;
+                            setIsEffectsMode(next);
+                            if (next) setIsInstructMode(false);
                           }}
                           className={cn(
                             'h-10 w-10 rounded-full transition-all duration-200',

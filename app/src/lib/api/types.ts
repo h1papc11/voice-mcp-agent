@@ -296,6 +296,12 @@ export interface EffectPresetCreate {
   effects_chain: EffectConfig[];
 }
 
+export interface EffectPresetUpdate {
+  name?: string;
+  description?: string;
+  effects_chain?: EffectConfig[];
+}
+
 export interface AvailableEffectParam {
   default: number;
   min: number;

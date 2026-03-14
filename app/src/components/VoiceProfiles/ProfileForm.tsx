@@ -456,6 +456,7 @@ export function ProfileForm() {
                 fxError instanceof Error ? fxError.message : 'Failed to save effects chain',
               variant: 'destructive',
             });
+            return;
           }
         }
 

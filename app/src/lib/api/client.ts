@@ -606,6 +606,16 @@ class ApiClient {
     });
   }
 
+  async updateEffectPreset(
+    presetId: string,
+    data: { name?: string; description?: string; effects_chain?: EffectConfig[] },
+  ): Promise<EffectPresetResponse> {
+    return this.request<EffectPresetResponse>(`/effects/presets/${presetId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteEffectPreset(presetId: string): Promise<void> {
     await this.request<void>(`/effects/presets/${presetId}`, {
       method: 'DELETE',

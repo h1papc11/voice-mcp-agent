@@ -1297,7 +1297,7 @@ async def transcribe_audio(
     try:
         # Get audio duration
         from .utils.audio import load_audio
-        audio, sr = load_audio(tmp_path)
+        audio, sr = await asyncio.to_thread(load_audio, tmp_path)
         duration = len(audio) / sr
         
         # Transcribe
@@ -1585,21 +1585,21 @@ async def preview_effects(
     if error:
         raise HTTPException(status_code=400, detail=error)
 
-    # Find clean version
+    # Find the original unprocessed version (no effects applied)
     all_versions = versions_mod.list_versions(generation_id, db)
-    clean_version = next((v for v in all_versions if v.label == "clean"), None)
+    clean_version = next((v for v in all_versions if v.effects_chain is None), None)
     source_path = clean_version.audio_path if clean_version else gen.audio_path
     if not source_path or not Path(source_path).exists():
         raise HTTPException(status_code=404, detail="Source audio file not found")
 
-    # Process in memory
-    audio, sample_rate = load_audio(source_path)
-    processed = apply_effects(audio, sample_rate, chain_dicts)
+    # Process in memory (off the event loop)
+    audio, sample_rate = await asyncio.to_thread(load_audio, source_path)
+    processed = await asyncio.to_thread(apply_effects, audio, sample_rate, chain_dicts)
 
     # Write to in-memory buffer
     import soundfile as sf
     buf = io.BytesIO()
-    sf.write(buf, processed, sample_rate, format="WAV")
+    await asyncio.to_thread(sf.write, buf, processed, sample_rate, "WAV")
     buf.seek(0)
 
     return StreamingResponse(
@@ -1723,10 +1723,10 @@ async def apply_effects_to_generation(
     if error:
         raise HTTPException(status_code=400, detail=error)
 
-    # Find the clean version to apply effects to
+    # Find the original unprocessed version (no effects applied)
     all_versions = versions_mod.list_versions(generation_id, db)
     clean_version = next(
-        (v for v in all_versions if v.label == "clean"), None
+        (v for v in all_versions if v.effects_chain is None), None
     )
     if not clean_version:
         # Fallback: use the generation's audio_path directly
@@ -1737,14 +1737,14 @@ async def apply_effects_to_generation(
     if not source_path or not Path(source_path).exists():
         raise HTTPException(status_code=404, detail="Source audio file not found")
 
-    # Load, process, save
-    audio, sample_rate = load_audio(source_path)
-    processed_audio = apply_effects(audio, sample_rate, chain_dicts)
+    # Load, process, save (off the event loop)
+    audio, sample_rate = await asyncio.to_thread(load_audio, source_path)
+    processed_audio = await asyncio.to_thread(apply_effects, audio, sample_rate, chain_dicts)
 
     # Generate a unique filename
     version_id = str(uuid.uuid4())
     processed_path = config.get_generations_dir() / f"{generation_id}_{version_id[:8]}.wav"
-    save_audio(processed_audio, str(processed_path), sample_rate)
+    await asyncio.to_thread(save_audio, processed_audio, str(processed_path), sample_rate)
 
     # Auto-label
     label = data.label or f"version-{len(all_versions) + 1}"
@@ -1857,14 +1857,15 @@ async def update_profile_effects(
 def _profile_to_response(profile) -> models.VoiceProfileResponse:
     """Convert a DB profile to a VoiceProfileResponse with parsed effects_chain."""
     import json as _json
+    import logging
 
     effects_chain = None
     if profile.effects_chain:
         try:
             raw = _json.loads(profile.effects_chain)
             effects_chain = [models.EffectConfig(**e) for e in raw]
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
 
     return models.VoiceProfileResponse(
         id=profile.id,

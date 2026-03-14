@@ -9,6 +9,7 @@ import uuid
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from .database import EffectPreset as DBEffectPreset
 from .models import EffectPresetResponse, EffectPresetCreate, EffectPresetUpdate, EffectConfig
@@ -58,6 +59,11 @@ def create_preset(data: EffectPresetCreate, db: Session) -> EffectPresetResponse
     if error:
         raise ValueError(error)
 
+    # Check for duplicate name before insert
+    existing = db.query(DBEffectPreset).filter_by(name=data.name).first()
+    if existing:
+        raise ValueError(f"A preset named '{data.name}' already exists")
+
     preset = DBEffectPreset(
         id=str(uuid.uuid4()),
         name=data.name,
@@ -66,7 +72,11 @@ def create_preset(data: EffectPresetCreate, db: Session) -> EffectPresetResponse
         is_builtin=False,
     )
     db.add(preset)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise ValueError(f"A preset named '{data.name}' already exists")
     db.refresh(preset)
     return _preset_response(preset)
 

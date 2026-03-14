@@ -22,5 +22,5 @@ export const useEffectsStore = create<EffectsStore>((set) => ({
   setWorkingChain: (chain) => set({ workingChain: chain }),
 
   isCreatingNew: false,
-  setIsCreatingNew: (v) => set({ isCreatingNew: v, selectedPresetId: v ? null : null }),
+  setIsCreatingNew: (v) => set({ isCreatingNew: v, ...(v && { selectedPresetId: null }) }),
 }));
