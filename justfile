@@ -8,12 +8,17 @@ tauri_dir := "tauri"
 app_dir := "app"
 web_dir := "web"
 venv := backend_dir / "venv"
-venv_bin := venv / "bin"
-python := venv_bin / "python"
-pip := venv_bin / "pip"
 
-# Detect best python for venv creation
-system_python := `command -v python3.12 2>/dev/null || command -v python3.13 2>/dev/null || echo python3`
+# Platform-aware paths
+venv_bin := if os() == "windows" { venv / "Scripts" } else { venv / "bin" }
+python := if os() == "windows" { venv_bin / "python.exe" } else { venv_bin / "python" }
+pip := if os() == "windows" { venv_bin / "pip.exe" } else { venv_bin / "pip" }
+
+# Shell selection: use powershell on Windows, bash elsewhere
+set windows-shell := ["powershell", "-NoProfile", "-Command"]
+
+# Detect best python for venv creation (platform-aware)
+system_python := if os() == "windows" { "python" } else { `command -v python3.12 2>/dev/null || command -v python3.13 2>/dev/null || echo python3` }
 
 # ─── Setup ────────────────────────────────────────────────────────────
 
@@ -23,6 +28,7 @@ setup: setup-python setup-js
     @echo "Setup complete! Run: just dev"
 
 # Create venv and install Python dependencies
+[unix]
 setup-python:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -48,6 +54,23 @@ setup-python:
     {{ pip }} install git+https://github.com/QwenLM/Qwen3-TTS.git
     echo "Python environment ready."
 
+[windows]
+setup-python:
+    if (-not (Test-Path "{{ venv }}")) { \
+        Write-Host "Creating Python virtual environment..."; \
+        $pyMinor = & {{ system_python }} -c "import sys; print(sys.version_info[1])"; \
+        if ([int]$pyMinor -gt 13) { \
+            Write-Host "Warning: Python 3.$pyMinor detected. ML packages may not be compatible."; \
+        }; \
+        & {{ system_python }} -m venv {{ venv }}; \
+    }
+    Write-Host "Installing Python dependencies..."
+    & "{{ python }}" -m pip install --upgrade pip -q
+    & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
+    & "{{ pip }}" install --no-deps chatterbox-tts
+    & "{{ pip }}" install git+https://github.com/QwenLM/Qwen3-TTS.git
+    Write-Host "Python environment ready."
+
 # Install JavaScript dependencies
 setup-js:
     bun install
@@ -55,6 +78,7 @@ setup-js:
 # ─── Development ──────────────────────────────────────────────────────
 
 # Start backend + frontend for development (two processes, one terminal)
+[unix]
 dev: _ensure-venv _ensure-sidecar
     #!/usr/bin/env bash
     set -euo pipefail
@@ -69,15 +93,30 @@ dev: _ensure-venv _ensure-sidecar
 
     wait
 
+[windows]
+dev: _ensure-venv _ensure-sidecar
+    Write-Host "Starting backend on http://localhost:17493 ..."
+    $backend = Start-Process -NoNewWindow -PassThru -FilePath "{{ python }}" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "17493"
+    Start-Sleep -Seconds 2
+    Write-Host "Starting Tauri desktop app..."
+    $frontend = Start-Process -NoNewWindow -PassThru -WorkingDirectory "{{ tauri_dir }}" -FilePath "bun" -ArgumentList "run", "tauri", "dev"
+    try { Wait-Process -Id $backend.Id, $frontend.Id } finally { Stop-Process -Id $backend.Id, $frontend.Id -ErrorAction SilentlyContinue }
+
 # Start backend only
+[unix]
 dev-backend: _ensure-venv
     {{ venv_bin }}/uvicorn backend.main:app --reload --port 17493
+
+[windows]
+dev-backend: _ensure-venv
+    & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493
 
 # Start Tauri desktop app only (backend must be running separately)
 dev-frontend: _ensure-sidecar
     cd {{ tauri_dir }} && bun run tauri dev
 
 # Start backend + web app (no Tauri)
+[unix]
 dev-web: _ensure-venv
     #!/usr/bin/env bash
     set -euo pipefail
@@ -87,11 +126,26 @@ dev-web: _ensure-venv
     cd {{ web_dir }} && bun run dev &
     wait
 
+[windows]
+dev-web: _ensure-venv
+    Write-Host "Starting backend on http://localhost:17493 ..."
+    $backend = Start-Process -NoNewWindow -PassThru -FilePath "{{ python }}" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "17493"
+    Start-Sleep -Seconds 2
+    Write-Host "Starting web app..."
+    $frontend = Start-Process -NoNewWindow -PassThru -WorkingDirectory "{{ web_dir }}" -FilePath "bun" -ArgumentList "run", "dev"
+    try { Wait-Process -Id $backend.Id, $frontend.Id } finally { Stop-Process -Id $backend.Id, $frontend.Id -ErrorAction SilentlyContinue }
+
 # Kill all dev processes
+[unix]
 kill:
     -pkill -f "uvicorn backend.main:app" 2>/dev/null || true
     -pkill -f "vite" 2>/dev/null || true
     @echo "Dev processes killed."
+
+[windows]
+kill:
+    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*uvicorn*backend.main*' -or $_.CommandLine -like '*vite*' } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Write-Host "Dev processes killed."
 
 # ─── Build ────────────────────────────────────────────────────────────
 
@@ -99,8 +153,13 @@ kill:
 build: build-server build-tauri
 
 # Build Python server binary
+[unix]
 build-server: _ensure-venv
     PATH="{{ venv_bin }}:$PATH" ./scripts/build-server.sh
+
+[windows]
+build-server: _ensure-venv
+    $env:PATH = "{{ venv_bin }};$env:PATH"; & "{{ python }}" -m PyInstaller backend/voicebox-server.spec
 
 # Build Tauri desktop app
 build-tauri:
@@ -135,38 +194,73 @@ db-init: _ensure-venv
     cd {{ backend_dir }} && {{ python }} -c "from database import init_db; init_db()"
 
 # Reset database (delete + reinit)
+[unix]
 db-reset:
     rm -f {{ backend_dir }}/data/voicebox.db
+    just db-init
+
+[windows]
+db-reset:
+    if (Test-Path "{{ backend_dir }}/data/voicebox.db") { Remove-Item -Force "{{ backend_dir }}/data/voicebox.db" }
     just db-init
 
 # ─── Utilities ────────────────────────────────────────────────────────
 
 # Generate TypeScript API client (backend must be running)
+[unix]
 generate-api:
     ./scripts/generate-api.sh
 
+[windows]
+generate-api:
+    bash scripts/generate-api.sh
+
 # Open API docs in browser
+[unix]
 docs:
     open http://localhost:17493/docs 2>/dev/null || xdg-open http://localhost:17493/docs
 
+[windows]
+docs:
+    Start-Process "http://localhost:17493/docs"
+
 # Tail backend logs
+[unix]
 logs:
     tail -f {{ backend_dir }}/logs/*.log 2>/dev/null || echo "No log files found"
+
+[windows]
+logs:
+    Get-ChildItem {{ backend_dir }}/logs/*.log -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 50 -Wait } ; if (-not $?) { Write-Host "No log files found" }
 
 # ─── Clean ────────────────────────────────────────────────────────────
 
 # Clean build artifacts
+[unix]
 clean:
     rm -rf {{ tauri_dir }}/src-tauri/target/release
     rm -rf {{ web_dir }}/dist
     rm -rf {{ app_dir }}/dist
 
+[windows]
+clean:
+    if (Test-Path "{{ tauri_dir }}/src-tauri/target/release") { Remove-Item -Recurse -Force "{{ tauri_dir }}/src-tauri/target/release" }
+    if (Test-Path "{{ web_dir }}/dist") { Remove-Item -Recurse -Force "{{ web_dir }}/dist" }
+    if (Test-Path "{{ app_dir }}/dist") { Remove-Item -Recurse -Force "{{ app_dir }}/dist" }
+
 # Clean Python venv and cache
+[unix]
 clean-python:
     rm -rf {{ venv }}
     find {{ backend_dir }} -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
+[windows]
+clean-python:
+    if (Test-Path "{{ venv }}") { Remove-Item -Recurse -Force "{{ venv }}" }
+    Get-ChildItem -Path "{{ backend_dir }}" -Directory -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+
 # Nuclear clean (everything including node_modules)
+[unix]
 clean-all: clean clean-python
     rm -rf node_modules
     rm -rf {{ app_dir }}/node_modules
@@ -174,16 +268,28 @@ clean-all: clean clean-python
     rm -rf {{ web_dir }}/node_modules
     cd {{ tauri_dir }}/src-tauri && cargo clean
 
+[windows]
+clean-all: clean clean-python
+    if (Test-Path "node_modules") { Remove-Item -Recurse -Force "node_modules" }
+    if (Test-Path "{{ app_dir }}/node_modules") { Remove-Item -Recurse -Force "{{ app_dir }}/node_modules" }
+    if (Test-Path "{{ tauri_dir }}/node_modules") { Remove-Item -Recurse -Force "{{ tauri_dir }}/node_modules" }
+    if (Test-Path "{{ web_dir }}/node_modules") { Remove-Item -Recurse -Force "{{ web_dir }}/node_modules" }
+    Push-Location "{{ tauri_dir }}/src-tauri"; cargo clean; Pop-Location
+
 # ─── Internal ─────────────────────────────────────────────────────────
 
 # Ensure venv exists (prompt to run setup if not)
-[private]
+[private, unix]
 _ensure-venv:
     #!/usr/bin/env bash
     if [ ! -d "{{ venv }}" ]; then
         echo "Python venv not found. Run: just setup"
         exit 1
     fi
+
+[private, windows]
+_ensure-venv:
+    if (-not (Test-Path "{{ venv }}")) { Write-Host "Python venv not found. Run: just setup"; exit 1 }
 
 # Ensure Tauri dev sidecar placeholder exists
 [private]
