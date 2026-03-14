@@ -54,6 +54,7 @@ class Generation(Base):
     model_size = Column(String, nullable=True)
     status = Column(String, default="completed")  # generating, completed, failed
     error = Column(Text, nullable=True)
+    is_favorited = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -374,6 +375,15 @@ def _run_migrations(engine):
                 conn.execute(text("ALTER TABLE effect_presets ADD COLUMN sort_order INTEGER DEFAULT 100"))
                 conn.commit()
                 print("Added sort_order column to effect_presets")
+
+    if 'generations' in inspector.get_table_names():
+        columns = {col['name'] for col in inspector.get_columns('generations')}
+        if 'is_favorited' not in columns:
+            print("Migrating generations: adding is_favorited column")
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generations ADD COLUMN is_favorited BOOLEAN DEFAULT 0"))
+                conn.commit()
+                print("Added is_favorited column to generations")
 
     # Migration: Create generation_versions for existing generations
     # (populate after tables are created, handled in init_db)

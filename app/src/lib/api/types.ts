@@ -72,6 +72,7 @@ export interface GenerationResponse {
   model_size?: string;
   status: 'generating' | 'completed' | 'failed';
   error?: string;
+  is_favorited?: boolean;
   created_at: string;
   versions?: GenerationVersionResponse[];
   active_version_id?: string;

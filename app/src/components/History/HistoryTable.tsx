@@ -3,11 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Download,
   FileArchive,
-  Layers,
+  GalleryVerticalEnd,
   Loader2,
   MoreHorizontal,
   Play,
   RotateCcw,
+  Star,
   Trash2,
   Wand2,
 } from 'lucide-react';
@@ -238,6 +239,19 @@ export function HistoryTable() {
     }
   };
 
+  const handleToggleFavorite = async (generationId: string) => {
+    try {
+      await apiClient.toggleFavorite(generationId);
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    } catch (error) {
+      toast({
+        title: 'Failed to update favorite',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleApplyEffects = (generationId: string) => {
     setEffectsTargetId(generationId);
     setEffectsChain([]);
@@ -380,6 +394,7 @@ export function HistoryTable() {
                     className={cn(
                       'flex items-stretch gap-4 h-26 p-3',
                       isPlayable && 'hover:bg-muted/70 cursor-pointer rounded-md',
+                      isVersionsExpanded && 'rounded-b-none',
                     )}
                     aria-label={
                       isGenerating
@@ -457,7 +472,7 @@ export function HistoryTable() {
 
                     {/* Far right - Actions */}
                     <div
-                      className="shrink-0 flex flex-col justify-center items-center gap-1"
+                      className="shrink-0 flex flex-col justify-center items-center gap-0.5"
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -465,11 +480,11 @@ export function HistoryTable() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-7 w-7 text-muted-foreground hover:bg-muted-foreground/20 hover:text-muted-foreground"
                           aria-label="Retry generation"
                           onClick={() => handleRetry(gen.id)}
                         >
-                          <RotateCcw className="h-4 w-4" />
+                          <RotateCcw className="h-2 w-2" />
                         </Button>
                       ) : (
                         <>
@@ -478,11 +493,11 @@ export function HistoryTable() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-7 w-7 text-muted-foreground hover:bg-muted-foreground/20 hover:text-muted-foreground"
                                 aria-label="Actions"
                                 disabled={isGenerating}
                               >
-                                <MoreHorizontal className="h-4 w-4" />
+                                <MoreHorizontal className="h-2 w-2" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
@@ -517,24 +532,42 @@ export function HistoryTable() {
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
                                 disabled={deleteGeneration.isPending}
-                                className="text-destructive focus:text-destructive"
+                                // className="text-destructive focus:text-destructive"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              'h-7 w-7 text-muted-foreground hover:bg-muted-foreground/20 hover:text-muted-foreground',
+                              gen.is_favorited && 'text-accent hover:text-accent',
+                            )}
+                            aria-label={gen.is_favorited ? 'Unfavorite' : 'Favorite'}
+                            onClick={() => handleToggleFavorite(gen.id)}
+                          >
+                            <Star
+                              className="h-2 w-2"
+                              fill={gen.is_favorited ? 'currentColor' : 'none'}
+                            />
+                          </Button>
                           {hasVersions && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className={cn('h-8 w-8', isVersionsExpanded && 'text-accent')}
+                              className={cn(
+                                'h-7 w-7 text-muted-foreground hover:bg-muted-foreground/20 hover:text-muted-foreground',
+                                isVersionsExpanded && 'text-accent hover:text-accent',
+                              )}
                               aria-label="Toggle versions"
                               onClick={() =>
                                 setExpandedVersionsId(isVersionsExpanded ? null : gen.id)
                               }
                             >
-                              <Layers className="h-4 w-4" />
+                              <GalleryVerticalEnd className="h-2 w-2" />
                             </Button>
                           )}
                         </>

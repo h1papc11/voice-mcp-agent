@@ -222,6 +222,7 @@ async def list_generations(
             model_size=generation.model_size,
             status=generation.status or "completed",
             error=generation.error,
+            is_favorited=bool(generation.is_favorited),
             created_at=generation.created_at,
             versions=versions,
             active_version_id=active_version_id,

@@ -79,6 +79,7 @@ class GenerationResponse(BaseModel):
     model_size: Optional[str] = None
     status: str = "completed"
     error: Optional[str] = None
+    is_favorited: bool = False
     created_at: datetime
     versions: Optional[List["GenerationVersionResponse"]] = None
     active_version_id: Optional[str] = None
@@ -110,6 +111,7 @@ class HistoryResponse(BaseModel):
     model_size: Optional[str] = None
     status: str = "completed"
     error: Optional[str] = None
+    is_favorited: bool = False
     created_at: datetime
     versions: Optional[List["GenerationVersionResponse"]] = None
     active_version_id: Optional[str] = None

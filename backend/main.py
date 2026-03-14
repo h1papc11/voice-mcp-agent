@@ -1314,6 +1314,20 @@ async def get_generation(
     )
 
 
+@app.post("/history/{generation_id}/favorite")
+async def toggle_favorite(
+    generation_id: str,
+    db: Session = Depends(get_db),
+):
+    """Toggle the favorite status of a generation."""
+    gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not gen:
+        raise HTTPException(status_code=404, detail="Generation not found")
+    gen.is_favorited = not gen.is_favorited
+    db.commit()
+    return {"is_favorited": gen.is_favorited}
+
+
 @app.delete("/history/{generation_id}")
 async def delete_generation(
     generation_id: str,

@@ -1,4 +1,4 @@
-import { Download, Edit, Mic, Trash2 } from 'lucide-react';
+import { Download, Edit, Mic, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -79,7 +79,7 @@ export function ProfileCard({ profile }: ProfileCardProps) {
       <Card
         className={cn(
           'cursor-pointer hover:shadow-md transition-all flex flex-col h-[162px]',
-          isSelected && 'ring-2 ring-primary shadow-md',
+          isSelected && 'ring-2 ring-accent shadow-md',
         )}
         onClick={handleSelect}
         tabIndex={0}
@@ -89,8 +89,8 @@ export function ProfileCard({ profile }: ProfileCardProps) {
         onKeyDown={handleKeyDown}
       >
         <CardHeader className="p-3 pb-2">
-          <CardTitle className="flex items-center gap-1.5 text-base font-medium">
-            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+          <CardTitle className="flex items-start gap-1.5 text-base font-medium">
+            <div className="h-6 w-6 mt-[3px] rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
               {avatarUrl && !avatarError ? (
                 <img
                   src={avatarUrl}
@@ -112,10 +112,13 @@ export function ProfileCard({ profile }: ProfileCardProps) {
           <p className="text-xs text-muted-foreground mb-1.5 line-clamp-2 leading-relaxed">
             {profile.description || 'No description'}
           </p>
-          <div className="mb-2">
+          <div className="mb-2 flex items-center gap-1.5">
             <Badge variant="outline" className="text-xs h-5 px-1.5 text-muted-foreground">
               {profile.language}
             </Badge>
+            {profile.effects_chain && profile.effects_chain.length > 0 && (
+              <Sparkles className="h-3.5 w-3.5 text-accent" />
+            )}
           </div>
           <div className="flex gap-0.5 justify-end items-end mt-auto">
             <CircleButton

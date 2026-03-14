@@ -218,6 +218,12 @@ class ApiClient {
     });
   }
 
+  async toggleFavorite(generationId: string): Promise<{ is_favorited: boolean }> {
+    return this.request<{ is_favorited: boolean }>(`/history/${generationId}/favorite`, {
+      method: 'POST',
+    });
+  }
+
   // History
   async listHistory(query?: HistoryQuery): Promise<HistoryListResponse> {
     const params = new URLSearchParams();
