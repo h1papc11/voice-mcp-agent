@@ -263,7 +263,7 @@ async def health():
         gpu_type=gpu_type,
         vram_used_mb=vram_used,
         backend_type=backend_type,
-        backend_variant=os.environ.get("VOICEBOX_BACKEND_VARIANT", "cpu"),
+        backend_variant=os.environ.get("VOICEBOX_BACKEND_VARIANT", "cuda" if torch.cuda.is_available() else "cpu"),
     )
 
 

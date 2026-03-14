@@ -26,7 +26,7 @@ export function GpuAcceleration() {
   // Query CUDA backend status
   const {
     data: cudaStatus,
-    isLoading: cudaStatusLoading,
+    isLoading: _cudaStatusLoading,
     refetch: refetchCudaStatus,
   } = useQuery({
     queryKey: ['cuda-status', serverUrl],
@@ -218,35 +218,33 @@ export function GpuAcceleration() {
         <CardTitle>GPU Acceleration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Current status */}
+        {/* GPU status */}
         <div className="space-y-1">
-          <div className="text-sm font-medium">Backend</div>
-          <div className="text-sm text-muted-foreground">
-            {isCurrentlyCuda
-              ? 'CUDA (GPU accelerated)'
-              : hasNativeGpu
-                ? `${health.backend_type === 'mlx' ? 'MLX' : 'PyTorch'} (GPU accelerated)`
-                : 'CPU'}
-          </div>
-        </div>
-
-        {/* GPU info from health */}
-        {health.gpu_type && (
-          <div className="space-y-1">
-            <div className="text-sm font-medium">GPU</div>
-            <div className="text-sm text-muted-foreground">{health.gpu_type}</div>
-            {health.vram_used_mb != null && (
-              <div className="text-xs text-muted-foreground">
-                VRAM: {health.vram_used_mb.toFixed(0)} MB used
+          {health.gpu_available && health.gpu_type ? (
+            <>
+              <div className="text-sm font-medium">
+                {health.gpu_type.replace(/^(CUDA|ROCm|MPS|Metal|XPU|DirectML)\s*\((.+)\)$/, '$2') ||
+                  health.gpu_type}
               </div>
-            )}
-          </div>
-        )}
+              <div className="text-sm text-muted-foreground">
+                {health.gpu_type.replace(/\s*\(.+\)$/, '')}
+                {health.vram_used_mb != null && health.vram_used_mb > 0
+                  ? ` \u00b7 ${health.vram_used_mb.toFixed(0)} MB VRAM used`
+                  : ''}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sm font-medium">CPU</div>
+              <div className="text-sm text-muted-foreground">No GPU acceleration available</div>
+            </>
+          )}
+        </div>
 
         {/* Native GPU detected - no CUDA download needed */}
 
-        {/* CUDA download section - only show when native GPU is NOT detected (i.e., Windows/Linux NVIDIA users) */}
-        {!hasNativeGpu && (
+        {/* CUDA download section - only show when no GPU is active (native or CUDA) */}
+        {!hasNativeGpu && !isCurrentlyCuda && (
           <>
             {/* Download progress */}
             {cudaDownloading && downloadProgress && (

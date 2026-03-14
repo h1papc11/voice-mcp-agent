@@ -113,7 +113,7 @@ export function ConnectionForm() {
               <Badge variant={health.gpu_available ? 'default' : 'secondary'}>
                 GPU: {health.gpu_available ? 'Available' : 'Not Available'}
               </Badge>
-              {health.vram_used_mb && (
+              {health.vram_used_mb != null && health.vram_used_mb > 0 && (
                 <Badge variant="outline">VRAM: {health.vram_used_mb.toFixed(0)} MB</Badge>
               )}
             </div>

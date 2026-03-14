@@ -66,6 +66,11 @@ setup-python:
     }
     Write-Host "Installing Python dependencies..."
     & "{{ python }}" -m pip install --upgrade pip -q
+    $hasNvidia = $null -ne (Get-WmiObject Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' })
+    if ($hasNvidia) { \
+        Write-Host "NVIDIA GPU detected — installing PyTorch with CUDA support..."; \
+        & "{{ pip }}" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126; \
+    }
     & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
     & "{{ pip }}" install --no-deps chatterbox-tts
     & "{{ pip }}" install git+https://github.com/QwenLM/Qwen3-TTS.git
@@ -77,30 +82,37 @@ setup-js:
 
 # ─── Development ──────────────────────────────────────────────────────
 
-# Start backend + frontend for development (two processes, one terminal)
+# Start backend (if not already running) + frontend for development
 [unix]
 dev: _ensure-venv _ensure-sidecar
     #!/usr/bin/env bash
     set -euo pipefail
-    trap 'kill 0' EXIT
 
-    echo "Starting backend on http://localhost:17493 ..."
-    {{ venv_bin }}/uvicorn backend.main:app --reload --port 17493 &
-    sleep 2
+    backend_pid=""
+    if curl -sf http://127.0.0.1:17493/health > /dev/null 2>&1; then
+        echo "Backend already running on http://localhost:17493"
+    else
+        echo "Starting backend on http://localhost:17493 ..."
+        {{ venv_bin }}/uvicorn backend.main:app --reload --port 17493 &
+        backend_pid=$!
+        sleep 2
+    fi
+
+    trap '[ -n "$backend_pid" ] && kill "$backend_pid" 2>/dev/null; wait' EXIT
 
     echo "Starting Tauri desktop app..."
-    cd {{ tauri_dir }} && bun run tauri dev &
-
-    wait
+    cd {{ tauri_dir }} && bun run tauri dev
 
 [windows]
 dev: _ensure-venv _ensure-sidecar
-    Write-Host "Starting backend on http://localhost:17493 ..."
-    $backend = Start-Process -NoNewWindow -PassThru -FilePath "{{ python }}" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "17493"
-    Start-Sleep -Seconds 2
+    $backendJob = $null
+    try { $null = Invoke-WebRequest -Uri "http://127.0.0.1:17493/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host "Backend already running on http://localhost:17493" } catch { \
+        Write-Host "Starting backend on http://localhost:17493 ..."; \
+        $backendJob = Start-Job -ScriptBlock { & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493 } -WorkingDirectory (Get-Location); \
+        Start-Sleep -Seconds 2; \
+    }
     Write-Host "Starting Tauri desktop app..."
-    $frontend = Start-Process -NoNewWindow -PassThru -WorkingDirectory "{{ tauri_dir }}" -FilePath "bun" -ArgumentList "run", "tauri", "dev"
-    try { Wait-Process -Id $backend.Id, $frontend.Id } finally { Stop-Process -Id $backend.Id, $frontend.Id -ErrorAction SilentlyContinue }
+    try { Set-Location "{{ tauri_dir }}"; bun run tauri dev } finally { if ($backendJob) { Stop-Job $backendJob -ErrorAction SilentlyContinue; Remove-Job $backendJob -Force -ErrorAction SilentlyContinue } }
 
 # Start backend only
 [unix]
@@ -115,25 +127,36 @@ dev-backend: _ensure-venv
 dev-frontend: _ensure-sidecar
     cd {{ tauri_dir }} && bun run tauri dev
 
-# Start backend + web app (no Tauri)
+# Start backend (if not already running) + web app (no Tauri)
 [unix]
 dev-web: _ensure-venv
     #!/usr/bin/env bash
     set -euo pipefail
-    trap 'kill 0' EXIT
-    {{ venv_bin }}/uvicorn backend.main:app --reload --port 17493 &
-    sleep 2
-    cd {{ web_dir }} && bun run dev &
-    wait
+
+    backend_pid=""
+    if curl -sf http://127.0.0.1:17493/health > /dev/null 2>&1; then
+        echo "Backend already running on http://localhost:17493"
+    else
+        echo "Starting backend on http://localhost:17493 ..."
+        {{ venv_bin }}/uvicorn backend.main:app --reload --port 17493 &
+        backend_pid=$!
+        sleep 2
+    fi
+
+    trap '[ -n "$backend_pid" ] && kill "$backend_pid" 2>/dev/null; wait' EXIT
+
+    cd {{ web_dir }} && bun run dev
 
 [windows]
 dev-web: _ensure-venv
-    Write-Host "Starting backend on http://localhost:17493 ..."
-    $backend = Start-Process -NoNewWindow -PassThru -FilePath "{{ python }}" -ArgumentList "-m", "uvicorn", "backend.main:app", "--reload", "--port", "17493"
-    Start-Sleep -Seconds 2
+    $backendJob = $null
+    try { $null = Invoke-WebRequest -Uri "http://127.0.0.1:17493/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host "Backend already running on http://localhost:17493" } catch { \
+        Write-Host "Starting backend on http://localhost:17493 ..."; \
+        $backendJob = Start-Job -ScriptBlock { & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493 } -WorkingDirectory (Get-Location); \
+        Start-Sleep -Seconds 2; \
+    }
     Write-Host "Starting web app..."
-    $frontend = Start-Process -NoNewWindow -PassThru -WorkingDirectory "{{ web_dir }}" -FilePath "bun" -ArgumentList "run", "dev"
-    try { Wait-Process -Id $backend.Id, $frontend.Id } finally { Stop-Process -Id $backend.Id, $frontend.Id -ErrorAction SilentlyContinue }
+    try { Set-Location "{{ web_dir }}"; bun run dev } finally { if ($backendJob) { Stop-Job $backendJob -ErrorAction SilentlyContinue; Remove-Job $backendJob -Force -ErrorAction SilentlyContinue } }
 
 # Kill all dev processes
 [unix]
