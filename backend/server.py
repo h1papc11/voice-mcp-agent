@@ -161,6 +161,9 @@ if __name__ == "__main__":
         )
         args = parser.parse_args()
 
+        if args.parent_pid is not None and args.parent_pid <= 0:
+            parser.error("--parent-pid must be a positive integer")
+
         # Detect backend variant from binary name
         # voicebox-server-cuda → sets VOICEBOX_BACKEND_VARIANT=cuda
         import os
