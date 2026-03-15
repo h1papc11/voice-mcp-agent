@@ -51,6 +51,15 @@ except Exception as e:
     logger.error(f"Failed to import required modules: {e}", exc_info=True)
     sys.exit(1)
 
+_watchdog_disabled = False
+
+
+def disable_watchdog():
+    """Disable the parent watchdog so the server keeps running after parent exits."""
+    global _watchdog_disabled
+    _watchdog_disabled = True
+
+
 def _start_parent_watchdog(parent_pid, data_dir=None):
     """Monitor parent process and exit if it dies.
 
@@ -117,6 +126,9 @@ def _start_parent_watchdog(parent_pid, data_dir=None):
             watchdog_logger.warning(f"Parent PID {parent_pid} not found on first check — disabling watchdog")
             return
         while True:
+            if _watchdog_disabled:
+                watchdog_logger.info("Watchdog disabled (keep server running), stopping monitor")
+                return
             if not _is_pid_alive(parent_pid):
                 watchdog_logger.info(f"Parent process {parent_pid} gone, shutting down server...")
                 if sys.platform == "win32":

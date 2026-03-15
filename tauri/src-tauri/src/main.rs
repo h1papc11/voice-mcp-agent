@@ -760,17 +760,28 @@ pub fn run() {
             let _ = &app; // used on unix
             match &event {
                 RunEvent::Exit => {
-                    println!("RunEvent::Exit received - server will self-terminate via parent watchdog");
-                    // The server monitors this process's PID via --parent-pid.
-                    // When this process exits, the server detects it and shuts itself down.
-                    // No need for taskkill/wmic/process tree enumeration.
-                    
-                    // On Unix, send SIGTERM to the process group for immediate cleanup.
-                    #[cfg(unix)]
-                    {
-                        let state = app.state::<ServerState>();
-                        let keep_running = *state.keep_running_on_close.lock().unwrap();
-                        if !keep_running {
+                    let state = app.state::<ServerState>();
+                    let keep_running = *state.keep_running_on_close.lock().unwrap();
+
+                    if keep_running {
+                        // Tell the server to disable its watchdog so it survives
+                        // after this process exits.
+                        println!("Keep server running: disabling watchdog...");
+                        let client = reqwest::blocking::Client::builder()
+                            .timeout(std::time::Duration::from_secs(2))
+                            .build()
+                            .unwrap();
+                        let _ = client
+                            .post(&format!("http://127.0.0.1:{}/watchdog/disable", SERVER_PORT))
+                            .send();
+                    } else {
+                        // Server will self-terminate via parent-pid watchdog when
+                        // this process exits. On Unix, also send SIGTERM for
+                        // immediate cleanup.
+                        println!("RunEvent::Exit - server will self-terminate via watchdog");
+
+                        #[cfg(unix)]
+                        {
                             if let Some(pid) = state.server_pid.lock().unwrap().take() {
                                 use std::process::Command;
                                 let _ = Command::new("kill")

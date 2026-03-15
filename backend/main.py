@@ -143,6 +143,14 @@ async def shutdown():
     return {"message": "Shutting down..."}
 
 
+@app.post("/watchdog/disable")
+async def watchdog_disable():
+    """Disable the parent process watchdog so the server keeps running."""
+    from backend.server import disable_watchdog
+    disable_watchdog()
+    return {"message": "Watchdog disabled"}
+
+
 @app.get("/health", response_model=models.HealthResponse)
 async def health():
     """Health check endpoint."""
