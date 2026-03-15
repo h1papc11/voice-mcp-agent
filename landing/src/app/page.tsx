@@ -58,13 +58,13 @@ export default function Home() {
             <img
               src="/voicebox-logo-app.webp"
               alt="Voicebox"
-              className="h-full w-full object-contain mix-blend-lighten"
+              className="h-full w-full object-contain"
             />
           </div>
 
           {/* Headline */}
           <div className="fade-in relative" style={{ animationDelay: '100ms' }}>
-            <h1 className="text-5xl font-bold tracking-tighter leading-[0.9] text-foreground drop-shadow-[0_16px_50px_rgba(0,0,0,0.95)] md:text-7xl lg:text-8xl">
+            <h1 className="text-5xl font-bold tracking-tighter leading-[0.9] text-foreground md:text-7xl lg:text-8xl">
               Your voice, your machine.
             </h1>
           </div>
