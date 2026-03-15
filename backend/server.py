@@ -6,6 +6,14 @@ absolute imports instead of relative imports.
 """
 
 import sys
+import os
+
+# On Windows with --noconsole (PyInstaller), sys.stdout/stderr are None.
+# Redirect to devnull to prevent crashes from print()/tqdm/logging.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
 
 # Fast path: handle --version before any heavy imports so the Rust
 # version check doesn't block for 30+ seconds loading torch etc.
