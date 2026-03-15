@@ -108,6 +108,7 @@ _default_origins = [
     "http://127.0.0.1:17493",
     "tauri://localhost",         # Tauri webview (macOS)
     "https://tauri.localhost",   # Tauri webview (Windows/Linux)
+    "http://tauri.localhost",    # Tauri webview (Windows, some builds)
 ]
 _env_origins = os.environ.get("VOICEBOX_CORS_ORIGINS", "")
 _cors_origins = _default_origins + [o.strip() for o in _env_origins.split(",") if o.strip()]
@@ -140,6 +141,14 @@ async def shutdown():
 
     asyncio.create_task(shutdown_async())
     return {"message": "Shutting down..."}
+
+
+@app.post("/watchdog/disable")
+async def watchdog_disable():
+    """Disable the parent process watchdog so the server keeps running."""
+    from backend.server import disable_watchdog
+    disable_watchdog()
+    return {"message": "Watchdog disabled"}
 
 
 @app.get("/health", response_model=models.HealthResponse)

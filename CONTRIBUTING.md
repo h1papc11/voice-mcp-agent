@@ -33,101 +33,41 @@ Thank you for your interest in contributing to Voicebox! This document provides 
 
 ### Development Setup
 
-**Using `just` (recommended):**
-
-Install [just](https://github.com/casey/just) (`brew install just` or `cargo install just`), then:
+Install [just](https://github.com/casey/just) (`brew install just`, `cargo install just`, or `winget install Casey.Just`), then:
 
 ```bash
+git clone https://github.com/YOUR_USERNAME/voicebox.git
+cd voicebox
+
 just setup   # creates venv, installs Python + JS deps
-just dev     # starts backend + desktop app in one terminal
+just dev     # starts backend + desktop app
 ```
+
+`just setup` handles everything automatically, including:
+- Creating a Python virtual environment
+- Installing Python dependencies (with CUDA PyTorch on Windows if an NVIDIA GPU is detected)
+- Installing MLX dependencies on Apple Silicon
+- Installing JavaScript dependencies
+
+`just dev` starts the backend and desktop app together. If a backend is already running (e.g. from `just dev-backend` in another terminal), it detects it and only starts the frontend.
 
 Other useful commands:
 
 ```bash
 just dev-web       # backend + web app (no Tauri/Rust build)
 just dev-backend   # backend only
+just dev-frontend  # Tauri app only (backend must be running)
 just kill          # stop all dev processes
 just clean-all     # nuke everything and start fresh
 just --list        # see all available commands
 ```
 
-**Using the Makefile:** Run `make setup` then `make dev`. See `make help` for all commands.
+> **Note:** In dev mode, the app connects to a manually-started Python server.
+> The bundled server binary is only used in production builds.
 
-**Manual setup (required for Windows):**
+#### Windows Notes
 
-1. **Fork and clone the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/voicebox.git
-   cd voicebox
-   ```
-
-2. **Install JavaScript dependencies**
-   ```bash
-   bun install
-   ```
-   This installs dependencies for:
-   - `app/` - Shared React frontend
-   - `tauri/` - Tauri desktop wrapper
-   - `web/` - Web deployment wrapper
-
-3. **Set up Python backend**
-   ```bash
-   cd backend
-   
-   # Create virtual environment
-   python -m venv venv
-   
-   # Activate virtual environment
-   source venv/bin/activate  # On macOS/Linux
-   # or
-   venv\Scripts\activate  # On Windows
-   
-   # Install Python dependencies
-   pip install -r requirements.txt
-   
-   # Install MLX dependencies (Apple Silicon only - for faster inference)
-   # On Apple Silicon, this enables native Metal acceleration
-   if [[ $(uname -m) == "arm64" ]]; then
-     pip install -r requirements-mlx.txt
-   fi
-   
-   # Install Qwen3-TTS (required for voice synthesis)
-   pip install git+https://github.com/QwenLM/Qwen3-TTS.git
-   ```
-
-4. **Start development servers**
-
-   Development requires two terminals: one for the Python backend, one for the Tauri app.
-
-   **Terminal 1: Backend server** (start this first)
-   ```bash
-   cd backend
-   source venv/bin/activate  # Activate venv if not already active
-   bun run dev:server
-   # Or manually: uvicorn main:app --reload --port 17493
-   ```
-   Backend will be available at `http://localhost:17493`
-
-   **Terminal 2: Desktop app**
-   ```bash
-   bun run dev
-   ```
-   This will:
-   - Create a placeholder sidecar binary (for Tauri compilation)
-   - Start Vite dev server on port 5173
-   - Launch Tauri window pointing to localhost:5173
-   - Connect to the Python server you started in Terminal 1
-   - Enable hot reload
-
-   > **Note:** In dev mode, the app connects to your manually-started Python server.
-   > The bundled server binary is only used in production builds.
-
-   **Optional: Web app**
-   ```bash
-   bun run dev:web
-   ```
-   Web app will be available at `http://localhost:5174`
+The justfile works natively on Windows via PowerShell. No WSL or Git Bash required. On Windows with an NVIDIA GPU, `just setup` automatically installs CUDA-enabled PyTorch for GPU acceleration.
 
 ### Model Downloads
 
@@ -139,25 +79,30 @@ First-time usage will be slower due to model downloads, but subsequent runs will
 
 ### Building
 
-**Build everything (recommended):**
+**Build production app:**
+
 ```bash
-bun run build
+just build        # Build CPU server binary + Tauri installer
 ```
-This automatically:
-1. Builds the Python server binary (`./scripts/build-server.sh`)
-2. Builds the Tauri desktop app (`cd tauri && bun run tauri build`)
+
+On Windows, to build with CUDA support for local testing:
+
+```bash
+just build-local  # Build CPU + CUDA server binaries + Tauri installer
+```
+
+This builds the CPU sidecar (bundled with the app), the CUDA binary (placed in `%APPDATA%/com.voicebox.app/backends/` for runtime GPU switching), and the installable Tauri app.
 
 Creates platform-specific installers (`.dmg`, `.msi`, `.AppImage`) in `tauri/src-tauri/target/release/bundle/`.
 
-**Note:** The build process detects your platform and includes the appropriate backend (MLX for Apple Silicon, PyTorch for others).
+**Individual build targets:**
 
-**Build server binary only:**
 ```bash
-bun run build:server
-# or
-./scripts/build-server.sh
+just build-server       # CPU server binary only
+just build-server-cuda  # CUDA server binary only (Windows)
+just build-tauri        # Tauri desktop app only
+just build-web          # Web app only
 ```
-Creates platform-specific binary in `tauri/src-tauri/binaries/`
 
 **Building with local Qwen3-TTS development version:**
 
@@ -165,17 +110,10 @@ If you're actively developing or modifying the Qwen3-TTS library, set the `QWEN_
 
 ```bash
 export QWEN_TTS_PATH=~/path/to/your/Qwen3-TTS
-bun run build:server
+just build-server
 ```
 
-This makes PyInstaller use your local qwen-tts version instead of the pip-installed package. Useful when testing changes to the TTS library before they're published to PyPI or when using an editable install (`pip install -e`).
-
-**Build web app:**
-```bash
-cd web
-bun run build
-```
-Output in `web/dist/`
+This makes PyInstaller use your local qwen-tts version instead of the pip-installed package.
 
 ### Generate OpenAPI Client
 
