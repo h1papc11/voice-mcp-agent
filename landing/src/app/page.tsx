@@ -39,7 +39,7 @@ export default function Home() {
       {/* ── Hero Section ─────────────────────────────────────────────── */}
       <section className="relative pt-32 pb-16">
         {/* Background glow */}
-        <div className="hero-glow pointer-events-none absolute inset-0 -top-32">
+        <div className="hero-glow hero-glow-fade pointer-events-none absolute inset-0 -top-32">
           <div className="absolute left-1/2 top-0 -translate-x-1/2 w-[800px] h-[600px] rounded-full bg-accent/15 blur-[150px]" />
           <div className="absolute left-1/2 top-12 -translate-x-1/2 w-[500px] h-[400px] rounded-full bg-accent/10 blur-[80px]" />
         </div>
@@ -48,11 +48,7 @@ export default function Home() {
           {/* Logo */}
           <div
             className="fade-in mx-auto mb-8 h-[120px] w-[120px] md:h-[160px] md:w-[160px]"
-            style={{
-              animationDelay: '0ms',
-              filter:
-                'drop-shadow(0 0 20px hsl(43 60% 50% / 0.4)) drop-shadow(0 0 60px hsl(43 60% 50% / 0.2))',
-            }}
+            style={{ animationDelay: '0ms' }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
