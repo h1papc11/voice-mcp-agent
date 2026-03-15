@@ -12,7 +12,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": "v1Compatible",
     "externalBin": ["binaries/voicebox-server"],
     "icon": [
       "icons/32x32.png",
