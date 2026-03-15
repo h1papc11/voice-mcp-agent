@@ -129,6 +129,17 @@ async def download_cuda_binary(version: Optional[str] = None):
             except Exception as e:
                 logger.warning(f"Could not fetch checksum file — skipping verification: {e}")
 
+            # Get total size across all parts by issuing HEAD requests
+            total_size = 0
+            for part_name in parts:
+                try:
+                    head_resp = await client.head(f"{base_url}/{part_name}")
+                    content_length = int(head_resp.headers.get("content-length", 0))
+                    total_size += content_length
+                except Exception:
+                    pass
+            logger.info(f"Total download size: {total_size / 1024 / 1024:.1f} MB")
+
             # Download and concatenate parts
             total_downloaded = 0
             with open(temp_path, "wb") as f:
@@ -142,8 +153,8 @@ async def download_cuda_binary(version: Optional[str] = None):
                             f.write(chunk)
                             total_downloaded += len(chunk)
                             progress.update_progress(
-                                PROGRESS_KEY, current=total_downloaded, total=0,
-                                filename=f"Part {i + 1}/{len(parts)}",
+                                PROGRESS_KEY, current=total_downloaded, total=total_size,
+                                filename=f"Downloading CUDA backend ({i + 1}/{len(parts)})",
                                 status="downloading",
                             )
 
