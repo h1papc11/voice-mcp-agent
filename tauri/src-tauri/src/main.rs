@@ -572,6 +572,7 @@ async fn restart_server(
 
 #[command]
 fn set_keep_server_running(state: State<'_, ServerState>, keep_running: bool) {
+    println!("set_keep_server_running called with: {}", keep_running);
     *state.keep_running_on_close.lock().unwrap() = keep_running;
 }
 
@@ -762,6 +763,8 @@ pub fn run() {
                 RunEvent::Exit => {
                     let state = app.state::<ServerState>();
                     let keep_running = *state.keep_running_on_close.lock().unwrap();
+                    let has_pid = state.server_pid.lock().unwrap().is_some();
+                    println!("RunEvent::Exit — keep_running={}, has_pid={}", keep_running, has_pid);
 
                     if keep_running {
                         // Tell the server to disable its watchdog so it survives
@@ -771,9 +774,13 @@ pub fn run() {
                             .timeout(std::time::Duration::from_secs(2))
                             .build()
                             .unwrap();
-                        let _ = client
+                        match client
                             .post(&format!("http://127.0.0.1:{}/watchdog/disable", SERVER_PORT))
-                            .send();
+                            .send()
+                        {
+                            Ok(resp) => println!("Watchdog disable response: {}", resp.status()),
+                            Err(e) => eprintln!("Failed to disable watchdog: {}", e),
+                        }
                     } else {
                         // Server will self-terminate via parent-pid watchdog when
                         // this process exits. On Unix, also send SIGTERM for

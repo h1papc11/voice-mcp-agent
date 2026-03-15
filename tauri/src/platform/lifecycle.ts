@@ -64,6 +64,12 @@ class TauriLifecycle implements PlatformLifecycle {
         // @ts-expect-error - accessing module-level variable from another module
         const serverStartedByApp = window.__voiceboxServerStartedByApp ?? false;
 
+        console.log(
+          '[lifecycle] window-close-requested: keepRunning=%s, serverStartedByApp=%s',
+          keepRunning,
+          serverStartedByApp,
+        );
+
         if (!keepRunning && serverStartedByApp) {
           // Stop server before closing (only if we started it)
           try {

@@ -58,6 +58,12 @@ def disable_watchdog():
     """Disable the parent watchdog so the server keeps running after parent exits."""
     global _watchdog_disabled
     _watchdog_disabled = True
+    # Ignore SIGHUP so the server survives when the parent Tauri process exits.
+    # On Unix, child processes receive SIGHUP when the parent's session leader
+    # exits, which would kill the server even though we want it to persist.
+    if sys.platform != "win32":
+        import signal
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
 
 
 def _start_parent_watchdog(parent_pid, data_dir=None):
@@ -130,7 +136,16 @@ def _start_parent_watchdog(parent_pid, data_dir=None):
                 watchdog_logger.info("Watchdog disabled (keep server running), stopping monitor")
                 return
             if not _is_pid_alive(parent_pid):
-                watchdog_logger.info(f"Parent process {parent_pid} gone, shutting down server...")
+                # Parent is gone. Before shutting down, give the app a moment
+                # to send /watchdog/disable — there is a race where the Tauri
+                # RunEvent::Exit handler sends the disable request while we are
+                # mid-iteration (already past the _watchdog_disabled check above).
+                watchdog_logger.info(f"Parent process {parent_pid} gone, waiting for possible disable request...")
+                time.sleep(1)
+                if _watchdog_disabled:
+                    watchdog_logger.info("Watchdog was disabled during grace period, keeping server alive")
+                    return
+                watchdog_logger.info("Watchdog still enabled after grace period, shutting down server...")
                 if sys.platform == "win32":
                     # sys.exit triggers SystemExit, allowing uvicorn to run
                     # shutdown handlers. os.kill(SIGTERM) on Windows calls

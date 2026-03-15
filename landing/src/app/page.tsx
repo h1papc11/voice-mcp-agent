@@ -1,7 +1,6 @@
 'use client';
 
 import { Github, Globe, Languages, MessageSquare, Zap } from 'lucide-react';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { ControlUI } from '@/components/ControlUI';
 import { Features } from '@/components/Features';
@@ -51,13 +50,11 @@ export default function Home() {
                 'drop-shadow(0 0 20px hsl(43 60% 50% / 0.4)) drop-shadow(0 0 60px hsl(43 60% 50% / 0.2))',
             }}
           >
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/voicebox-logo-app.webp"
               alt="Voicebox"
-              width={160}
-              height={160}
               className="h-full w-full object-contain mix-blend-lighten"
-              priority
             />
           </div>
 
