@@ -3104,6 +3104,10 @@ async def startup_event():
     print(f"Backend: {backend_type.upper()}")
     print(f"GPU available: {_get_gpu_status()}")
 
+    # Auto-update CUDA binary if installed but outdated
+    from .cuda_download import check_and_update_cuda_binary
+    _create_background_task(check_and_update_cuda_binary())
+
     # Initialize progress manager with main event loop for thread-safe operations
     try:
         progress_manager = get_progress_manager()

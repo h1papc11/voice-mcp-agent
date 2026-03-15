@@ -246,13 +246,18 @@ export function GpuAcceleration() {
         {/* CUDA download section - only show when no GPU is active (native or CUDA) */}
         {!hasNativeGpu && !isCurrentlyCuda && (
           <>
-            {/* Download progress */}
+            {/* Download progress (manual download or auto-update) */}
             {cudaDownloading && downloadProgress && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{downloadProgress.filename || 'Downloading CUDA backend...'}</span>
+                    <span>
+                      {downloadProgress.filename ||
+                        (cudaAvailable
+                          ? 'Updating CUDA backend...'
+                          : 'Downloading CUDA backend...')}
+                    </span>
                   </div>
                   {downloadProgress.total > 0 && (
                     <span className="text-muted-foreground">
