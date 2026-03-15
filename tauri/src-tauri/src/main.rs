@@ -282,6 +282,7 @@ async fn start_server(
         .ok_or_else(|| "Invalid data dir path".to_string())?
         .to_string();
     let port_str = SERVER_PORT.to_string();
+    let parent_pid_str = std::process::id().to_string();
     let is_remote = remote.unwrap_or(false);
 
     // Resolve the custom models directory from the parameter or stored state
@@ -294,7 +295,7 @@ async fn start_server(
     let spawn_result = if let Some(ref cuda_path) = cuda_binary {
         println!("Launching CUDA backend: {:?}", cuda_path);
         let mut cmd = app.shell().command(cuda_path.to_str().unwrap());
-        cmd = cmd.args(["--data-dir", &data_dir_str, "--port", &port_str]);
+        cmd = cmd.args(["--data-dir", &data_dir_str, "--port", &port_str, "--parent-pid", &parent_pid_str]);
         if is_remote {
             cmd = cmd.args(["--host", "0.0.0.0"]);
         }
@@ -304,7 +305,7 @@ async fn start_server(
         cmd.spawn()
     } else {
         // Use the bundled CPU sidecar
-        sidecar = sidecar.args(["--data-dir", &data_dir_str, "--port", &port_str]);
+        sidecar = sidecar.args(["--data-dir", &data_dir_str, "--port", &port_str, "--parent-pid", &parent_pid_str]);
         if is_remote {
             sidecar = sidecar.args(["--host", "0.0.0.0"]);
         }
@@ -490,67 +491,13 @@ async fn start_server(
     Ok(format!("http://127.0.0.1:{}", SERVER_PORT))
 }
 
-/// Check if a Windows process is still running
-#[cfg(windows)]
-fn is_process_running(pid: u32) -> bool {
-    use std::process::Command;
-    if let Ok(output) = Command::new("tasklist")
-        .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-        .output()
-    {
-        // If process exists, tasklist returns it in output
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        return !output_str.trim().is_empty() && output_str.contains(&pid.to_string());
-    }
-    false
-}
-
-/// Kill entire Windows process tree by enumerating children
-#[cfg(windows)]
-fn kill_windows_process_tree(parent_pid: u32) -> Result<(), String> {
-    use std::process::Command;
-
-    // Find all child processes using WMIC
-    let output = Command::new("wmic")
-        .args([
-            "process",
-            "where",
-            &format!("ParentProcessId={}", parent_pid),
-            "get",
-            "ProcessId"
-        ])
-        .output();
-
-    if let Ok(output) = output {
-        let output_str = String::from_utf8_lossy(&output.stdout);
-        for line in output_str.lines().skip(1) { // Skip header
-            if let Ok(child_pid) = line.trim().parse::<u32>() {
-                println!("Found child process: {}", child_pid);
-                // Recursively kill child's children
-                let _ = kill_windows_process_tree(child_pid);
-                // Kill the child
-                let _ = Command::new("taskkill")
-                    .args(["/PID", &child_pid.to_string(), "/F"])
-                    .output();
-            }
-        }
-    }
-
-    // Kill the parent process
-    let _ = Command::new("taskkill")
-        .args(["/PID", &parent_pid.to_string(), "/F"])
-        .output();
-
-    Ok(())
-}
-
 #[command]
 async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
     let pid = state.server_pid.lock().unwrap().take();
     let _child = state.child.lock().unwrap().take();
     
     if let Some(pid) = pid {
-        println!("stop_server: Killing server process group with PID: {}", pid);
+        println!("stop_server: Stopping server with PID: {}", pid);
         
         #[cfg(unix)]
         {
@@ -569,62 +516,25 @@ async fn stop_server(state: State<'_, ServerState>) -> Result<(), String> {
             let _ = Command::new("kill")
                 .args(["-9", &pid.to_string()])
                 .output();
+            
+            println!("stop_server: Process group kill completed");
         }
         
         #[cfg(windows)]
         {
-            // Layer 1: Try graceful HTTP shutdown first
-            println!("Attempting graceful shutdown via HTTP...");
+            // Send graceful shutdown via HTTP — the server's parent-pid watchdog
+            // will also handle cleanup if this app process exits.
+            println!("Sending graceful shutdown via HTTP...");
             let client = reqwest::blocking::Client::builder()
                 .timeout(std::time::Duration::from_secs(2))
                 .build()
                 .unwrap();
 
-            let shutdown_result = client
+            let _ = client
                 .post(&format!("http://127.0.0.1:{}/shutdown", SERVER_PORT))
                 .send();
 
-            if shutdown_result.is_ok() {
-                println!("HTTP shutdown sent, waiting for graceful exit...");
-                // Wait up to 3 seconds for graceful shutdown
-                for i in 0..30 {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    if !is_process_running(pid) {
-                        println!("Process exited gracefully after {}ms", i * 100);
-                        return Ok(());
-                    }
-                }
-                println!("Graceful shutdown timed out, forcing kill...");
-            } else {
-                println!("HTTP shutdown failed, forcing kill...");
-            }
-
-            // Layer 2: Kill process tree with enumeration
-            println!("Killing process tree for wrapper PID {}...", pid);
-            kill_windows_process_tree(pid)?;
-
-            // Layer 3: Verify and kill by name if still running
-            std::thread::sleep(std::time::Duration::from_millis(200));
-            if is_process_running(pid) {
-                println!("Process tree kill failed, killing by name...");
-                use std::process::Command;
-                let _ = Command::new("taskkill")
-                    .args(["/IM", "voicebox-server.exe", "/T", "/F"])
-                    .output();
-            }
-
-            // Layer 4: Final verification
-            std::thread::sleep(std::time::Duration::from_millis(200));
-            if is_process_running(pid) {
-                eprintln!("WARNING: Failed to kill server after all attempts");
-            } else {
-                println!("Server killed successfully");
-            }
-        }
-
-        #[cfg(unix)]
-        {
-            println!("stop_server: Process group kill completed");
+            println!("Shutdown request sent (server watchdog will handle cleanup)");
         }
     }
     
@@ -847,123 +757,35 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            let _ = &app; // used on unix
             match &event {
                 RunEvent::Exit => {
-                    println!("=================================================================");
-                    println!("RunEvent::Exit received - checking server cleanup");
-                    let state = app.state::<ServerState>();
-                    let keep_running = *state.keep_running_on_close.lock().unwrap();
-                    println!("keep_running_on_close = {}", keep_running);
+                    println!("RunEvent::Exit received - server will self-terminate via parent watchdog");
+                    // The server monitors this process's PID via --parent-pid.
+                    // When this process exits, the server detects it and shuts itself down.
+                    // No need for taskkill/wmic/process tree enumeration.
                     
-                    if !keep_running {
-                        // Get the stored PID for process group killing
-                        let pid = state.server_pid.lock().unwrap().take();
-                        // Also take the child to clean up
-                        let _child = state.child.lock().unwrap().take();
-                        
-                        if let Some(pid) = pid {
-                            println!("Killing server process group with PID: {}", pid);
-                            
-                            // Kill the entire process group on Unix systems
-                            // Using negative PID sends signal to all processes in the group
-                            #[cfg(unix)]
-                            {
+                    // On Unix, send SIGTERM to the process group for immediate cleanup.
+                    #[cfg(unix)]
+                    {
+                        let state = app.state::<ServerState>();
+                        let keep_running = *state.keep_running_on_close.lock().unwrap();
+                        if !keep_running {
+                            if let Some(pid) = state.server_pid.lock().unwrap().take() {
                                 use std::process::Command;
-                                // First try SIGTERM to the process group
-                                let pgid_kill = Command::new("kill")
+                                let _ = Command::new("kill")
                                     .args(["-TERM", "--", &format!("-{}", pid)])
                                     .output();
-                                
-                                match pgid_kill {
-                                    Ok(output) => {
-                                        if output.status.success() {
-                                            println!("SIGTERM sent to process group -{}", pid);
-                                        } else {
-                                            // Process group kill failed, try direct kill
-                                            println!("Process group kill failed, trying direct kill");
-                                            let _ = Command::new("kill")
-                                                .args(["-TERM", &pid.to_string()])
-                                                .output();
-                                        }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("Failed to execute kill command: {}", e);
-                                    }
-                                }
-                                
-                                // Give it a moment, then force kill if needed
                                 std::thread::sleep(std::time::Duration::from_millis(100));
-                                
-                                // Force kill with SIGKILL
                                 let _ = Command::new("kill")
                                     .args(["-9", "--", &format!("-{}", pid)])
                                     .output();
                                 let _ = Command::new("kill")
                                     .args(["-9", &pid.to_string()])
                                     .output();
-                                
-                                println!("Server process group kill completed");
                             }
-                            
-                            #[cfg(windows)]
-                            {
-                                // Layer 1: Try graceful HTTP shutdown first
-                                println!("Attempting graceful shutdown via HTTP...");
-                                let client = reqwest::blocking::Client::builder()
-                                    .timeout(std::time::Duration::from_secs(2))
-                                    .build()
-                                    .unwrap();
-
-                                let shutdown_result = client
-                                    .post(&format!("http://127.0.0.1:{}/shutdown", SERVER_PORT))
-                                    .send();
-
-                                if shutdown_result.is_ok() {
-                                    println!("HTTP shutdown sent, waiting for graceful exit...");
-                                    // Wait up to 3 seconds for graceful shutdown
-                                    for i in 0..30 {
-                                        std::thread::sleep(std::time::Duration::from_millis(100));
-                                        if !is_process_running(pid) {
-                                            println!("Process exited gracefully after {}ms", i * 100);
-                                            println!("Server process tree kill completed");
-                                            return;
-                                        }
-                                    }
-                                    println!("Graceful shutdown timed out, forcing kill...");
-                                } else {
-                                    println!("HTTP shutdown failed, forcing kill...");
-                                }
-
-                                // Layer 2: Kill process tree with enumeration
-                                println!("Killing process tree for wrapper PID {}...", pid);
-                                let _ = kill_windows_process_tree(pid);
-
-                                // Layer 3: Verify and kill by name if still running
-                                std::thread::sleep(std::time::Duration::from_millis(200));
-                                if is_process_running(pid) {
-                                    println!("Process tree kill failed, killing by name...");
-                                    use std::process::Command;
-                                    let _ = Command::new("taskkill")
-                                        .args(["/IM", "voicebox-server.exe", "/T", "/F"])
-                                        .output();
-                                }
-
-                                // Layer 4: Final verification
-                                std::thread::sleep(std::time::Duration::from_millis(200));
-                                if is_process_running(pid) {
-                                    eprintln!("WARNING: Failed to kill server after all attempts");
-                                } else {
-                                    println!("Server killed successfully");
-                                }
-                                println!("Server process tree kill completed");
-                            }
-                        } else {
-                            println!("No server PID found (already stopped or never started)");
                         }
-                    } else {
-                        println!("Keeping server running per user setting");
                     }
-                    println!("=================================================================");
                 }
                 RunEvent::ExitRequested { api, .. } => {
                     println!("RunEvent::ExitRequested received");

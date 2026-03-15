@@ -108,6 +108,7 @@ _default_origins = [
     "http://127.0.0.1:17493",
     "tauri://localhost",         # Tauri webview (macOS)
     "https://tauri.localhost",   # Tauri webview (Windows/Linux)
+    "http://tauri.localhost",    # Tauri webview (Windows, some builds)
 ]
 _env_origins = os.environ.get("VOICEBOX_CORS_ORIGINS", "")
 _cors_origins = _default_origins + [o.strip() for o in _env_origins.split(",") if o.strip()]

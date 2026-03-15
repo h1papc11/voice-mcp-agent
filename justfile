@@ -52,6 +52,7 @@ setup-python:
         {{ pip }} install -r {{ backend_dir }}/requirements-mlx.txt
     fi
     {{ pip }} install git+https://github.com/QwenLM/Qwen3-TTS.git
+    {{ pip }} install pyinstaller -q
     echo "Python environment ready."
 
 [windows]
@@ -74,6 +75,7 @@ setup-python:
     & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
     & "{{ pip }}" install --no-deps chatterbox-tts
     & "{{ pip }}" install git+https://github.com/QwenLM/Qwen3-TTS.git
+    & "{{ pip }}" install pyinstaller -q
     Write-Host "Python environment ready."
 
 # Install JavaScript dependencies
@@ -105,14 +107,14 @@ dev: _ensure-venv _ensure-sidecar
 
 [windows]
 dev: _ensure-venv _ensure-sidecar
-    $backendJob = $null
+    $backendJob = $null; \
     try { $null = Invoke-WebRequest -Uri "http://127.0.0.1:17493/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host "Backend already running on http://localhost:17493" } catch { \
         Write-Host "Starting backend on http://localhost:17493 ..."; \
-        $backendJob = Start-Job -ScriptBlock { & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493 } -WorkingDirectory (Get-Location); \
+        $backendJob = Start-Process -PassThru -NoNewWindow -FilePath "{{ python }}" -ArgumentList "-m","uvicorn","backend.main:app","--reload","--port","17493"; \
         Start-Sleep -Seconds 2; \
-    }
-    Write-Host "Starting Tauri desktop app..."
-    try { Set-Location "{{ tauri_dir }}"; bun run tauri dev } finally { if ($backendJob) { Stop-Job $backendJob -ErrorAction SilentlyContinue; Remove-Job $backendJob -Force -ErrorAction SilentlyContinue } }
+    }; \
+    Write-Host "Starting Tauri desktop app..."; \
+    try { Set-Location "{{ tauri_dir }}"; bun run tauri dev } finally { if ($backendJob) { Stop-Process -Id $backendJob.Id -Force -ErrorAction SilentlyContinue } }
 
 # Start backend only
 [unix]
@@ -124,8 +126,13 @@ dev-backend: _ensure-venv
     & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493
 
 # Start Tauri desktop app only (backend must be running separately)
+[unix]
 dev-frontend: _ensure-sidecar
     cd {{ tauri_dir }} && bun run tauri dev
+
+[windows]
+dev-frontend: _ensure-sidecar
+    Set-Location "{{ tauri_dir }}"; bun run tauri dev
 
 # Start backend (if not already running) + web app (no Tauri)
 [unix]
@@ -149,14 +156,14 @@ dev-web: _ensure-venv
 
 [windows]
 dev-web: _ensure-venv
-    $backendJob = $null
+    $backendJob = $null; \
     try { $null = Invoke-WebRequest -Uri "http://127.0.0.1:17493/health" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host "Backend already running on http://localhost:17493" } catch { \
         Write-Host "Starting backend on http://localhost:17493 ..."; \
-        $backendJob = Start-Job -ScriptBlock { & "{{ python }}" -m uvicorn backend.main:app --reload --port 17493 } -WorkingDirectory (Get-Location); \
+        $backendJob = Start-Process -PassThru -NoNewWindow -FilePath "{{ python }}" -ArgumentList "-m","uvicorn","backend.main:app","--reload","--port","17493"; \
         Start-Sleep -Seconds 2; \
-    }
-    Write-Host "Starting web app..."
-    try { Set-Location "{{ web_dir }}"; bun run dev } finally { if ($backendJob) { Stop-Job $backendJob -ErrorAction SilentlyContinue; Remove-Job $backendJob -Force -ErrorAction SilentlyContinue } }
+    }; \
+    Write-Host "Starting web app..."; \
+    try { Set-Location "{{ web_dir }}"; bun run dev } finally { if ($backendJob) { Stop-Process -Id $backendJob.Id -Force -ErrorAction SilentlyContinue } }
 
 # Kill all dev processes
 [unix]
@@ -175,22 +182,50 @@ kill:
 # Build everything (server binary + desktop app)
 build: build-server build-tauri
 
-# Build Python server binary
+# Build Python server binary (CPU)
 [unix]
 build-server: _ensure-venv
     PATH="{{ venv_bin }}:$PATH" ./scripts/build-server.sh
 
 [windows]
 build-server: _ensure-venv
-    $env:PATH = "{{ venv_bin }};$env:PATH"; & "{{ python }}" -m PyInstaller backend/voicebox-server.spec
+    $env:PATH = "{{ venv_bin }};$env:PATH"; \
+    & "{{ python }}" backend/build_binary.py; \
+    $triple = (rustc --print host-tuple); \
+    Copy-Item "backend/dist/voicebox-server.exe" "{{ tauri_dir }}/src-tauri/binaries/voicebox-server-$triple.exe" -Force; \
+    Write-Host "Copied sidecar: voicebox-server-$triple.exe"
+
+# Build CUDA server binary and place in app data dir for local testing
+[windows]
+build-server-cuda: _ensure-venv
+    $env:PATH = "{{ venv_bin }};$env:PATH"; \
+    & "{{ python }}" backend/build_binary.py --cuda; \
+    $dest = "$env:APPDATA/com.voicebox.app/backends"; \
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null; \
+    Copy-Item "backend/dist/voicebox-server-cuda.exe" "$dest/voicebox-server-cuda.exe" -Force; \
+    Write-Host "Copied CUDA binary to $dest"
+
+# Build everything locally: CPU server + CUDA server + installable Tauri app
+[windows]
+build-local: build-server build-server-cuda build-tauri
 
 # Build Tauri desktop app
+[unix]
 build-tauri:
     cd {{ tauri_dir }} && bun run tauri build
 
+[windows]
+build-tauri:
+    Set-Location "{{ tauri_dir }}"; bun run tauri build
+
 # Build web app
+[unix]
 build-web:
     cd {{ web_dir }} && bun run build
+
+[windows]
+build-web:
+    Set-Location "{{ web_dir }}"; bun run build
 
 # ─── Code Quality ────────────────────────────────────────────────────
 
@@ -213,8 +248,13 @@ fix:
 # ─── Database ─────────────────────────────────────────────────────────
 
 # Initialize SQLite database
+[unix]
 db-init: _ensure-venv
     cd {{ backend_dir }} && {{ python }} -c "from database import init_db; init_db()"
+
+[windows]
+db-init: _ensure-venv
+    Set-Location "{{ backend_dir }}"; & "{{ python }}" -c "from database import init_db; init_db()"
 
 # Reset database (delete + reinit)
 [unix]

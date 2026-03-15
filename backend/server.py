@@ -6,6 +6,14 @@ absolute imports instead of relative imports.
 """
 
 import sys
+
+# Fast path: handle --version before any heavy imports so the Rust
+# version check doesn't block for 30+ seconds loading torch etc.
+if "--version" in sys.argv:
+    from backend import __version__
+    print(f"voicebox-server {__version__}")
+    sys.exit(0)
+
 import logging
 
 # Set up logging FIRST, before any imports that might fail
@@ -43,6 +51,49 @@ except Exception as e:
     logger.error(f"Failed to import required modules: {e}", exc_info=True)
     sys.exit(1)
 
+def _start_parent_watchdog(parent_pid):
+    """Monitor parent process and exit if it dies.
+
+    This is the clean shutdown mechanism: instead of the Tauri app trying to
+    forcefully kill the server (which spawns console windows on Windows),
+    the server monitors its parent and shuts itself down gracefully.
+    """
+    import os
+    import signal
+    import threading
+    import time
+
+    def _is_pid_alive(pid):
+        """Check if a process with the given PID exists (cross-platform)."""
+        try:
+            if sys.platform == "win32":
+                import ctypes
+                kernel32 = ctypes.windll.kernel32
+                SYNCHRONIZE = 0x00100000
+                handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+                if handle:
+                    kernel32.CloseHandle(handle)
+                    return True
+                return False
+            else:
+                os.kill(pid, 0)
+                return True
+        except (OSError, PermissionError):
+            return False
+
+    def _watch():
+        logger.info(f"Parent watchdog started, monitoring PID {parent_pid}")
+        while True:
+            if not _is_pid_alive(parent_pid):
+                logger.info(f"Parent process {parent_pid} no longer exists, shutting down...")
+                os.kill(os.getpid(), signal.SIGTERM)
+                return
+            time.sleep(1)
+
+    t = threading.Thread(target=_watch, daemon=True)
+    t.start()
+
+
 if __name__ == "__main__":
     try:
         parser = argparse.ArgumentParser(description="voicebox backend server")
@@ -65,16 +116,17 @@ if __name__ == "__main__":
             help="Data directory for database, profiles, and generated audio",
         )
         parser.add_argument(
+            "--parent-pid",
+            type=int,
+            default=None,
+            help="PID of parent process to monitor; server exits when parent dies",
+        )
+        parser.add_argument(
             "--version",
             action="store_true",
-            help="Print version and exit",
+            help="Print version and exit (handled above, kept for argparse help)",
         )
         args = parser.parse_args()
-
-        if args.version:
-            from backend import __version__
-            print(f"voicebox-server {__version__}")
-            sys.exit(0)
 
         # Detect backend variant from binary name
         # voicebox-server-cuda → sets VOICEBOX_BACKEND_VARIANT=cuda
@@ -86,6 +138,10 @@ if __name__ == "__main__":
         else:
             os.environ["VOICEBOX_BACKEND_VARIANT"] = "cpu"
             logger.info("Backend variant: CPU")
+
+        # Start parent process watchdog if requested
+        if args.parent_pid is not None:
+            _start_parent_watchdog(args.parent_pid)
 
         logger.info(f"Parsed arguments: host={args.host}, port={args.port}, data_dir={args.data_dir}")
 
