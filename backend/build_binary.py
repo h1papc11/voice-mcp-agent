@@ -92,6 +92,13 @@ def build_server(cuda=False):
         '--hidden-import', 'qwen_tts.core',
         '--hidden-import', 'qwen_tts.cli',
         '--copy-metadata', 'qwen-tts',
+        '--copy-metadata', 'requests',
+        '--copy-metadata', 'transformers',
+        '--copy-metadata', 'huggingface-hub',
+        '--copy-metadata', 'tokenizers',
+        '--copy-metadata', 'safetensors',
+        '--copy-metadata', 'tqdm',
+        '--hidden-import', 'requests',
         '--collect-submodules', 'qwen_tts',
         '--collect-data', 'qwen_tts',
         # Fix for pkg_resources and jaraco namespace packages
