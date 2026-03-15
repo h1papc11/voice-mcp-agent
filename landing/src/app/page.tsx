@@ -13,6 +13,8 @@ import type { DownloadLinks } from '@/lib/releases';
 
 export default function Home() {
   const [downloadLinks, setDownloadLinks] = useState<DownloadLinks>(DOWNLOAD_LINKS);
+  const [version, setVersion] = useState<string | null>(null);
+  const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
 
   useEffect(() => {
     fetch('/api/releases')
@@ -22,6 +24,8 @@ export default function Home() {
       })
       .then((data) => {
         if (data.downloadLinks) setDownloadLinks(data.downloadLinks);
+        if (data.version) setVersion(data.version);
+        if (data.totalDownloads != null) setTotalDownloads(data.totalDownloads);
       })
       .catch((error) => {
         console.error('Failed to fetch release info:', error);
@@ -96,12 +100,16 @@ export default function Home() {
             </a>
           </div>
 
-          {/* Version */}
+          {/* Version + downloads */}
           <p
             className="fade-in mt-4 text-xs text-muted-foreground/50"
             style={{ animationDelay: '400ms' }}
           >
-            Free and open source &middot; macOS, Windows, Linux
+            {version ?? ''}
+            {version && totalDownloads != null ? ' \u00b7 ' : ''}
+            {totalDownloads != null ? `${totalDownloads.toLocaleString()} downloads` : ''}
+            {version || totalDownloads != null ? ' \u00b7 ' : ''}
+            macOS, Windows, Linux
           </p>
         </div>
 

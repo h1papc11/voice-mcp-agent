@@ -9,6 +9,7 @@ export interface DownloadLinks {
 export interface ReleaseInfo {
   version: string;
   downloadLinks: DownloadLinks;
+  totalDownloads: number;
 }
 
 const GITHUB_REPO = 'jamiepine/voicebox';
@@ -72,11 +73,15 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
       }
     }
 
+    // Fetch total downloads across ALL releases
+    const totalDownloads = await getTotalDownloads();
+
     // Fallback: construct URLs if not found in assets
     const baseUrl = `https://github.com/${GITHUB_REPO}/releases/download/${version}`;
 
     const releaseInfo: ReleaseInfo = {
       version,
+      totalDownloads,
       downloadLinks: {
         macArm: downloadLinks.macArm || `${baseUrl}/voicebox_aarch64.app.tar.gz`,
         macIntel: downloadLinks.macIntel || `${baseUrl}/voicebox_x64.app.tar.gz`,
@@ -95,6 +100,56 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
     console.error('Failed to fetch latest release:', error);
     throw error;
   }
+}
+
+// Cache for total download count
+let cachedTotalDownloads: number | null = null;
+let downloadsCacheTimestamp: number = 0;
+
+/**
+ * Fetches download counts across ALL releases (paginated)
+ */
+async function getTotalDownloads(): Promise<number> {
+  const now = Date.now();
+  if (cachedTotalDownloads !== null && now - downloadsCacheTimestamp < CACHE_DURATION) {
+    return cachedTotalDownloads;
+  }
+
+  let total = 0;
+  let page = 1;
+
+  try {
+    while (true) {
+      const response = await fetch(
+        `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}`,
+        {
+          headers: { Accept: 'application/vnd.github.v3+json' },
+        },
+      );
+
+      if (!response.ok) break;
+
+      const releases = await response.json();
+      if (!Array.isArray(releases) || releases.length === 0) break;
+
+      for (const release of releases) {
+        for (const asset of release.assets || []) {
+          total += asset.download_count || 0;
+        }
+      }
+
+      if (releases.length < 100) break;
+      page++;
+    }
+
+    cachedTotalDownloads = total;
+    downloadsCacheTimestamp = now;
+  } catch (error) {
+    console.error('Failed to fetch total downloads:', error);
+    if (cachedTotalDownloads !== null) return cachedTotalDownloads;
+  }
+
+  return total;
 }
 
 /**
