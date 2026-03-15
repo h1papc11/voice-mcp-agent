@@ -708,9 +708,17 @@ pub fn run() {
             play_audio_to_devices,
             stop_audio_playback
         ])
-        .on_window_event(|window, event| {
+        .on_window_event({
+            let closing = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            move |window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                // Prevent automatic close
+                // If we're already in the close flow, let it proceed
+                if closing.load(std::sync::atomic::Ordering::SeqCst) {
+                    return;
+                }
+                closing.store(true, std::sync::atomic::Ordering::SeqCst);
+
+                // Prevent automatic close so frontend can clean up
                 api.prevent_close();
 
                 // Emit event to frontend to check setting and stop server if needed
@@ -718,42 +726,34 @@ pub fn run() {
 
                 if let Err(e) = app_handle.emit("window-close-requested", ()) {
                     eprintln!("Failed to emit window-close-requested event: {}", e);
-                    // If event emission fails, allow close anyway
                     window.close().ok();
                     return;
                 }
 
                 // Set up listener for frontend response
                 let window_for_close = window.clone();
+                let closing_for_timeout = closing.clone();
                 let (tx, mut rx) = mpsc::unbounded_channel::<()>();
 
-                // Listen for response from frontend using window's listen method
                 let listener_id = window.listen("window-close-allowed", move |_| {
-                    // Frontend has checked setting and stopped server if needed
-                    // Signal that we can close
                     let _ = tx.send(());
                 });
 
-                // Wait for frontend response or timeout
-                // Use tauri::async_runtime::spawn instead of tokio::spawn to avoid
-                // panics when the Tokio runtime is being dropped during app shutdown
                 tauri::async_runtime::spawn(async move {
                     tokio::select! {
                         _ = rx.recv() => {
-                            // Frontend responded, close window
                             window_for_close.close().ok();
                         }
                         _ = tokio::time::sleep(tokio::time::Duration::from_secs(5)) => {
-                            // Timeout - close anyway
                             eprintln!("Window close timeout, closing anyway");
                             window_for_close.close().ok();
                         }
                     }
-                    // Clean up listener
                     window_for_close.unlisten(listener_id);
+                    closing_for_timeout.store(false, std::sync::atomic::Ordering::SeqCst);
                 });
             }
-        })
+        }})
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {

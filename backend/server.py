@@ -51,7 +51,7 @@ except Exception as e:
     logger.error(f"Failed to import required modules: {e}", exc_info=True)
     sys.exit(1)
 
-def _start_parent_watchdog(parent_pid):
+def _start_parent_watchdog(parent_pid, data_dir=None):
     """Monitor parent process and exit if it dies.
 
     This is the clean shutdown mechanism: instead of the Tauri app trying to
@@ -63,17 +63,44 @@ def _start_parent_watchdog(parent_pid):
     import threading
     import time
 
+    # Set up a file logger so we can debug in production
+    watchdog_logger = logging.getLogger("watchdog")
+    if data_dir:
+        try:
+            log_dir = os.path.join(data_dir, "logs")
+            os.makedirs(log_dir, exist_ok=True)
+            fh = logging.FileHandler(os.path.join(log_dir, "watchdog.log"))
+            fh.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
+            watchdog_logger.addHandler(fh)
+        except Exception:
+            pass
+    watchdog_logger.setLevel(logging.INFO)
+
     def _is_pid_alive(pid):
         """Check if a process with the given PID exists (cross-platform)."""
         try:
             if sys.platform == "win32":
                 import ctypes
                 kernel32 = ctypes.windll.kernel32
-                SYNCHRONIZE = 0x00100000
-                handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
+                PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
                 if handle:
+                    # Check if process has actually exited
+                    STILL_ACTIVE = 259
+                    exit_code = ctypes.c_ulong()
+                    result = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
                     kernel32.CloseHandle(handle)
-                    return True
+                    if result and exit_code.value == STILL_ACTIVE:
+                        return True
+                    watchdog_logger.info(f"PID {pid}: exited with code {exit_code.value}")
+                    return False
+                # OpenProcess failed — check if it's an access error (process exists
+                # but we can't open it) vs process not found
+                error = ctypes.GetLastError()
+                ACCESS_DENIED = 5
+                if error == ACCESS_DENIED:
+                    return True  # process exists, we just can't open it
+                watchdog_logger.info(f"PID {pid}: OpenProcess failed, error={error}")
                 return False
             else:
                 os.kill(pid, 0)
@@ -82,13 +109,19 @@ def _start_parent_watchdog(parent_pid):
             return False
 
     def _watch():
-        logger.info(f"Parent watchdog started, monitoring PID {parent_pid}")
+        watchdog_logger.info(f"Parent watchdog started, monitoring PID {parent_pid}, server PID {os.getpid()}")
+        # Verify parent is alive before starting the loop
+        alive = _is_pid_alive(parent_pid)
+        watchdog_logger.info(f"Parent PID {parent_pid} initial check: alive={alive}")
+        if not alive:
+            watchdog_logger.warning(f"Parent PID {parent_pid} not found on first check — disabling watchdog")
+            return
         while True:
             if not _is_pid_alive(parent_pid):
-                logger.info(f"Parent process {parent_pid} no longer exists, shutting down...")
+                watchdog_logger.info(f"Parent process {parent_pid} gone, shutting down server...")
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
-            time.sleep(1)
+            time.sleep(2)
 
     t = threading.Thread(target=_watch, daemon=True)
     t.start()
@@ -139,9 +172,13 @@ if __name__ == "__main__":
             os.environ["VOICEBOX_BACKEND_VARIANT"] = "cpu"
             logger.info("Backend variant: CPU")
 
-        # Start parent process watchdog if requested
+        # Register parent watchdog to start after server is fully ready
         if args.parent_pid is not None:
-            _start_parent_watchdog(args.parent_pid)
+            _parent_pid = args.parent_pid
+            _data_dir = args.data_dir
+            @app.on_event("startup")
+            async def _on_startup():
+                _start_parent_watchdog(_parent_pid, _data_dir)
 
         logger.info(f"Parsed arguments: host={args.host}, port={args.port}, data_dir={args.data_dir}")
 

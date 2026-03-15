@@ -10,6 +10,7 @@ import PyInstaller.__main__
 import argparse
 import os
 import platform
+import sys
 from pathlib import Path
 
 
@@ -62,6 +63,10 @@ def build_server(cuda=False):
         '--hidden-import', 'backend.utils.hf_progress',
         '--hidden-import', 'backend.utils.validation',
         '--hidden-import', 'backend.cuda_download',
+        '--hidden-import', 'backend.effects',
+        '--hidden-import', 'backend.utils.effects',
+        '--hidden-import', 'backend.versions',
+        '--hidden-import', 'pedalboard',
         '--hidden-import', 'torch',
         '--hidden-import', 'transformers',
         '--hidden-import', 'fastapi',
@@ -91,9 +96,10 @@ def build_server(cuda=False):
             '--hidden-import', 'torch.backends.cudnn',
         ])
     else:
-        # Exclude NVIDIA CUDA packages from CPU-only builds to keep binary under 4GB.
-        # On Linux, pip may pull CUDA-enabled PyTorch by default which includes ~3GB
-        # of NVIDIA shared libraries that PyInstaller would bundle.
+        # Exclude NVIDIA CUDA packages from CPU-only builds to keep binary small.
+        # When building from a venv with CUDA torch installed, PyInstaller would
+        # bundle ~3GB of NVIDIA shared libraries. We exclude both the Python
+        # modules and the binary DLLs.
         nvidia_packages = [
             'nvidia', 'nvidia.cublas', 'nvidia.cuda_cupti', 'nvidia.cuda_nvrtc',
             'nvidia.cuda_runtime', 'nvidia.cudnn', 'nvidia.cufft', 'nvidia.curand',
@@ -127,7 +133,12 @@ def build_server(cuda=False):
     elif not cuda:
         print("Building for non-Apple Silicon platform - PyTorch only")
 
+    dist_dir = str(backend_dir / 'dist')
+    build_dir = str(backend_dir / 'build')
+
     args.extend([
+        '--distpath', dist_dir,
+        '--workpath', build_dir,
         '--noconfirm',
         '--clean',
     ])
@@ -135,10 +146,76 @@ def build_server(cuda=False):
     # Change to backend directory
     os.chdir(backend_dir)
     
+    # For CPU builds on Windows, ensure we're using CPU-only torch.
+    # If CUDA torch is installed (local dev), swap to CPU torch before building,
+    # then restore CUDA torch after. This prevents PyInstaller from bundling
+    # ~3GB of CUDA DLLs into the CPU binary.
+    restore_cuda = False
+    if not cuda and platform.system() == "Windows":
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-c", "import torch; print(torch.version.cuda or '')"],
+            capture_output=True, text=True
+        )
+        has_cuda_torch = bool(result.stdout.strip())
+        if has_cuda_torch:
+            print("CUDA torch detected — installing CPU torch for CPU build...")
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio",
+                 "--index-url", "https://download.pytorch.org/whl/cpu", "--force-reinstall", "-q"],
+                check=True
+            )
+            restore_cuda = True
+
     # Run PyInstaller
     PyInstaller.__main__.run(args)
+
+    # Restore CUDA torch if we swapped it out
+    if restore_cuda:
+        print("Restoring CUDA torch...")
+        import subprocess
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio",
+             "--index-url", "https://download.pytorch.org/whl/cu126", "--force-reinstall", "-q"],
+            check=True
+        )
     
     print(f"Binary built in {backend_dir / 'dist' / binary_name}")
+
+
+def _get_cuda_dll_excludes():
+    """Get list of CUDA DLL filenames to exclude from CPU builds.
+    
+    When building locally with CUDA torch installed, PyInstaller bundles ~3GB of
+    CUDA DLLs from torch/lib/. Returns a list of DLL filenames to exclude.
+    """
+    try:
+        import torch
+        torch_lib = Path(torch.__file__).parent / 'lib'
+    except ImportError:
+        return []
+    
+    cuda_prefixes = (
+        'torch_cuda', 'cublas', 'cublasLt', 'cudnn', 'cusparse', 'cufft',
+        'cusolver', 'cusolverMg', 'curand', 'nvrtc', 'nvJitLink', 'nccl',
+        'nvperf', 'nvrtc-builtins',
+    )
+    
+    exclude_dlls = []
+    if torch_lib.exists():
+        for f in torch_lib.iterdir():
+            if f.suffix == '.dll' and any(f.name.startswith(p) for p in cuda_prefixes):
+                exclude_dlls.append(f.name)
+    
+    if exclude_dlls:
+        total_mb = sum(
+            (torch_lib / dll).stat().st_size 
+            for dll in exclude_dlls 
+            if (torch_lib / dll).exists()
+        ) / 1024 / 1024
+        print(f"CPU build: will exclude {len(exclude_dlls)} CUDA DLLs ({total_mb:.0f} MB)")
+    
+    return exclude_dlls
 
 
 if __name__ == '__main__':
