@@ -18,7 +18,7 @@ const GITHUB_API_BASE = 'https://api.github.com';
 // Cache for release info (in-memory cache, resets on server restart)
 let cachedReleaseInfo: ReleaseInfo | null = null;
 let cacheTimestamp: number = 0;
-const CACHE_DURATION = 1000 * 60 * 10; // 10 minutes
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
 // Cache for star count
 let cachedStarCount: number | null = null;
@@ -36,7 +36,7 @@ export async function getLatestRelease(): Promise<ReleaseInfo> {
 
   try {
     const response = await fetch(`${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases/latest`, {
-      next: { revalidate: 600 }, // Revalidate every 10 minutes
+      cache: 'no-store',
       headers: {
         Accept: 'application/vnd.github.v3+json',
       },
@@ -123,6 +123,7 @@ async function getTotalDownloads(): Promise<number> {
       const response = await fetch(
         `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}`,
         {
+          cache: 'no-store',
           headers: { Accept: 'application/vnd.github.v3+json' },
         },
       );
