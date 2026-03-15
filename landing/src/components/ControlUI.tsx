@@ -17,7 +17,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LandingAudioPlayer } from './LandingAudioPlayer';
+import { LandingAudioPlayer, unlockAudioContext } from './LandingAudioPlayer';
 
 // ─── Data ───────────────────────────────────────────────────────────────────
 // Edit this section to customise all the content shown in the ControlUI demo.
@@ -29,7 +29,7 @@ interface VoiceProfile {
   hasEffects: boolean;
 }
 
-/** Voice profiles shown in the 3×3 grid. Index matters — DemoScript references profiles by index. */
+/** Voice profiles shown in the grid / scroll strip. Index matters — DemoScript references profiles by index. */
 const PROFILES: VoiceProfile[] = [
   {
     name: 'Jarvis',
@@ -301,24 +301,27 @@ function LoadingBars({ mode }: { mode: 'idle' | 'generating' | 'playing' }) {
 
 // ─── Profile Card ───────────────────────────────────────────────────────────
 
-function ProfileCard({
+const ProfileCard = ({
   profile,
   selected,
   selecting,
+  cardRef,
 }: {
   profile: VoiceProfile;
   selected: boolean;
   selecting: boolean;
-}) {
+  cardRef?: React.Ref<HTMLDivElement>;
+}) => {
   return (
     <motion.div
-      className={`rounded-xl border-2 bg-card p-3.5 flex flex-col aspect-square transition-all duration-200 ${
+      ref={cardRef}
+      className={`rounded-xl border-2 bg-card p-3.5 flex flex-col h-[143px] transition-all duration-200 ${
         selected ? 'border-accent shadow-md' : 'border-border/50 hover:shadow-sm'
       } ${selecting && !selected ? 'opacity-60' : ''}`}
       animate={selecting && selected ? { scale: [1, 1.02, 1] } : {}}
       transition={{ duration: 0.3 }}
     >
-      <div className="text-[15px] font-bold leading-tight">{profile.name}</div>
+      <div className="text-[15px] font-bold leading-tight line-clamp-2">{profile.name}</div>
       <div className="text-[10px] text-muted-foreground line-clamp-2 leading-relaxed mt-1">
         {profile.description}
       </div>
@@ -335,7 +338,7 @@ function ProfileCard({
       </div>
     </motion.div>
   );
-}
+};
 
 // ─── History Row ────────────────────────────────────────────────────────────
 
@@ -416,79 +419,79 @@ function FloatingGenerateBox({
   phase,
   typingText,
   selectedProfile,
+  engine,
   effect,
 }: {
   phase: Phase;
   typingText: string;
   selectedProfile: VoiceProfile | null;
+  engine: string;
   effect?: string;
 }) {
   const isFocused = phase === 'typing' || phase === 'generating';
   const isGenerating = phase === 'generating';
 
   return (
-    <div className="absolute left-3 right-3 z-20" style={{ bottom: 117 }}>
-      <motion.div
-        className="bg-background/30 backdrop-blur-2xl border border-accent/20 rounded-[1.5rem] shadow-2xl p-2.5"
-        animate={{
-          borderColor: isGenerating
-            ? 'hsl(43 50% 45% / 0.35)'
-            : isFocused
-              ? 'hsl(43 50% 45% / 0.25)'
-              : 'hsl(43 50% 45% / 0.15)',
-        }}
-        transition={{ duration: 0.3 }}
-      >
-        {/* Text area + generate button */}
-        <div className="flex items-start gap-2">
-          <div className="flex-1 min-w-0">
-            <motion.div
-              className="overflow-hidden"
-              animate={{ height: isFocused ? 100 : 32 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
+    <motion.div
+      className="bg-background/30 backdrop-blur-2xl border border-accent/20 rounded-[1.5rem] shadow-2xl p-2.5"
+      animate={{
+        borderColor: isGenerating
+          ? 'hsl(43 50% 45% / 0.35)'
+          : isFocused
+            ? 'hsl(43 50% 45% / 0.25)'
+            : 'hsl(43 50% 45% / 0.15)',
+      }}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Text area + generate button */}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <motion.div
+            className="overflow-hidden"
+            animate={{ height: isFocused ? 100 : 32 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <div
+              className="text-[12.5px] text-muted-foreground/60 px-2 py-1 leading-relaxed"
+              style={{ minHeight: isFocused ? 100 : 32 }}
             >
-              <div
-                className="text-[12.5px] text-muted-foreground/60 px-2 py-1 leading-relaxed"
-                style={{ minHeight: isFocused ? 100 : 32 }}
-              >
-                {phase === 'typing' ? (
-                  <span className="text-foreground">
-                    <TypewriterText text={typingText} />
-                  </span>
-                ) : phase === 'generating' ? (
-                  <span className="text-muted-foreground/40">{typingText}</span>
-                ) : (
-                  <span>
-                    {selectedProfile
-                      ? `Generate speech using ${selectedProfile.name}...`
-                      : 'Select a voice profile above...'}
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Generate button */}
-          <button className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 shadow-lg">
-            <Sparkles className="h-3.5 w-3.5 text-accent-foreground" />
-          </button>
+              {phase === 'typing' ? (
+                <span className="text-foreground">
+                  <TypewriterText text={typingText} />
+                </span>
+              ) : phase === 'generating' ? (
+                <span className="text-muted-foreground/40">{typingText}</span>
+              ) : (
+                <span>
+                  {selectedProfile
+                    ? `Generate speech using ${selectedProfile.name}...`
+                    : 'Select a voice profile above...'}
+                </span>
+              )}
+            </div>
+          </motion.div>
         </div>
 
-        {/* Bottom selectors */}
-        <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground">
-            English
-          </span>
-          <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground">
-            Qwen3-TTS 1.7B
-          </span>
-          <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground flex items-center gap-1">
-            <Sparkles className="h-2.5 w-2.5" />
-            {effect || 'Effect'}
-          </span>
-        </div>
-      </motion.div>
-    </div>
+        {/* Generate button */}
+        <button className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 shadow-lg">
+          <Sparkles className="h-3.5 w-3.5 text-accent-foreground" />
+        </button>
+      </div>
+
+      {/* Bottom selectors */}
+      <div className="flex items-center gap-1.5 mt-2">
+        <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground">
+          English
+        </span>
+        <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground">
+          {engine}
+        </span>
+        <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground flex items-center gap-1">
+          <Sparkles className="h-2.5 w-2.5" />
+          {effect || 'Effect'}
+        </span>
+      </div>
+    </motion.div>
   );
 }
 
@@ -505,10 +508,19 @@ export function ControlUI() {
   const [pageHidden, setPageHidden] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef(phase);
+  const profileCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   phaseRef.current = phase;
 
   const step = DEMO_SCRIPT[cycle % DEMO_SCRIPT.length];
   const selectedProfile = PROFILES[selectedIndex];
+
+  // Scroll to selected profile card
+  useEffect(() => {
+    const el = profileCardRefs.current.get(selectedIndex);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, [selectedIndex]);
 
   // Visibility detection
   useEffect(() => {
@@ -589,33 +601,83 @@ export function ControlUI() {
 
   return (
     <div ref={containerRef} className="relative z-20 mx-auto w-full max-w-6xl px-6">
-      {/* Unmute button */}
+      {/* Unmute button with handwritten hint */}
       <div className="flex justify-end mb-3">
-        <button
-          onClick={() => setIsMuted(!isMuted)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card/50 backdrop-blur text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {isMuted ? (
-            <>
-              <Volume2 className="h-3.5 w-3.5" />
-              <span>Unmute</span>
-            </>
-          ) : (
-            <>
-              <Volume2 className="h-3.5 w-3.5 text-accent" />
-              <span>Mute</span>
-            </>
+        <div className="relative">
+          {/* Handwritten hint — absolutely positioned above the button */}
+          {isMuted && (
+            <motion.div
+              className="absolute select-none pointer-events-none"
+              style={{ top: -30, right: 100 }}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 2, duration: 0.6, ease: 'easeOut' }}
+            >
+              <span
+                className="text-xl text-accent/80 whitespace-nowrap"
+                style={{
+                  fontFamily: "'Caveat', 'Segoe Script', 'Comic Sans MS', cursive",
+                  letterSpacing: '0.02em',
+                }}
+              >
+                try me!
+              </span>
+              {/* Curved arrow from text down-right toward the button */}
+              <svg
+                width="22"
+                height="11"
+                viewBox="0 0 80 40"
+                fill="none"
+                className="text-accent/70 absolute"
+                style={{ top: 14, left: 60 }}
+                aria-hidden="true"
+              >
+                <title>Arrow</title>
+                <path
+                  d="M4 4 C20 4, 40 8, 55 20 C62 26, 66 32, 70 36"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+                <path
+                  d="M58 42 L70 36 L64 22"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  transform="rotate(35, 70, 36)"
+                  fill="none"
+                />
+              </svg>
+            </motion.div>
           )}
-        </button>
+          <button
+            onClick={() => {
+              unlockAudioContext();
+              setIsMuted(!isMuted);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-card/50 backdrop-blur text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {isMuted ? (
+              <>
+                <Volume2 className="h-3.5 w-3.5" />
+                <span>Unmute</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="h-3.5 w-3.5 text-accent" />
+                <span>Mute</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
-      <div
-        className="overflow-hidden rounded-2xl border border-app-line bg-app-box shadow-[0_25px_60px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.3)]"
-        style={{ height: 640 }}
-      >
-        <div className="flex h-full">
-          {/* ── Sidebar ───────────────────────────────────────────── */}
-          <div className="w-16 shrink-0 border-r border-app-line bg-sidebar flex flex-col items-center py-4 gap-4">
+      <div className="overflow-hidden rounded-2xl border border-app-line bg-app-box shadow-[0_25px_60px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.3)] md:h-[640px]">
+        <div className="flex flex-col md:flex-row h-full">
+          {/* ── Sidebar (hidden on mobile) ─────────────────────────── */}
+          <div className="hidden md:flex w-16 shrink-0 border-r border-app-line bg-sidebar flex-col items-center py-4 gap-4">
             {/* Logo */}
             <div className="mb-1">
               <div
@@ -658,11 +720,11 @@ export function ControlUI() {
           </div>
 
           {/* ── Main content ──────────────────────────────────────── */}
-          <div className="flex-1 flex min-w-0 relative">
-            {/* Left: Profiles */}
-            <div className="flex-1 flex flex-col min-w-0 relative">
+          <div className="flex-1 flex flex-col md:flex-row min-w-0 relative">
+            {/* Left: Profiles + Generate box */}
+            <div className="flex flex-col min-w-0 relative md:flex-1">
               {/* Header */}
-              <div className="px-4 pt-6 pb-2 flex items-center justify-between relative z-10">
+              <div className="px-4 pt-4 md:pt-6 pb-2 flex items-center justify-between relative z-10">
                 <h2 className="text-base font-bold">Voicebox</h2>
                 <div className="flex items-center gap-1.5">
                   <button className="h-6 text-[10px] px-2.5 rounded-full border border-border bg-card text-muted-foreground flex items-center gap-1">
@@ -675,32 +737,58 @@ export function ControlUI() {
                 </div>
               </div>
 
-              {/* Profile grid */}
-              <div className="flex-1 overflow-hidden px-4 pb-24">
-                <div className="grid grid-cols-3 gap-2 auto-rows-auto mt-1">
+              {/* Profile cards — horizontal scroll on mobile, 3-col grid on desktop */}
+              <div className="px-4">
+                {/* Mobile: horizontal scroll strip */}
+                <div className="flex gap-2 overflow-x-auto pb-2 md:hidden">
+                  {PROFILES.map((profile, i) => (
+                    <div
+                      key={profile.name}
+                      className="shrink-0 w-[140px]"
+                      ref={(el) => {
+                        if (el) profileCardRefs.current.set(i, el);
+                      }}
+                    >
+                      <ProfileCard
+                        profile={profile}
+                        selected={i === selectedIndex}
+                        selecting={phase === 'selecting'}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: 3-col grid */}
+                <div className="hidden md:grid grid-cols-3 gap-2 mt-1 pb-24">
                   {PROFILES.map((profile, i) => (
                     <ProfileCard
                       key={profile.name}
                       profile={profile}
                       selected={i === selectedIndex}
                       selecting={phase === 'selecting'}
+                      cardRef={(el: HTMLDivElement | null) => {
+                        if (el) profileCardRefs.current.set(i, el);
+                      }}
                     />
                   ))}
                 </div>
               </div>
 
-              {/* Floating generate box */}
-              <FloatingGenerateBox
-                phase={phase}
-                typingText={step.text}
-                selectedProfile={selectedProfile}
-                effect={step.effect}
-              />
+              {/* Floating generate box — desktop: absolute overlay, mobile: inline */}
+              <div className="px-3 pt-2 pb-3 md:pt-0 md:absolute md:left-3 md:right-3 md:bottom-[117px] md:z-20 md:pb-0">
+                <FloatingGenerateBox
+                  phase={phase}
+                  typingText={step.text}
+                  selectedProfile={selectedProfile}
+                  engine={step.engine}
+                  effect={step.effect}
+                />
+              </div>
             </div>
 
-            {/* Right: History */}
-            <div className="w-[48%] shrink-0 flex flex-col min-w-0">
-              <div className="flex-1 overflow-hidden px-3 pt-6 pb-3">
+            {/* Right/Below: History */}
+            <div className="md:w-[48%] shrink-0 flex flex-col min-w-0 border-t md:border-t-0 border-app-line">
+              <div className="max-h-[360px] md:max-h-none flex-1 overflow-hidden px-3 pt-3 md:pt-6 pb-3">
                 <div className="flex flex-col gap-2">
                   {generations.map((gen) => {
                     const isThisNew = gen.id === newGenId;

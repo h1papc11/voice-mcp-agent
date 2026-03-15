@@ -5,6 +5,14 @@ import { useEffect, useRef, useState } from 'react';
 import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { GenerationPicker } from '@/components/Effects/GenerationPicker';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -28,6 +36,11 @@ export function EffectsDetail() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // "Save as Custom" dialog state
+  const [saveAsDialogOpen, setSaveAsDialogOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState('');
+  const [saveAsDescription, setSaveAsDescription] = useState('');
 
   // Preview state
   const [previewGenId, setPreviewGenId] = useState<string | null>(null);
@@ -165,8 +178,38 @@ export function EffectsDetail() {
     }
   }
 
-  async function handleSaveAsNew() {
-    await handleSaveNew();
+  function handleSaveAsNew() {
+    // Open the dialog with a suggested name based on the current preset
+    setSaveAsName(`${name} (Copy)`);
+    setSaveAsDescription(description);
+    setSaveAsDialogOpen(true);
+  }
+
+  async function handleSaveAsConfirm() {
+    if (!saveAsName.trim()) {
+      toast({ title: 'Name required', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const created = await apiClient.createEffectPreset({
+        name: saveAsName.trim(),
+        description: saveAsDescription.trim() || undefined,
+        effects_chain: workingChain,
+      });
+      queryClient.invalidateQueries({ queryKey: ['effect-presets'] });
+      setSaveAsDialogOpen(false);
+      setSelectedPresetId(created.id);
+      toast({ title: 'Preset saved', description: `"${created.name}" has been created.` });
+    } catch (error) {
+      toast({
+        title: 'Failed to save',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDelete() {
@@ -327,6 +370,53 @@ export function EffectsDetail() {
           </p>
         </div>
       </div>
+
+      {/* Save as Custom dialog */}
+      <Dialog open={saveAsDialogOpen} onOpenChange={setSaveAsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save as Custom Preset</DialogTitle>
+            <DialogDescription>
+              Create a new custom preset based on the current effects chain.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Name</Label>
+              <Input
+                value={saveAsName}
+                onChange={(e) => setSaveAsName(e.target.value)}
+                placeholder="My preset..."
+                className="h-9"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && saveAsName.trim()) {
+                    handleSaveAsConfirm();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Description</Label>
+              <Textarea
+                value={saveAsDescription}
+                onChange={(e) => setSaveAsDescription(e.target.value)}
+                placeholder="Describe what this preset does..."
+                className="min-h-[60px] resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsDialogOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveAsConfirm} disabled={saving || !saveAsName.trim()}>
+              <Save className="h-3.5 w-3.5 mr-1.5" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

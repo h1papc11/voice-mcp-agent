@@ -1,6 +1,6 @@
 'use client';
 
-import { Github } from 'lucide-react';
+import { Github, Globe, Languages, MessageSquare, Zap } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { ControlUI } from '@/components/ControlUI';
@@ -8,6 +8,7 @@ import { Features } from '@/components/Features';
 import { Footer } from '@/components/Footer';
 import { Navbar } from '@/components/Navbar';
 import { AppleIcon, LinuxIcon, WindowsIcon } from '@/components/PlatformIcons';
+import { VoiceCreator } from '@/components/VoiceCreator';
 import { DOWNLOAD_LINKS, GITHUB_REPO } from '@/lib/constants';
 import type { DownloadLinks } from '@/lib/releases';
 
@@ -44,18 +45,18 @@ export default function Home() {
           {/* Logo */}
           <div
             className="fade-in mx-auto mb-8 h-[120px] w-[120px] md:h-[160px] md:w-[160px]"
-            style={{ animationDelay: '0ms' }}
+            style={{
+              animationDelay: '0ms',
+              filter:
+                'drop-shadow(0 0 20px hsl(43 60% 50% / 0.4)) drop-shadow(0 0 60px hsl(43 60% 50% / 0.2))',
+            }}
           >
             <Image
               src="/voicebox-logo-app.webp"
               alt="Voicebox"
               width={160}
               height={160}
-              className="h-full w-full object-contain"
-              style={{
-                filter:
-                  'drop-shadow(0 0 20px hsl(43 60% 50% / 0.4)) drop-shadow(0 0 60px hsl(43 60% 50% / 0.2))',
-              }}
+              className="h-full w-full object-contain mix-blend-lighten"
               priority
             />
           </div>
@@ -72,8 +73,8 @@ export default function Home() {
             className="fade-in mx-auto mt-6 max-w-2xl text-lg text-muted-foreground md:text-xl"
             style={{ animationDelay: '200ms' }}
           >
-            Open source voice cloning studio powered by Qwen3-TTS. Clone any voice, generate natural
-            speech, and compose multi-voice projects — all running locally.
+            Open source voice cloning studio with support for multiple TTS engines. Clone any voice,
+            generate natural speech, and compose multi-voice projects — all running locally.
           </p>
 
           {/* CTAs */}
@@ -116,26 +117,124 @@ export default function Home() {
       {/* ── Features ─────────────────────────────────────────────── */}
       <Features />
 
-      {/* ── About / Manifesto ────────────────────────────────────── */}
+      {/* ── Voice Creator ────────────────────────────────────────── */}
+      <VoiceCreator />
+
+      {/* ── Models ─────────────────────────────────────────────────── */}
       <section id="about" className="border-t border-border py-24">
-        <div className="mx-auto max-w-3xl px-6">
-          <h2 className="mb-10 text-center text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-            Why Voicebox exists
-          </h2>
-          <div className="space-y-6 text-center">
-            <p className="text-base leading-relaxed text-muted-foreground">
-              Cloud voice cloning services lock your voice data behind subscriptions, rate limits,
-              and terms of service that can change at any time. Your voice — and the voices you
-              clone — should belong to you.
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl mb-4">
+              Multi-Engine Architecture
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Choose the right model for every job. All models run locally on your hardware —
+              download once, use forever.
             </p>
-            <p className="text-lg font-medium text-foreground">
-              Voicebox is a local-first voice cloning studio. Download a model, clone any voice from
-              a few seconds of audio, and generate speech entirely on your machine.
-            </p>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Optimized with Metal acceleration on Mac and CUDA on Windows/Linux. No Python install
-              required. No cloud. No subscriptions. Free and open-source, forever.
-            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Qwen3-TTS */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Qwen3-TTS</h3>
+                  <span className="text-xs text-muted-foreground/60">by Alibaba</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    1.7B
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    0.6B
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                High-quality multilingual voice cloning with natural prosody. The only engine with
+                delivery instructions — control tone, pace, and emotion with natural language.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Globe className="h-3 w-3" />
+                  10 languages
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <MessageSquare className="h-3 w-3" />
+                  Delivery instructions
+                </span>
+              </div>
+            </div>
+
+            {/* Chatterbox */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Chatterbox</h3>
+                  <span className="text-xs text-muted-foreground/60">by Resemble AI</span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Production-grade voice cloning with the broadest language support. 23 languages with
+                zero-shot cloning and emotion exaggeration control.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Languages className="h-3 w-3" />
+                  23 languages
+                </span>
+              </div>
+            </div>
+
+            {/* Chatterbox Turbo */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Chatterbox Turbo</h3>
+                  <span className="text-xs text-muted-foreground/60">by Resemble AI</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                  350M
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Lightweight and fast. Supports paralinguistic tags — embed [laugh], [sigh], [gasp]
+                and more directly in your text for expressive, natural speech.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Zap className="h-3 w-3" />
+                  350M params
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <MessageSquare className="h-3 w-3" />
+                  [laugh] [sigh] tags
+                </span>
+              </div>
+            </div>
+
+            {/* LuxTTS */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">LuxTTS</h3>
+                  <span className="text-xs text-muted-foreground/60">by ZipVoice</span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Ultra-fast, CPU-friendly voice cloning at 48kHz. Exceeds 150x realtime on CPU with
+                ~1GB VRAM. The fastest engine for quick iterations.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Zap className="h-3 w-3" />
+                  150x realtime
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  48kHz output
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -193,16 +292,17 @@ export default function Home() {
             </a>
 
             {/* Linux */}
-            <div
-              className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 opacity-50 cursor-not-allowed"
-              title="Linux builds coming soon"
+            <a
+              href={downloadLinks.linux}
+              download
+              className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 transition-all hover:border-accent/30 hover:bg-card group"
             >
-              <LinuxIcon className="h-6 w-6 shrink-0 text-muted-foreground" />
+              <LinuxIcon className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
               <div className="ml-4">
                 <div className="text-sm font-medium">Linux</div>
-                <div className="text-xs text-muted-foreground">Coming soon</div>
+                <div className="text-xs text-muted-foreground">AppImage (x64)</div>
               </div>
-            </div>
+            </a>
           </div>
 
           {/* GitHub link */}

@@ -45,11 +45,14 @@ export function Sidebar({ isMacOS }: SidebarProps) {
 
       {/* Navigation Buttons */}
       <div className="flex flex-col gap-3">
-        {tabs.map((tab) => {
+        {tabs.map((tab, index) => {
           const Icon = tab.icon;
           // For index route, use exact match; for others, use default matching
           const isActive =
             tab.path === '/' ? matchRoute({ to: '/', exact: true }) : matchRoute({ to: tab.path });
+
+          // Accent fades as buttons get further from the logo
+          const accentOpacity = Math.max(0.08, 0.5 - index * 0.07);
 
           return (
             <Link
@@ -70,7 +73,7 @@ export function Sidebar({ isMacOS }: SidebarProps) {
                   style={{
                     maskImage: 'linear-gradient(to bottom, black, transparent 60%)',
                     WebkitMaskImage: 'linear-gradient(to bottom, black, transparent 60%)',
-                    border: '1px solid hsl(var(--accent) / 0.5)',
+                    border: `1px solid hsl(var(--accent) / ${accentOpacity})`,
                   }}
                 />
               )}

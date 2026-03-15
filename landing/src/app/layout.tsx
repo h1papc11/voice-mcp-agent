@@ -4,11 +4,11 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Voicebox - Open Source Voice Cloning Desktop App',
   description:
-    'Near-perfect voice cloning powered by Qwen3-TTS. Desktop app for Mac, Windows, and Linux. Multi-sample support, smart caching, local or remote inference.',
+    'Near-perfect voice cloning with multiple TTS engines. Desktop app for Mac, Windows, and Linux. Multi-sample support, smart caching, local or remote inference.',
   keywords: [
     'voice cloning',
     'TTS',
-    'Qwen3',
+    'multi-engine',
     'desktop app',
     'AI voice',
     'open source',
@@ -32,6 +32,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning className="dark">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <div className="relative min-h-screen bg-background font-sans">{children}</div>
       </body>

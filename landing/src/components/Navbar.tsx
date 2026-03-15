@@ -2,9 +2,34 @@
 
 import { Github } from 'lucide-react';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { GITHUB_REPO } from '@/lib/constants';
 
+function formatStarCount(count: number): string {
+  if (count >= 1000) {
+    const k = count / 1000;
+    return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
+  }
+  return count.toString();
+}
+
 export function Navbar() {
+  const [starCount, setStarCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/stars')
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch stars');
+        return res.json();
+      })
+      .then((data) => {
+        if (typeof data.count === 'number') setStarCount(data.count);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch star count:', error);
+      });
+  }, []);
+
   return (
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
@@ -50,8 +75,12 @@ export function Navbar() {
           className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-border"
         >
           <Github className="h-4 w-4" />
-          <span className="hidden sm:inline">Star on GitHub</span>
-          <span className="sm:hidden">GitHub</span>
+          <span className="text-[13px] font-medium">Star</span>
+          {starCount !== null && (
+            <span className="border-l border-border/60 pl-2 text-[13px] font-semibold text-foreground">
+              {formatStarCount(starCount)}
+            </span>
+          )}
         </a>
       </div>
     </nav>
