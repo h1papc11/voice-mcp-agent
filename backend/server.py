@@ -119,7 +119,13 @@ def _start_parent_watchdog(parent_pid, data_dir=None):
         while True:
             if not _is_pid_alive(parent_pid):
                 watchdog_logger.info(f"Parent process {parent_pid} gone, shutting down server...")
-                os.kill(os.getpid(), signal.SIGTERM)
+                if sys.platform == "win32":
+                    # sys.exit triggers SystemExit, allowing uvicorn to run
+                    # shutdown handlers. os.kill(SIGTERM) on Windows calls
+                    # TerminateProcess which hard-kills without cleanup.
+                    os._exit(0)
+                else:
+                    os.kill(os.getpid(), signal.SIGTERM)
                 return
             time.sleep(2)
 

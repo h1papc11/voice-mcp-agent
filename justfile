@@ -114,7 +114,7 @@ dev: _ensure-venv _ensure-sidecar
         Start-Sleep -Seconds 2; \
     }; \
     Write-Host "Starting Tauri desktop app..."; \
-    try { Set-Location "{{ tauri_dir }}"; bun run tauri dev } finally { if ($backendJob) { Stop-Process -Id $backendJob.Id -Force -ErrorAction SilentlyContinue } }
+    try { Set-Location "{{ tauri_dir }}"; bun run tauri dev } finally { if ($backendJob) { taskkill /PID $backendJob.Id /T /F 2>$null | Out-Null } }
 
 # Start backend only
 [unix]
@@ -163,7 +163,7 @@ dev-web: _ensure-venv
         Start-Sleep -Seconds 2; \
     }; \
     Write-Host "Starting web app..."; \
-    try { Set-Location "{{ web_dir }}"; bun run dev } finally { if ($backendJob) { Stop-Process -Id $backendJob.Id -Force -ErrorAction SilentlyContinue } }
+    try { Set-Location "{{ web_dir }}"; bun run dev } finally { if ($backendJob) { taskkill /PID $backendJob.Id /T /F 2>$null | Out-Null } }
 
 # Kill all dev processes
 [unix]
@@ -201,8 +201,10 @@ build-server: _ensure-venv
 # Build CUDA server binary and place in app data dir for local testing
 [windows]
 build-server-cuda: _ensure-venv
+    $ErrorActionPreference = "Stop"; \
     $env:PATH = "{{ venv_bin }};$env:PATH"; \
     & "{{ python }}" backend/build_binary.py --cuda; \
+    if ($LASTEXITCODE -ne 0) { throw "build_binary.py --cuda failed with exit code $LASTEXITCODE" }; \
     $dest = "$env:APPDATA/com.voicebox.app/backends"; \
     New-Item -ItemType Directory -Path $dest -Force | Out-Null; \
     Copy-Item "backend/dist/voicebox-server-cuda.exe" "$dest/voicebox-server-cuda.exe" -Force; \
@@ -253,11 +255,11 @@ fix:
 # Initialize SQLite database
 [unix]
 db-init: _ensure-venv
-    cd {{ backend_dir }} && {{ python }} -c "from database import init_db; init_db()"
+    {{ python }} -c "from backend.database import init_db; init_db()"
 
 [windows]
 db-init: _ensure-venv
-    Set-Location "{{ backend_dir }}"; & "{{ python }}" -c "from database import init_db; init_db()"
+    & "{{ python }}" -c "from backend.database import init_db; init_db()"
 
 # Reset database (delete + reinit)
 [unix]

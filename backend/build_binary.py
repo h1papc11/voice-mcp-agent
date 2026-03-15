@@ -168,17 +168,18 @@ def build_server(cuda=False):
             restore_cuda = True
 
     # Run PyInstaller
-    PyInstaller.__main__.run(args)
-
-    # Restore CUDA torch if we swapped it out
-    if restore_cuda:
-        print("Restoring CUDA torch...")
-        import subprocess
-        subprocess.run(
-            [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio",
-             "--index-url", "https://download.pytorch.org/whl/cu126", "--force-reinstall", "-q"],
-            check=True
-        )
+    try:
+        PyInstaller.__main__.run(args)
+    finally:
+        # Restore CUDA torch if we swapped it out (even on build failure)
+        if restore_cuda:
+            print("Restoring CUDA torch...")
+            import subprocess
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "torch", "torchvision", "torchaudio",
+                 "--index-url", "https://download.pytorch.org/whl/cu126", "--force-reinstall", "-q"],
+                check=True
+            )
     
     print(f"Binary built in {backend_dir / 'dist' / binary_name}")
 
