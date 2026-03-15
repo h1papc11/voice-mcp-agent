@@ -10,10 +10,32 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-// Unlock Web Audio on iOS Safari — must be called from a user gesture (click/tap)
-let audioContextUnlocked = false;
+// Shared ref so the unmute button can unlock WaveSurfer's audio on iOS Safari
+// Must call .play() on WaveSurfer's actual media element during a user gesture
+let sharedWaveSurfer: WaveSurfer | null = null;
+let audioUnlocked = false;
+
 export function unlockAudioContext() {
-  if (audioContextUnlocked) return;
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  // Unlock WaveSurfer's internal audio element
+  if (sharedWaveSurfer) {
+    const media = sharedWaveSurfer.getMediaElement();
+    if (media) {
+      media.muted = true;
+      media
+        .play()
+        .then(() => {
+          media.pause();
+          media.muted = false;
+          media.currentTime = 0;
+        })
+        .catch(() => {});
+    }
+  }
+
+  // Also unlock a standalone AudioContext as fallback
   try {
     const ctx = new (
       window.AudioContext ||
@@ -24,9 +46,8 @@ export function unlockAudioContext() {
     source.buffer = buffer;
     source.connect(ctx.destination);
     source.start(0);
-    audioContextUnlocked = true;
   } catch {
-    // Silently fail — non-Safari browsers don't need this
+    // Silently fail
   }
 }
 
@@ -137,6 +158,7 @@ export function LandingAudioPlayer({
 
       ws.load(audioUrl);
       wavesurferRef.current = ws;
+      sharedWaveSurfer = ws;
     };
 
     setIsReady(false);
@@ -213,9 +235,13 @@ export function LandingAudioPlayer({
           <button
             onClick={handlePlayPause}
             disabled={!isReady}
-            className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-muted shrink-0 disabled:opacity-50 md:order-1"
+            className="h-10 w-10 rounded-full bg-accent flex items-center justify-center shrink-0 disabled:opacity-50 md:order-1 shadow-lg"
           >
-            {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 ml-0.5" />}
+            {isPlaying ? (
+              <Pause className="h-5 w-5 text-accent-foreground fill-accent-foreground" />
+            ) : (
+              <Play className="h-5 w-5 ml-0.5 text-accent-foreground fill-accent-foreground" />
+            )}
           </button>
 
           {/* Time */}
@@ -243,7 +269,7 @@ export function LandingAudioPlayer({
           </button>
 
           {/* Volume */}
-          <div className="flex items-center gap-2 shrink-0 w-[120px] md:order-6">
+          <div className="flex items-center gap-2 shrink-0 w-[140px] md:order-6 mr-3">
             <button
               onClick={() => setVolume(volume > 0 ? 0 : 0.75)}
               className="h-8 w-8 flex items-center justify-center hover:bg-muted rounded-sm"

@@ -85,6 +85,24 @@ const PROFILES: VoiceProfile[] = [
     language: 'en',
     hasEffects: false,
   },
+  {
+    name: 'David Attenborough',
+    description: 'Warm, reverent narration with wonder and precision',
+    language: 'en',
+    hasEffects: false,
+  },
+  {
+    name: 'Zendaya',
+    description: 'Relaxed, modern delivery with effortless cool',
+    language: 'en',
+    hasEffects: false,
+  },
+  {
+    name: 'Barack Obama',
+    description: 'Measured cadence with rhythmic pauses and gravitas',
+    language: 'en',
+    hasEffects: false,
+  },
 ];
 
 /** Each entry is one cycle of the demo animation: select a profile → type text → generate → play audio. */
@@ -474,7 +492,7 @@ function FloatingGenerateBox({
 
         {/* Generate button */}
         <button className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 shadow-lg">
-          <Sparkles className="h-3.5 w-3.5 text-accent-foreground" />
+          <Sparkles className="h-3.5 w-3.5 text-white fill-white" />
         </button>
       </div>
 
@@ -486,8 +504,14 @@ function FloatingGenerateBox({
         <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground">
           {engine}
         </span>
-        <span className="text-[10px] px-2 py-1 rounded-full border border-border bg-card text-muted-foreground flex items-center gap-1">
-          <Sparkles className="h-2.5 w-2.5" />
+        <span
+          className={`text-[10px] px-2 py-1 rounded-full border flex items-center gap-1 ${
+            effect
+              ? 'border-accent/30 bg-accent/10 text-accent'
+              : 'border-border bg-card text-muted-foreground'
+          }`}
+        >
+          <Sparkles className={`h-2.5 w-2.5 ${effect ? 'fill-accent' : ''}`} />
           {effect || 'Effect'}
         </span>
       </div>
@@ -508,18 +532,46 @@ export function ControlUI() {
   const [pageHidden, setPageHidden] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const phaseRef = useRef(phase);
-  const profileCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const mobileCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const desktopCardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const profileGridRef = useRef<HTMLDivElement>(null);
+  const [scrollLeft, setScrollLeft] = useState(0);
   phaseRef.current = phase;
 
   const step = DEMO_SCRIPT[cycle % DEMO_SCRIPT.length];
   const selectedProfile = PROFILES[selectedIndex];
 
-  // Scroll to selected profile card
+  // Scroll to selected profile card — accounts for generate box overlay on desktop
   useEffect(() => {
-    const el = profileCardRefs.current.get(selectedIndex);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    const isMobile = window.innerWidth < 768;
+
+    if (isMobile) {
+      const el = mobileCardRefs.current.get(selectedIndex);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      return;
     }
+
+    // Desktop
+    const el = desktopCardRefs.current.get(selectedIndex);
+    const scrollContainer = profileGridRef.current;
+    if (!el || !scrollContainer) return;
+
+    const containerTop = scrollContainer.getBoundingClientRect().top;
+    const elTop = el.getBoundingClientRect().top;
+    const elRelTop = elTop - containerTop + scrollContainer.scrollTop;
+
+    const rowHeight = 145;
+    const generateBoxHeight = 200;
+    const visibleTop = scrollContainer.scrollTop;
+    const visibleBottom = visibleTop + scrollContainer.clientHeight - generateBoxHeight;
+    const elRelBottom = elRelTop + el.offsetHeight;
+
+    if (elRelTop >= visibleTop && elRelBottom <= visibleBottom) {
+      return;
+    }
+
+    const target = elRelTop - rowHeight;
+    scrollContainer.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
   }, [selectedIndex]);
 
   // Visibility detection
@@ -674,7 +726,7 @@ export function ControlUI() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-app-line bg-app-box shadow-[0_25px_60px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.3)] md:h-[640px]">
+      <div className="overflow-hidden rounded-2xl border border-app-line bg-app-box shadow-[0_25px_60px_rgba(0,0,0,0.5),0_8px_20px_rgba(0,0,0,0.3)] md:h-[640px] pointer-events-none select-none">
         <div className="flex flex-col md:flex-row h-full">
           {/* ── Sidebar (hidden on mobile) ─────────────────────────── */}
           <div className="hidden md:flex w-16 shrink-0 border-r border-app-line bg-sidebar flex-col items-center py-4 gap-4">
@@ -722,60 +774,76 @@ export function ControlUI() {
           {/* ── Main content ──────────────────────────────────────── */}
           <div className="flex-1 flex flex-col md:flex-row min-w-0 relative">
             {/* Left: Profiles + Generate box */}
-            <div className="flex flex-col min-w-0 relative md:flex-1">
-              {/* Header */}
-              <div className="px-4 pt-4 md:pt-6 pb-2 flex items-center justify-between relative z-10">
+            <div className="flex flex-col min-w-0 relative md:flex-1 md:overflow-hidden">
+              {/* Gradient fade overlay — sits between header and scroll content */}
+              <div className="hidden md:block absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-app-box to-transparent z-[1] pointer-events-none" />
+
+              {/* Header — floats above everything */}
+              <div className="absolute top-0 left-0 right-0 z-10 px-4 pt-4 md:pt-6 pb-2 flex items-center justify-between">
                 <h2 className="text-base font-bold">Voicebox</h2>
                 <div className="flex items-center gap-1.5">
                   <button className="h-6 text-[10px] px-2.5 rounded-full border border-border bg-card text-muted-foreground flex items-center gap-1">
                     Import Voice
                   </button>
-                  <button className="h-6 text-[10px] px-2.5 rounded-full bg-accent text-accent-foreground flex items-center gap-1">
-                    <Sparkles className="h-2.5 w-2.5" />
+                  <button className="h-6 text-[10px] px-2.5 rounded-full bg-accent text-accent-foreground flex items-center">
                     Create Voice
                   </button>
                 </div>
               </div>
 
-              {/* Profile cards — horizontal scroll on mobile, 3-col grid on desktop */}
-              <div className="px-4">
-                {/* Mobile: horizontal scroll strip */}
-                <div className="flex gap-2 overflow-x-auto pb-2 md:hidden">
-                  {PROFILES.map((profile, i) => (
+              {/* Scrollable profile cards — scrolls behind header + gradient */}
+              <div
+                ref={profileGridRef}
+                className="flex-1 min-h-0 md:overflow-y-auto md:pt-14 pt-12"
+              >
+                <div className="px-4">
+                  {/* Mobile: horizontal scroll strip with edge fade */}
+                  <div className="relative md:hidden">
+                    {scrollLeft > 0 && (
+                      <div className="absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-app-box to-transparent z-10" />
+                    )}
+                    <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-app-box to-transparent z-10" />
                     <div
-                      key={profile.name}
-                      className="shrink-0 w-[140px]"
-                      ref={(el) => {
-                        if (el) profileCardRefs.current.set(i, el);
-                      }}
+                      className="flex gap-2 overflow-x-auto pb-2"
+                      onScroll={(e) => setScrollLeft(e.currentTarget.scrollLeft)}
                     >
+                      {PROFILES.map((profile, i) => (
+                        <div
+                          key={profile.name}
+                          className="shrink-0 w-[140px]"
+                          ref={(el) => {
+                            if (el) mobileCardRefs.current.set(i, el);
+                          }}
+                        >
+                          <ProfileCard
+                            profile={profile}
+                            selected={i === selectedIndex}
+                            selecting={phase === 'selecting'}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Desktop: 3-col grid */}
+                  <div className="hidden md:grid grid-cols-3 gap-2 mt-1 pb-44">
+                    {PROFILES.map((profile, i) => (
                       <ProfileCard
+                        key={profile.name}
                         profile={profile}
                         selected={i === selectedIndex}
                         selecting={phase === 'selecting'}
+                        cardRef={(el: HTMLDivElement | null) => {
+                          if (el) desktopCardRefs.current.set(i, el);
+                        }}
                       />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Desktop: 3-col grid */}
-                <div className="hidden md:grid grid-cols-3 gap-2 mt-1 pb-24">
-                  {PROFILES.map((profile, i) => (
-                    <ProfileCard
-                      key={profile.name}
-                      profile={profile}
-                      selected={i === selectedIndex}
-                      selecting={phase === 'selecting'}
-                      cardRef={(el: HTMLDivElement | null) => {
-                        if (el) profileCardRefs.current.set(i, el);
-                      }}
-                    />
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Floating generate box — desktop: absolute overlay, mobile: inline */}
-              <div className="px-3 pt-2 pb-3 md:pt-0 md:absolute md:left-3 md:right-3 md:bottom-[117px] md:z-20 md:pb-0">
+              <div className="px-3 pt-2 pb-3 md:pt-0 md:absolute md:left-4 md:right-4 md:bottom-[117px] md:z-20 md:pb-0 md:px-0">
                 <FloatingGenerateBox
                   phase={phase}
                   typingText={step.text}

@@ -429,7 +429,7 @@ export function VoiceCreator() {
           </div>
 
           {/* Right: Animated UI mock */}
-          <div className="rounded-xl border border-app-line bg-app-darkBox overflow-hidden">
+          <div className="rounded-xl border border-app-line bg-app-darkBox overflow-hidden pointer-events-none select-none">
             <div className="p-5">
               {/* Tab bar */}
               <div className="flex rounded-lg border border-border bg-card/50 p-1 mb-4">

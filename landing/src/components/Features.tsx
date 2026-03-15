@@ -814,7 +814,9 @@ function FeatureCard({ feature }: { feature: (typeof FEATURES)[number] }) {
   return (
     <div className="rounded-lg border border-app-line bg-app-darkBox overflow-hidden">
       <LazyLoad>
-        <Animation />
+        <div className="pointer-events-none select-none">
+          <Animation />
+        </div>
       </LazyLoad>
       <div className="p-5">
         <div className="flex items-center gap-2 mb-2">
