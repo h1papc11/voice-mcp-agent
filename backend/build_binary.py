@@ -108,6 +108,9 @@ def build_server(cuda=False):
         # Fix for pkg_resources and jaraco namespace packages
         '--hidden-import', 'pkg_resources.extern',
         '--collect-submodules', 'jaraco',
+        # inflect uses typeguard @typechecked which calls inspect.getsource()
+        # at import time — needs .py source files, not just .pyc bytecode
+        '--collect-all', 'inflect',
     ])
 
     # Add CUDA-specific hidden imports
