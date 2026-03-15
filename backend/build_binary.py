@@ -34,6 +34,7 @@ def build_server(cuda=False):
     args = [
         'server.py',  # Use server.py as entry point instead of main.py
         '--onefile',
+        '--noconsole',  # No visible console window on Windows
         '--name', binary_name,
     ]
 
