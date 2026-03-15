@@ -34,9 +34,13 @@ def build_server(cuda=False):
     args = [
         'server.py',  # Use server.py as entry point instead of main.py
         '--onefile',
-        '--noconsole',  # No visible console window on Windows
         '--name', binary_name,
     ]
+
+    # Hide console window on Windows only. On macOS/Linux the sidecar needs
+    # stdout/stderr for Tauri to capture logs.
+    if platform.system() == "Windows":
+        args.append('--noconsole')
 
     # Add local qwen_tts path if specified (for editable installs)
     qwen_tts_path = os.getenv('QWEN_TTS_PATH')
