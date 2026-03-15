@@ -228,7 +228,8 @@ class ChatterboxTurboTTSBackend:
                 task_manager.error_download(model_name, str(e))
             raise
         except Exception as e:
-            logger.error(f"Failed to load Chatterbox Turbo: {e}")
+            import traceback
+            logger.error(f"Failed to load Chatterbox Turbo: {e}\n{traceback.format_exc()}")
             if not is_cached:
                 progress_manager.mark_error(model_name, str(e))
                 task_manager.error_download(model_name, str(e))

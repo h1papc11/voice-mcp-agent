@@ -149,7 +149,8 @@ class LuxTTSBackend:
             logger.info("LuxTTS loaded successfully")
 
         except Exception as e:
-            logger.error(f"Failed to load LuxTTS: {e}")
+            import traceback
+            logger.error(f"Failed to load LuxTTS: {e}\n{traceback.format_exc()}")
             if not is_cached:
                 progress_manager.mark_error(model_name, str(e))
                 task_manager.error_download(model_name, str(e))

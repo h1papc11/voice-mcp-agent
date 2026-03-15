@@ -9,10 +9,21 @@ import sys
 import os
 
 # On Windows with --noconsole (PyInstaller), sys.stdout/stderr are None.
+# They can also be broken file objects in some edge cases.
 # Redirect to devnull to prevent crashes from print()/tqdm/logging.
-if sys.stdout is None:
+def _is_writable(stream):
+    """Check if a stream is usable for writing."""
+    if stream is None:
+        return False
+    try:
+        stream.write("")
+        return True
+    except Exception:
+        return False
+
+if not _is_writable(sys.stdout):
     sys.stdout = open(os.devnull, 'w')
-if sys.stderr is None:
+if not _is_writable(sys.stderr):
     sys.stderr = open(os.devnull, 'w')
 
 # Fast path: handle --version before any heavy imports so the Rust

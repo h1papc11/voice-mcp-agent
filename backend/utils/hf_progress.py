@@ -64,11 +64,17 @@ class HFProgressTracker:
                     if key in tqdm_kwargs:
                         filtered_kwargs[key] = value
                 
+                # Force-enable the progress bar — we're tracking progress ourselves,
+                # we don't need tqdm to render to a terminal, but we DO need
+                # self.n to be updated when update() is called.
+                filtered_kwargs['disable'] = False
+
                 # Try to initialize with filtered kwargs, fall back to all kwargs if that fails
                 try:
                     super().__init__(*args, **filtered_kwargs)
                 except TypeError:
                     # If filtering failed, try with all kwargs (maybe tqdm version accepts them)
+                    kwargs['disable'] = False
                     super().__init__(*args, **kwargs)
                 
                 self._tracker_filename = filename or "unknown"
