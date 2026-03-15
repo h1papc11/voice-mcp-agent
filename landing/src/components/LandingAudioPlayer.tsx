@@ -20,7 +20,9 @@ export function unlockAudioContext() {
   audioUnlocked = true;
 
   // Unlock WaveSurfer's internal audio element
-  if (sharedWaveSurfer) {
+  // Skip if already playing — the context is already unlocked and the
+  // play/pause/reset dance would destroy the active playback.
+  if (sharedWaveSurfer && !sharedWaveSurfer.isPlaying()) {
     const media = sharedWaveSurfer.getMediaElement();
     if (media) {
       media.muted = true;
