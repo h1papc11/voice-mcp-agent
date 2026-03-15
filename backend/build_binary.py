@@ -76,6 +76,7 @@ def build_server(cuda=False):
         '--hidden-import', 'backend.backends.luxtts_backend',
         '--hidden-import', 'zipvoice',
         '--hidden-import', 'zipvoice.luxvoice',
+        '--collect-all', 'zipvoice',
         '--hidden-import', 'torch',
         '--hidden-import', 'transformers',
         '--hidden-import', 'fastapi',
