@@ -294,14 +294,13 @@ export default function Home() {
 
             {/* Linux */}
             <a
-              href={downloadLinks.linux}
-              download
+              href="/linux-install"
               className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 transition-all hover:border-accent/30 hover:bg-card group"
             >
               <LinuxIcon className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
               <div className="ml-4">
                 <div className="text-sm font-medium">Linux</div>
-                <div className="text-xs text-muted-foreground">AppImage (x64)</div>
+                <div className="text-xs text-muted-foreground">Build from source</div>
               </div>
             </a>
           </div>
