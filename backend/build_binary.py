@@ -111,6 +111,12 @@ def build_server(cuda=False):
         # inflect uses typeguard @typechecked which calls inspect.getsource()
         # at import time — needs .py source files, not just .pyc bytecode
         '--collect-all', 'inflect',
+        # perth ships pretrained watermark model files (hparams.yaml, .pth.tar)
+        # in perth/perth_net/pretrained/ — needed by chatterbox at runtime
+        '--collect-all', 'perth',
+        # piper_phonemize ships espeak-ng-data/ (phoneme tables, language dicts)
+        # needed by LuxTTS for text-to-phoneme conversion
+        '--collect-all', 'piper_phonemize',
     ])
 
     # Add CUDA-specific hidden imports

@@ -26,6 +26,20 @@ if not _is_writable(sys.stdout):
 if not _is_writable(sys.stderr):
     sys.stderr = open(os.devnull, 'w')
 
+# PyInstaller + multiprocessing: child processes re-execute the frozen binary
+# with internal arguments. freeze_support() handles this and exits early.
+import multiprocessing
+multiprocessing.freeze_support()
+
+# In frozen builds, piper_phonemize's espeak-ng C library falls back to
+# /usr/share/espeak-ng-data/ which doesn't exist.  Point it at the bundled
+# data directory instead.
+if getattr(sys, 'frozen', False):
+    _meipass = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    _espeak_data = os.path.join(_meipass, 'piper_phonemize', 'espeak-ng-data')
+    if os.path.isdir(_espeak_data):
+        os.environ.setdefault('ESPEAK_DATA_PATH', _espeak_data)
+
 # Fast path: handle --version before any heavy imports so the Rust
 # version check doesn't block for 30+ seconds loading torch etc.
 if "--version" in sys.argv:
