@@ -132,6 +132,9 @@ async def migrate_models(request: models.ModelMigrateRequest):
     if source.resolve() == destination.resolve():
         raise HTTPException(status_code=400, detail="Source and destination are the same directory")
 
+    if destination.resolve().is_relative_to(source.resolve()):
+        raise HTTPException(status_code=400, detail="Destination cannot be inside the current cache directory")
+
     model_dirs = [d for d in source.iterdir() if d.name.startswith("models--") and d.is_dir()]
     if not model_dirs:
         return {"moved": 0, "errors": [], "source": str(source), "destination": str(destination)}
