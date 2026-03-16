@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://voicebox.sh'),
   title: 'Voicebox - Open Source Voice Cloning Desktop App',
   description:
     'Near-perfect voice cloning with multiple TTS engines. Desktop app for Mac, Windows, and Linux. Multi-sample support, smart caching, local or remote inference.',
@@ -26,6 +27,13 @@ export const metadata: Metadata = {
     description: 'Open source voice cloning. Local-first. Free forever.',
     type: 'website',
     url: 'https://voicebox.sh',
+    images: [{ url: '/og.webp', width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Voicebox',
+    description: 'Open source voice cloning. Local-first. Free forever.',
+    images: ['/og.webp'],
   },
 };
 
