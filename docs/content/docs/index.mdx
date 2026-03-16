@@ -1,50 +1,36 @@
 ---
 title: "Voicebox Documentation"
-description: "Welcome to Voicebox - the open-source voice synthesis studio"
+description: "Voicebox is a local-first voice cloning studio -- a free and open-source alternative to ElevenLabs."
 ---
 
-## What is Voicebox?
+Voicebox is a **local-first voice cloning studio** -- a free and open-source alternative to ElevenLabs. Clone voices from a few seconds of audio, generate speech in 23 languages across 4 TTS engines, apply post-processing effects, and compose multi-voice projects with a timeline editor.
 
-Voicebox is a **local-first voice cloning studio** with DAW-like features for professional voice synthesis. Think of it as the **Ollama for voice** — download models, clone voices, and generate speech entirely on your machine.
+![Voicebox App Screenshot](/images/app-screenshot-1.webp)
 
-<Frame>
-  <img src="/images/app-screenshot-1.webp" alt="Voicebox App Screenshot" />
-</Frame>
+- **Complete privacy** -- models and voice data stay on your machine
+- **4 TTS engines** -- Qwen3-TTS, LuxTTS, Chatterbox Multilingual, and Chatterbox Turbo
+- **23 languages** -- from English to Arabic, Japanese, Hindi, Swahili, and more
+- **Post-processing effects** -- pitch shift, reverb, delay, chorus, compression, and filters
+- **Expressive speech** -- paralinguistic tags like `[laugh]`, `[sigh]`, `[gasp]` via Chatterbox Turbo
+- **Unlimited length** -- auto-chunking with crossfade for scripts, articles, and chapters
+- **Stories editor** -- multi-track timeline for conversations, podcasts, and narratives
+- **API-first** -- REST API for integrating voice synthesis into your own projects
+- **Native performance** -- built with Tauri (Rust), not Electron
+- **Runs everywhere** -- macOS (MLX/Metal), Windows (CUDA), Linux, AMD ROCm, Intel Arc, Docker
 
-Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives you:
+## Download
 
-- **Complete privacy** — models and voice data stay on your machine
-- **Professional tools** — multi-track timeline editor, audio trimming, conversation mixing
-- **Model flexibility** — currently powered by Qwen3-TTS, with support for XTTS, Bark, and other models coming soon
-- **API-first** — use the desktop app or integrate voice synthesis into your own projects
-- **Native performance** — built with Tauri (Rust), not Electron
+| Platform | Download |
+|----------|----------|
+| macOS (Apple Silicon) | [Download DMG](https://voicebox.sh/download/mac-arm) |
+| macOS (Intel) | [Download DMG](https://voicebox.sh/download/mac-intel) |
+| Windows | [Download MSI](https://voicebox.sh/download/windows) |
+| Docker | `docker compose up` |
 
-Download a voice model, clone any voice from a few seconds of audio, and compose multi-voice projects with studio-grade editing tools. No Python install required, no cloud dependency, no limits.
-
-## Key Features
-
-<CardGroup cols={2}>
-  <Card title="Voice Cloning" icon="microphone">
-    Instant cloning from just a few seconds of audio with Qwen3-TTS
-  </Card>
-  <Card title="Stories Editor" icon="film">
-    Multi-track timeline for creating conversations and narratives
-  </Card>
-  <Card title="Full API" icon="code">
-    REST API for integrating voice synthesis into your apps
-  </Card>
-  <Card title="Local-First" icon="shield">
-    Everything runs on your machine - complete privacy
-  </Card>
-</CardGroup>
+[View all releases](https://github.com/jamiepine/voicebox/releases/latest)
 
 ## Get Started
 
-<CardGroup cols={2}>
-  <Card title="Installation" icon="download" href="/docs/overview/installation">
-    Download and install Voicebox on your machine
-  </Card>
-  <Card title="Quick Start" icon="rocket" href="/docs/overview/quick-start">
-    Get up and running in 5 minutes
-  </Card>
-</CardGroup>
+- [Installation](/docs/overview/installation) -- download and install Voicebox
+- [Quick Start](/docs/overview/quick-start) -- get up and running in 5 minutes
+- [API Reference](/docs/api-reference) -- integrate voice synthesis into your apps
