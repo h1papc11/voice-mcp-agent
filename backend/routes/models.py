@@ -129,6 +129,9 @@ async def migrate_models(request: models.ModelMigrateRequest):
     if not source.exists():
         raise HTTPException(status_code=404, detail="Current model cache directory not found")
 
+    if source.resolve() == destination.resolve():
+        raise HTTPException(status_code=400, detail="Source and destination are the same directory")
+
     model_dirs = [d for d in source.iterdir() if d.name.startswith("models--") and d.is_dir()]
     if not model_dirs:
         return {"moved": 0, "errors": [], "source": str(source), "destination": str(destination)}

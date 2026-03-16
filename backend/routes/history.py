@@ -126,27 +126,27 @@ async def export_generation(
     db: Session = Depends(get_db),
 ):
     """Export a generation as a ZIP archive."""
+    generation = db.query(DBGeneration).filter_by(id=generation_id).first()
+    if not generation:
+        raise HTTPException(status_code=404, detail="Generation not found")
+
     try:
-        generation = db.query(DBGeneration).filter_by(id=generation_id).first()
-        if not generation:
-            raise HTTPException(status_code=404, detail="Generation not found")
-
         zip_bytes = export_import.export_generation_to_zip(generation_id, db)
-
-        safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
-        if not safe_text:
-            safe_text = "generation"
-        filename = f"generation-{safe_text}.voicebox.zip"
-
-        return StreamingResponse(
-            io.BytesIO(zip_bytes),
-            media_type="application/zip",
-            headers={"Content-Disposition": safe_content_disposition("attachment", filename)},
-        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
+    if not safe_text:
+        safe_text = "generation"
+    filename = f"generation-{safe_text}.voicebox.zip"
+
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={"Content-Disposition": safe_content_disposition("attachment", filename)},
+    )
 
 
 @router.get("/history/{generation_id}/export-audio")
@@ -159,8 +159,11 @@ async def export_generation_audio(
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")
 
+    if not generation.audio_path:
+        raise HTTPException(status_code=404, detail="Generation has no audio file")
+
     audio_path = Path(generation.audio_path)
-    if not audio_path.exists():
+    if not audio_path.is_file():
         raise HTTPException(status_code=404, detail="Audio file not found")
 
     safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()

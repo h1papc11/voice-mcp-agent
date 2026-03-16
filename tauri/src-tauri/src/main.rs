@@ -113,11 +113,17 @@ async fn start_server(
             &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
             std::time::Duration::from_secs(1),
         ).is_ok() {
-            // Port is in use — check if it's a voicebox process via tasklist
+            // Port is in use — check if it's a voicebox process
             if let Some(pid) = find_voicebox_pid_on_port(SERVER_PORT) {
                 println!("Found existing voicebox-server on port {} (PID: {}), reusing it", SERVER_PORT, pid);
                 *state.server_pid.lock().unwrap() = Some(pid);
                 return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+            } else {
+                return Err(format!(
+                    "Port {} is already in use by another application. \
+                     Close the other application or change the Voicebox port.",
+                    SERVER_PORT
+                ));
             }
         }
     }

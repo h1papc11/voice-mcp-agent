@@ -13,6 +13,8 @@ from ..utils.tasks import get_task_manager
 
 router = APIRouter()
 
+UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1MB
+
 
 @router.post("/transcribe", response_model=models.TranscriptionResponse)
 async def transcribe_audio(
@@ -21,8 +23,8 @@ async def transcribe_audio(
 ):
     """Transcribe audio file to text."""
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        content = await file.read()
-        tmp.write(content)
+        while chunk := await file.read(UPLOAD_CHUNK_SIZE):
+            tmp.write(chunk)
         tmp_path = tmp.name
 
     try:
@@ -32,27 +34,20 @@ async def transcribe_audio(
         duration = len(audio) / sr
 
         whisper_model = transcribe.get_whisper_model()
-
         model_size = whisper_model.model_size
-        whisper_hf_repos = {
-            "large": "openai/whisper-large-v3",
-            "turbo": "openai/whisper-large-v3-turbo",
-        }
-        model_name = whisper_hf_repos.get(model_size, f"openai/whisper-{model_size}")
 
-        from huggingface_hub import constants as hf_constants
-
-        repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
-        if not repo_cache.exists():
+        if not whisper_model.is_loaded() and not whisper_model._is_model_cached(model_size):
             progress_model_name = f"whisper-{model_size}"
+            task_manager = get_task_manager()
 
             async def download_whisper_background():
                 try:
                     await whisper_model.load_model_async(model_size)
+                    task_manager.complete_download(progress_model_name)
                 except Exception as e:
-                    get_task_manager().error_download(progress_model_name, str(e))
+                    task_manager.error_download(progress_model_name, str(e))
 
-            get_task_manager().start_download(progress_model_name)
+            task_manager.start_download(progress_model_name)
             create_background_task(download_whisper_background())
 
             raise HTTPException(

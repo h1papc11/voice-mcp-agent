@@ -29,6 +29,11 @@ async def download_cuda_backend():
     if cuda.get_cuda_binary_path() is not None:
         raise HTTPException(status_code=409, detail="CUDA backend already downloaded")
 
+    progress_manager = get_progress_manager()
+    existing = progress_manager.get_progress(cuda.PROGRESS_KEY)
+    if existing and existing.get("status") == "downloading":
+        raise HTTPException(status_code=409, detail="CUDA backend download already in progress")
+
     async def _download():
         try:
             await cuda.download_cuda_binary()

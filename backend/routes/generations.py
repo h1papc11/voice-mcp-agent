@@ -33,7 +33,7 @@ async def generate_speech(
     from ..backends import engine_has_model_sizes
 
     engine = data.engine or "qwen"
-    model_size = data.model_size or "1.7B"
+    model_size = (data.model_size or "1.7B") if engine_has_model_sizes(engine) else None
 
     generation = await history.create_generation(
         profile_id=data.profile_id,

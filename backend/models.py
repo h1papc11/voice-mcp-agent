@@ -64,7 +64,7 @@ class GenerationRequest(BaseModel):
 
     profile_id: str
     text: str = Field(..., min_length=1, max_length=50000)
-    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it|he)$")
+    language: str = Field(default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it|he|ar|da|el|fi|hi|ms|nl|no|pl|sv|sw|tr)$")
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B)$")
     instruct: Optional[str] = Field(None, max_length=500)

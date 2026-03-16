@@ -92,14 +92,20 @@ def _migrate_story_items(engine, inspector, tables: set[str]) -> None:
                     story_id VARCHAR NOT NULL,
                     generation_id VARCHAR NOT NULL,
                     start_time_ms INTEGER NOT NULL DEFAULT 0,
+                    track INTEGER NOT NULL DEFAULT 0,
+                    trim_start_ms INTEGER NOT NULL DEFAULT 0,
+                    trim_end_ms INTEGER NOT NULL DEFAULT 0,
+                    version_id VARCHAR,
                     created_at DATETIME,
                     FOREIGN KEY (story_id) REFERENCES stories(id),
                     FOREIGN KEY (generation_id) REFERENCES generations(id)
                 )
             """))
             conn.execute(text("""
-                INSERT INTO story_items_new (id, story_id, generation_id, start_time_ms, created_at)
-                SELECT id, story_id, generation_id, start_time_ms, created_at FROM story_items
+                INSERT INTO story_items_new (id, story_id, generation_id, start_time_ms, track, trim_start_ms, trim_end_ms, version_id, created_at)
+                SELECT id, story_id, generation_id, start_time_ms,
+                    COALESCE(track, 0), COALESCE(trim_start_ms, 0), COALESCE(trim_end_ms, 0), version_id, created_at
+                FROM story_items
             """))
             conn.execute(text("DROP TABLE story_items"))
             conn.execute(text("ALTER TABLE story_items_new RENAME TO story_items"))

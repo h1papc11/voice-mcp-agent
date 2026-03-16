@@ -42,8 +42,15 @@ function handleEngineChange(form: UseFormReturn<GenerationFormValues>, value: st
     const [, modelSize] = value.split(':');
     form.setValue('engine', 'qwen');
     form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
+    // Validate language is supported by Qwen
+    const currentLang = form.getValues('language');
+    const available = getLanguageOptionsForEngine('qwen');
+    if (!available.some((l) => l.value === currentLang)) {
+      form.setValue('language', available[0]?.value ?? 'en');
+    }
   } else {
     form.setValue('engine', value as GenerationFormValues['engine']);
+    form.setValue('modelSize', undefined as unknown as '1.7B' | '0.6B');
     if (ENGLISH_ONLY_ENGINES.has(value)) {
       form.setValue('language', 'en');
     } else {
