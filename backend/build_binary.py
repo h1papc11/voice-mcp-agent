@@ -67,7 +67,7 @@ def build_server(cuda=False):
         '--hidden-import', 'backend.utils.progress',
         '--hidden-import', 'backend.utils.hf_progress',
         '--hidden-import', 'backend.utils.validation',
-        '--hidden-import', 'backend.cuda_download',
+        '--hidden-import', 'backend.services.cuda',
         '--hidden-import', 'backend.effects',
         '--hidden-import', 'backend.utils.effects',
         '--hidden-import', 'backend.versions',
