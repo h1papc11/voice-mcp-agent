@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils/cn';
 import { useGenerationStore } from '@/stores/generationStore';
 import { useStoryStore } from '@/stores/storyStore';
 import { useUIStore } from '@/stores/uiStore';
+import { EngineModelSelector } from './EngineModelSelector';
 import { ParalinguisticInput } from './ParalinguisticInput';
 
 interface FloatingGenerateBoxProps {
@@ -455,58 +456,7 @@ export function FloatingGenerateBox({
                   />
 
                   <FormItem className="flex-1 space-y-0">
-                    <Select
-                      value={
-                        form.watch('engine') === 'luxtts'
-                          ? 'luxtts'
-                          : form.watch('engine') === 'chatterbox'
-                            ? 'chatterbox'
-                            : form.watch('engine') === 'chatterbox_turbo'
-                              ? 'chatterbox_turbo'
-                              : `qwen:${form.watch('modelSize') || '1.7B'}`
-                      }
-                      onValueChange={(value) => {
-                        if (value === 'luxtts') {
-                          form.setValue('engine', 'luxtts');
-                          form.setValue('language', 'en');
-                        } else if (value === 'chatterbox') {
-                          form.setValue('engine', 'chatterbox');
-                        } else if (value === 'chatterbox_turbo') {
-                          form.setValue('engine', 'chatterbox_turbo');
-                          form.setValue('language', 'en');
-                        } else {
-                          const [, modelSize] = value.split(':');
-                          form.setValue('engine', 'qwen');
-                          form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
-                        }
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="qwen:1.7B" className="text-xs text-muted-foreground">
-                          Qwen3-TTS 1.7B
-                        </SelectItem>
-                        <SelectItem value="qwen:0.6B" className="text-xs text-muted-foreground">
-                          Qwen3-TTS 0.6B
-                        </SelectItem>
-                        <SelectItem value="luxtts" className="text-xs text-muted-foreground">
-                          LuxTTS
-                        </SelectItem>
-                        <SelectItem value="chatterbox" className="text-xs text-muted-foreground">
-                          Chatterbox
-                        </SelectItem>
-                        <SelectItem
-                          value="chatterbox_turbo"
-                          className="text-xs text-muted-foreground"
-                        >
-                          Chatterbox Turbo
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <EngineModelSelector form={form} compact />
                   </FormItem>
                 </div>
               </motion.div>

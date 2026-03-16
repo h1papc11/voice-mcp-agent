@@ -233,11 +233,9 @@ async def health():
     model_downloaded = None
     try:
         # Check if the default model (1.7B) is cached
-        # Use different model IDs based on backend
-        if backend_type == "mlx":
-            default_model_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
-        else:
-            default_model_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+        from .backends import get_model_config
+        default_config = get_model_config("qwen-tts-1.7B")
+        default_model_id = default_config.hf_repo_id if default_config else "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
         
         # Method 1: Try scan_cache_dir if available
         try:
@@ -738,7 +736,7 @@ async def generate_speech(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    from .backends import get_tts_backend_for_engine
+    from .backends import get_tts_backend_for_engine, engine_has_model_sizes
     engine = data.engine or "qwen"
     tts_model = get_tts_backend_for_engine(engine)
     model_size = data.model_size or "1.7B"
@@ -756,7 +754,7 @@ async def generate_speech(
         generation_id=generation_id,
         status="generating",
         engine=engine,
-        model_size=model_size if engine == "qwen" else None,
+        model_size=model_size if engine_has_model_sizes(engine) else None,
     )
 
     # Track in task manager
@@ -785,10 +783,8 @@ async def generate_speech(
         bg_db = next(get_db())
         try:
             # Load model
-            if engine == "qwen":
-                await tts_model.load_model_async(model_size)
-            else:
-                await tts_model.load_model()
+            from .backends import load_engine_model, engine_needs_trim
+            await load_engine_model(engine, model_size)
 
             # Create voice prompt
             voice_prompt = await profiles.create_voice_prompt_for_profile(
@@ -801,7 +797,7 @@ async def generate_speech(
             from .utils.chunked_tts import generate_chunked
 
             trim_fn = None
-            if engine in ("chatterbox", "chatterbox_turbo"):
+            if engine_needs_trim(engine):
                 from .utils.audio import trim_tts_output
                 trim_fn = trim_tts_output
 
@@ -927,10 +923,8 @@ async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
     async def _run_retry():
         bg_db = next(get_db())
         try:
-            if retry_engine == "qwen":
-                await tts_model.load_model_async(retry_model_size)
-            else:
-                await tts_model.load_model()
+            from .backends import load_engine_model, engine_needs_trim
+            await load_engine_model(retry_engine, retry_model_size)
 
             voice_prompt = await profiles.create_voice_prompt_for_profile(
                 gen.profile_id,
@@ -942,7 +936,7 @@ async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
             from .utils.chunked_tts import generate_chunked
 
             trim_fn = None
-            if retry_engine in ("chatterbox", "chatterbox_turbo"):
+            if engine_needs_trim(retry_engine):
                 from .utils.audio import trim_tts_output
                 trim_fn = trim_tts_output
 
@@ -1024,10 +1018,8 @@ async def regenerate_generation(generation_id: str, db: Session = Depends(get_db
     async def _run_regenerate():
         bg_db = next(get_db())
         try:
-            if regen_engine == "qwen":
-                await tts_model.load_model_async(regen_model_size)
-            else:
-                await tts_model.load_model()
+            from .backends import load_engine_model, engine_needs_trim
+            await load_engine_model(regen_engine, regen_model_size)
 
             voice_prompt = await profiles.create_voice_prompt_for_profile(
                 gen.profile_id,
@@ -1039,7 +1031,7 @@ async def regenerate_generation(generation_id: str, db: Session = Depends(get_db
             from .utils.chunked_tts import generate_chunked
 
             trim_fn = None
-            if regen_engine in ("chatterbox", "chatterbox_turbo"):
+            if engine_needs_trim(regen_engine):
                 from .utils.audio import trim_tts_output
                 trim_fn = trim_tts_output
 
@@ -1162,34 +1154,9 @@ async def stream_speech(
     tts_model = get_tts_backend_for_engine(engine)
     model_size = data.model_size or "1.7B"
 
-    if engine == "qwen":
-        if not tts_model._is_model_cached(model_size):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Model {model_size} is not downloaded yet. Use /generate to trigger a download.",
-            )
-        await tts_model.load_model_async(model_size)
-    elif engine == "luxtts":
-        if not tts_model._is_model_cached():
-            raise HTTPException(
-                status_code=400,
-                detail="LuxTTS model is not downloaded yet. Use /generate to trigger a download.",
-            )
-        await tts_model.load_model()
-    elif engine == "chatterbox":
-        if not tts_model._is_model_cached():
-            raise HTTPException(
-                status_code=400,
-                detail="Chatterbox model is not downloaded yet. Use /generate to trigger a download.",
-            )
-        await tts_model.load_model()
-    elif engine == "chatterbox_turbo":
-        if not tts_model._is_model_cached():
-            raise HTTPException(
-                status_code=400,
-                detail="Chatterbox Turbo model is not downloaded yet. Use /generate to trigger a download.",
-            )
-        await tts_model.load_model()
+    from .backends import ensure_model_cached_or_raise, load_engine_model, engine_needs_trim
+    await ensure_model_cached_or_raise(engine, model_size)
+    await load_engine_model(engine, model_size)
 
     voice_prompt = await profiles.create_voice_prompt_for_profile(
         data.profile_id, db, engine=engine,
@@ -1198,7 +1165,7 @@ async def stream_speech(
     from .utils.chunked_tts import generate_chunked
 
     trim_fn = None
-    if engine in ("chatterbox", "chatterbox_turbo"):
+    if engine_needs_trim(engine):
         from .utils.audio import trim_tts_output
         trim_fn = trim_tts_output
 
@@ -2108,63 +2075,16 @@ async def unload_model():
 @app.post("/models/{model_name}/unload")
 async def unload_model_by_name(model_name: str):
     """Unload a specific model from memory without deleting it from disk."""
-    # Map of model_name -> (model_type, model_size)
-    model_types = {
-        "qwen-tts-1.7B": ("tts", "1.7B"),
-        "qwen-tts-0.6B": ("tts", "0.6B"),
-        "luxtts": ("luxtts", "default"),
-        "chatterbox-tts": ("chatterbox", "default"),
-        "chatterbox-turbo": ("chatterbox_turbo", "default"),
-        "whisper-base": ("whisper", "base"),
-        "whisper-small": ("whisper", "small"),
-        "whisper-medium": ("whisper", "medium"),
-        "whisper-large": ("whisper", "large"),
-        "whisper-turbo": ("whisper", "turbo"),
-    }
+    from .backends import get_model_config, unload_model_by_config
 
-    if model_name not in model_types:
+    config = get_model_config(model_name)
+    if not config:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
 
-    model_type, model_size = model_types[model_name]
-
     try:
-        if model_type == "tts":
-            tts_model = tts.get_tts_model()
-            loaded_size = getattr(
-                tts_model, "_current_model_size", None
-            ) or getattr(tts_model, "model_size", None)
-            if tts_model.is_loaded() and loaded_size == model_size:
-                tts.unload_tts_model()
-            else:
-                return {"message": f"Model {model_name} is not loaded"}
-        elif model_type == "luxtts":
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("luxtts")
-            if backend.is_loaded():
-                backend.unload_model()
-            else:
-                return {"message": f"Model {model_name} is not loaded"}
-        elif model_type == "chatterbox":
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("chatterbox")
-            if backend.is_loaded():
-                backend.unload_model()
-            else:
-                return {"message": f"Model {model_name} is not loaded"}
-        elif model_type == "chatterbox_turbo":
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("chatterbox_turbo")
-            if backend.is_loaded():
-                backend.unload_model()
-            else:
-                return {"message": f"Model {model_name} is not loaded"}
-        elif model_type == "whisper":
-            whisper_model = transcribe.get_whisper_model()
-            if whisper_model.is_loaded() and whisper_model.model_size == model_size:
-                transcribe.unload_whisper_model()
-            else:
-                return {"message": f"Model {model_name} is not loaded"}
-
+        was_loaded = unload_model_by_config(config)
+        if not was_loaded:
+            return {"message": f"Model {model_name} is not loaded"}
         return {"message": f"Model {model_name} unloaded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -2347,140 +2267,18 @@ async def get_model_status():
     except ImportError:
         use_scan_cache = False
     
-    def check_tts_loaded(model_size: str):
-        """Check if TTS model is loaded with specific size."""
-        try:
-            tts_model = tts.get_tts_model()
-            loaded_size = getattr(
-                tts_model, "_current_model_size", None
-            ) or getattr(tts_model, "model_size", None)
-            return tts_model.is_loaded() and loaded_size == model_size
-        except Exception:
-            return False
-    
-    def check_whisper_loaded(model_size: str):
-        """Check if Whisper model is loaded with specific size."""
-        try:
-            whisper_model = transcribe.get_whisper_model()
-            return whisper_model.is_loaded() and getattr(whisper_model, 'model_size', None) == model_size
-        except Exception:
-            return False
-    
-    # Use backend-specific model IDs
-    if backend_type == "mlx":
-        tts_1_7b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"
-        tts_0_6b_id = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16"  # Fallback to 1.7B
-        # MLX backend uses openai/whisper-* models, not mlx-community
-        whisper_base_id = "openai/whisper-base"
-        whisper_small_id = "openai/whisper-small"
-        whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large-v3"
-    else:
-        tts_1_7b_id = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-        tts_0_6b_id = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
-        whisper_base_id = "openai/whisper-base"
-        whisper_small_id = "openai/whisper-small"
-        whisper_medium_id = "openai/whisper-medium"
-        whisper_large_id = "openai/whisper-large-v3"
-    
-    # Check if LuxTTS backend is loaded
-    def check_luxtts_loaded():
-        try:
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("luxtts")
-            return backend.is_loaded()
-        except Exception:
-            return False
+    from .backends import get_all_model_configs, check_model_loaded
 
-    # Check if Chatterbox backend is loaded
-    def check_chatterbox_loaded():
-        try:
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("chatterbox")
-            return backend.is_loaded()
-        except Exception:
-            return False
-
-    # Check if Chatterbox Turbo backend is loaded
-    def check_chatterbox_turbo_loaded():
-        try:
-            from .backends import get_tts_backend_for_engine
-            backend = get_tts_backend_for_engine("chatterbox_turbo")
-            return backend.is_loaded()
-        except Exception:
-            return False
-
+    registry_configs = get_all_model_configs()
     model_configs = [
         {
-            "model_name": "qwen-tts-1.7B",
-            "display_name": "Qwen TTS 1.7B",
-            "hf_repo_id": tts_1_7b_id,
-            "model_size": "1.7B",
-            "check_loaded": lambda: check_tts_loaded("1.7B"),
-        },
-        {
-            "model_name": "qwen-tts-0.6B",
-            "display_name": "Qwen TTS 0.6B",
-            "hf_repo_id": tts_0_6b_id,
-            "model_size": "0.6B",
-            "check_loaded": lambda: check_tts_loaded("0.6B"),
-        },
-        {
-            "model_name": "luxtts",
-            "display_name": "LuxTTS (Fast, CPU-friendly)",
-            "hf_repo_id": "YatharthS/LuxTTS",
-            "model_size": "default",
-            "check_loaded": check_luxtts_loaded,
-        },
-        {
-            "model_name": "chatterbox-tts",
-            "display_name": "Chatterbox TTS (Multilingual)",
-            "hf_repo_id": "ResembleAI/chatterbox",
-            "model_size": "default",
-            "check_loaded": check_chatterbox_loaded,
-        },
-        {
-            "model_name": "chatterbox-turbo",
-            "display_name": "Chatterbox Turbo (English, Tags)",
-            "hf_repo_id": "ResembleAI/chatterbox-turbo",
-            "model_size": "default",
-            "check_loaded": check_chatterbox_turbo_loaded,
-        },
-        {
-            "model_name": "whisper-base",
-            "display_name": "Whisper Base",
-            "hf_repo_id": whisper_base_id,
-            "model_size": "base",
-            "check_loaded": lambda: check_whisper_loaded("base"),
-        },
-        {
-            "model_name": "whisper-small",
-            "display_name": "Whisper Small",
-            "hf_repo_id": whisper_small_id,
-            "model_size": "small",
-            "check_loaded": lambda: check_whisper_loaded("small"),
-        },
-        {
-            "model_name": "whisper-medium",
-            "display_name": "Whisper Medium",
-            "hf_repo_id": whisper_medium_id,
-            "model_size": "medium",
-            "check_loaded": lambda: check_whisper_loaded("medium"),
-        },
-        {
-            "model_name": "whisper-large",
-            "display_name": "Whisper Large",
-            "hf_repo_id": whisper_large_id,
-            "model_size": "large",
-            "check_loaded": lambda: check_whisper_loaded("large"),
-        },
-        {
-            "model_name": "whisper-turbo",
-            "display_name": "Whisper Turbo",
-            "hf_repo_id": "openai/whisper-large-v3-turbo",
-            "model_size": "turbo",
-            "check_loaded": lambda: check_whisper_loaded("turbo"),
-        },
+            "model_name": cfg.model_name,
+            "display_name": cfg.display_name,
+            "hf_repo_id": cfg.hf_repo_id,
+            "model_size": cfg.model_size,
+            "check_loaded": lambda c=cfg: check_model_loaded(c),
+        }
+        for cfg in registry_configs
     ]
     
     # Build a mapping of model_name -> hf_repo_id so we can check if shared repos are downloading
@@ -2637,64 +2435,22 @@ async def get_model_status():
 async def trigger_model_download(request: models.ModelDownloadRequest):
     """Trigger download of a specific model."""
     import asyncio
-    from .backends import get_tts_backend_for_engine
-    
+    from .backends import get_model_config, get_model_load_func
+
     task_manager = get_task_manager()
     progress_manager = get_progress_manager()
-    
-    model_configs = {
-        "qwen-tts-1.7B": {
-            "model_size": "1.7B",
-            "load_func": lambda: tts.get_tts_model().load_model("1.7B"),
-        },
-        "qwen-tts-0.6B": {
-            "model_size": "0.6B",
-            "load_func": lambda: tts.get_tts_model().load_model("0.6B"),
-        },
-        "luxtts": {
-            "model_size": "default",
-            "load_func": lambda: get_tts_backend_for_engine("luxtts").load_model(),
-        },
-        "chatterbox-tts": {
-            "model_size": "default",
-            "load_func": lambda: get_tts_backend_for_engine("chatterbox").load_model(),
-        },
-        "chatterbox-turbo": {
-            "model_size": "default",
-            "load_func": lambda: get_tts_backend_for_engine("chatterbox_turbo").load_model(),
-        },
-        "whisper-base": {
-            "model_size": "base",
-            "load_func": lambda: transcribe.get_whisper_model().load_model("base"),
-        },
-        "whisper-small": {
-            "model_size": "small",
-            "load_func": lambda: transcribe.get_whisper_model().load_model("small"),
-        },
-        "whisper-medium": {
-            "model_size": "medium",
-            "load_func": lambda: transcribe.get_whisper_model().load_model("medium"),
-        },
-        "whisper-large": {
-            "model_size": "large",
-            "load_func": lambda: transcribe.get_whisper_model().load_model("large"),
-        },
-        "whisper-turbo": {
-            "model_size": "turbo",
-            "load_func": lambda: transcribe.get_whisper_model().load_model("turbo"),
-        },
-    }
-    
-    if request.model_name not in model_configs:
+
+    config = get_model_config(request.model_name)
+    if not config:
         raise HTTPException(status_code=400, detail=f"Unknown model: {request.model_name}")
-    
-    config = model_configs[request.model_name]
+
+    load_func = get_model_load_func(config)
     
     async def download_in_background():
         """Download model in background without blocking the HTTP request."""
         try:
             # Call the load function (which may be async)
-            result = config["load_func"]()
+            result = load_func()
             # If it's a coroutine, await it
             if asyncio.iscoroutine(result):
                 await result
@@ -2767,94 +2523,17 @@ async def delete_model(model_name: str):
     import os
     from huggingface_hub import constants as hf_constants
     
-    # Map model names to HuggingFace repo IDs
-    model_configs = {
-        "qwen-tts-1.7B": {
-            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-            "model_size": "1.7B",
-            "model_type": "tts",
-        },
-        "qwen-tts-0.6B": {
-            "hf_repo_id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-            "model_size": "0.6B",
-            "model_type": "tts",
-        },
-        "luxtts": {
-            "hf_repo_id": "YatharthS/LuxTTS",
-            "model_size": "default",
-            "model_type": "luxtts",
-        },
-        "chatterbox-tts": {
-            "hf_repo_id": "ResembleAI/chatterbox",
-            "model_size": "default",
-            "model_type": "chatterbox",
-        },
-        "chatterbox-turbo": {
-            "hf_repo_id": "ResembleAI/chatterbox-turbo",
-            "model_size": "default",
-            "model_type": "chatterbox_turbo",
-        },
-        "whisper-base": {
-            "hf_repo_id": "openai/whisper-base",
-            "model_size": "base",
-            "model_type": "whisper",
-        },
-        "whisper-small": {
-            "hf_repo_id": "openai/whisper-small",
-            "model_size": "small",
-            "model_type": "whisper",
-        },
-        "whisper-medium": {
-            "hf_repo_id": "openai/whisper-medium",
-            "model_size": "medium",
-            "model_type": "whisper",
-        },
-        "whisper-large": {
-            "hf_repo_id": "openai/whisper-large-v3",
-            "model_size": "large",
-            "model_type": "whisper",
-        },
-        "whisper-turbo": {
-            "hf_repo_id": "openai/whisper-large-v3-turbo",
-            "model_size": "turbo",
-            "model_type": "whisper",
-        },
-    }
+    from .backends import get_model_config, unload_model_by_config
 
-    if model_name not in model_configs:
+    config = get_model_config(model_name)
+    if not config:
         raise HTTPException(status_code=400, detail=f"Unknown model: {model_name}")
-    
-    config = model_configs[model_name]
-    hf_repo_id = config["hf_repo_id"]
-    
+
+    hf_repo_id = config.hf_repo_id
+
     try:
-        # Check if model is loaded and unload it first
-        if config["model_type"] == "tts":
-            tts_model = tts.get_tts_model()
-            loaded_size = getattr(
-                tts_model, "_current_model_size", None
-            ) or getattr(tts_model, "model_size", None)
-            if tts_model.is_loaded() and loaded_size == config["model_size"]:
-                tts.unload_tts_model()
-        elif config["model_type"] == "luxtts":
-            from .backends import get_tts_backend_for_engine
-            luxtts = get_tts_backend_for_engine("luxtts")
-            if luxtts.is_loaded():
-                luxtts.unload_model()
-        elif config["model_type"] == "chatterbox":
-            from .backends import get_tts_backend_for_engine
-            chatterbox = get_tts_backend_for_engine("chatterbox")
-            if chatterbox.is_loaded():
-                chatterbox.unload_model()
-        elif config["model_type"] == "chatterbox_turbo":
-            from .backends import get_tts_backend_for_engine
-            turbo = get_tts_backend_for_engine("chatterbox_turbo")
-            if turbo.is_loaded():
-                turbo.unload_model()
-        elif config["model_type"] == "whisper":
-            whisper_model = transcribe.get_whisper_model()
-            if whisper_model.is_loaded() and whisper_model.model_size == config["model_size"]:
-                transcribe.unload_whisper_model()
+        # Unload model if currently loaded
+        unload_model_by_config(config)
         
         # Find and delete the cache directory (using HuggingFace's OS-specific cache location)
         cache_dir = hf_constants.HF_HUB_CACHE
