@@ -27,10 +27,10 @@
 
 <p align="center">
   <a href="https://voicebox.sh">voicebox.sh</a> •
+  <a href="https://docs.voicebox.sh">Docs</a> •
   <a href="#download">Download</a> •
   <a href="#features">Features</a> •
-  <a href="#api">API</a> •
-  <a href="#roadmap">Roadmap</a>
+  <a href="#api">API</a>
 </p>
 
 <br/>
@@ -76,12 +76,12 @@ Voicebox is a **local-first voice cloning studio** — a free and open-source al
 
 ## Download
 
-| Platform | Download |
-|----------|----------|
-| macOS (Apple Silicon) | [Download DMG](https://voicebox.sh/download/mac-arm) |
-| macOS (Intel) | [Download DMG](https://voicebox.sh/download/mac-intel) |
-| Windows | [Download MSI](https://voicebox.sh/download/windows) |
-| Docker | `docker compose up` |
+| Platform              | Download                                               |
+| --------------------- | ------------------------------------------------------ |
+| macOS (Apple Silicon) | [Download DMG](https://voicebox.sh/download/mac-arm)   |
+| macOS (Intel)         | [Download DMG](https://voicebox.sh/download/mac-intel) |
+| Windows               | [Download MSI](https://voicebox.sh/download/windows)   |
+| Docker                | `docker compose up`                                    |
 
 > **[View all binaries →](https://github.com/jamiepine/voicebox/releases/latest)**
 
@@ -95,12 +95,12 @@ Voicebox is a **local-first voice cloning studio** — a free and open-source al
 
 Four TTS engines with different strengths, switchable per-generation:
 
-| Engine | Languages | Strengths |
-|--------|-----------|-----------|
-| **Qwen3-TTS** (0.6B / 1.7B) | 10 | High-quality multilingual cloning, delivery instructions ("speak slowly", "whisper") |
-| **LuxTTS** | English | Lightweight (~1GB VRAM), 48kHz output, 150x realtime on CPU |
-| **Chatterbox Multilingual** | 23 | Broadest language coverage — Arabic, Danish, Finnish, Greek, Hebrew, Hindi, Malay, Norwegian, Polish, Swahili, Swedish, Turkish and more |
-| **Chatterbox Turbo** | English | Fast 350M model with paralinguistic emotion/sound tags |
+| Engine                      | Languages | Strengths                                                                                                                                |
+| --------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Qwen3-TTS** (0.6B / 1.7B) | 10        | High-quality multilingual cloning, delivery instructions ("speak slowly", "whisper")                                                     |
+| **LuxTTS**                  | English   | Lightweight (~1GB VRAM), 48kHz output, 150x realtime on CPU                                                                              |
+| **Chatterbox Multilingual** | 23        | Broadest language coverage — Arabic, Danish, Finnish, Greek, Hebrew, Hindi, Malay, Norwegian, Polish, Swahili, Swedish, Turkish and more |
+| **Chatterbox Turbo**        | English   | Fast 350M model with paralinguistic emotion/sound tags                                                                                   |
 
 ### Emotions & Paralinguistic Tags
 
@@ -112,16 +112,16 @@ Type `/` in the text input to insert expressive tags that the model synthesizes 
 
 8 audio effects powered by Spotify's `pedalboard` library. Apply after generation, preview in real time, build reusable presets.
 
-| Effect | Description |
-|--------|-------------|
-| Pitch Shift | Up or down by up to 12 semitones |
-| Reverb | Configurable room size, damping, wet/dry mix |
-| Delay | Echo with adjustable time, feedback, and mix |
+| Effect           | Description                                   |
+| ---------------- | --------------------------------------------- |
+| Pitch Shift      | Up or down by up to 12 semitones              |
+| Reverb           | Configurable room size, damping, wet/dry mix  |
+| Delay            | Echo with adjustable time, feedback, and mix  |
 | Chorus / Flanger | Modulated delay for metallic or lush textures |
-| Compressor | Dynamic range compression |
-| Gain | Volume adjustment (-40 to +40 dB) |
-| High-Pass Filter | Remove low frequencies |
-| Low-Pass Filter | Remove high frequencies |
+| Compressor       | Dynamic range compression                     |
+| Gain             | Volume adjustment (-40 to +40 dB)             |
+| High-Pass Filter | Remove low frequencies                        |
+| Low-Pass Filter  | Remove high frequencies                       |
 
 Ships with 4 built-in presets (Robotic, Radio, Echo Chamber, Deep Voice) and supports custom presets. Effects can be assigned per-profile as defaults.
 
@@ -186,14 +186,14 @@ Multi-voice timeline editor for conversations, podcasts, and narratives.
 
 ### GPU Support
 
-| Platform | Backend | Notes |
-|----------|---------|-------|
-| macOS (Apple Silicon) | MLX (Metal) | 4-5x faster via Neural Engine |
+| Platform                 | Backend        | Notes                                          |
+| ------------------------ | -------------- | ---------------------------------------------- |
+| macOS (Apple Silicon)    | MLX (Metal)    | 4-5x faster via Neural Engine                  |
 | Windows / Linux (NVIDIA) | PyTorch (CUDA) | Auto-downloads CUDA binary from within the app |
-| Linux (AMD) | PyTorch (ROCm) | Auto-configures HSA_OVERRIDE_GFX_VERSION |
-| Windows (any GPU) | DirectML | Universal Windows GPU support |
-| Intel Arc | IPEX/XPU | Intel discrete GPU acceleration |
-| Any | CPU | Works everywhere, just slower |
+| Linux (AMD)              | PyTorch (ROCm) | Auto-configures HSA_OVERRIDE_GFX_VERSION       |
+| Windows (any GPU)        | DirectML       | Universal Windows GPU support                  |
+| Intel Arc                | IPEX/XPU       | Intel discrete GPU acceleration                |
+| Any                      | CPU            | Works everywhere, just slower                  |
 
 ---
 
@@ -224,30 +224,30 @@ Full API documentation available at `http://localhost:17493/docs`.
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Desktop App | Tauri (Rust) |
-| Frontend | React, TypeScript, Tailwind CSS |
-| State | Zustand, React Query |
-| Backend | FastAPI (Python) |
-| TTS Engines | Qwen3-TTS, LuxTTS, Chatterbox, Chatterbox Turbo |
-| Effects | Pedalboard (Spotify) |
-| Transcription | Whisper / Whisper Turbo (PyTorch or MLX) |
-| Inference | MLX (Apple Silicon) / PyTorch (CUDA/ROCm/XPU/CPU) |
-| Database | SQLite |
-| Audio | WaveSurfer.js, librosa |
+| Layer         | Technology                                        |
+| ------------- | ------------------------------------------------- |
+| Desktop App   | Tauri (Rust)                                      |
+| Frontend      | React, TypeScript, Tailwind CSS                   |
+| State         | Zustand, React Query                              |
+| Backend       | FastAPI (Python)                                  |
+| TTS Engines   | Qwen3-TTS, LuxTTS, Chatterbox, Chatterbox Turbo   |
+| Effects       | Pedalboard (Spotify)                              |
+| Transcription | Whisper / Whisper Turbo (PyTorch or MLX)          |
+| Inference     | MLX (Apple Silicon) / PyTorch (CUDA/ROCm/XPU/CPU) |
+| Database      | SQLite                                            |
+| Audio         | WaveSurfer.js, librosa                            |
 
 ---
 
 ## Roadmap
 
-| Feature | Description |
-|---------|-------------|
-| **Real-time Streaming** | Stream audio as it generates, word by word |
-| **Voice Design** | Create new voices from text descriptions |
-| **More Models** | XTTS, Bark, and other open-source voice models |
-| **Plugin Architecture** | Extend with custom models and effects |
-| **Mobile Companion** | Control Voicebox from your phone |
+| Feature                 | Description                                    |
+| ----------------------- | ---------------------------------------------- |
+| **Real-time Streaming** | Stream audio as it generates, word by word     |
+| **Voice Design**        | Create new voices from text descriptions       |
+| **More Models**         | XTTS, Bark, and other open-source voice models |
+| **Plugin Architecture** | Extend with custom models and effects          |
+| **Mobile Companion**    | Control Voicebox from your phone               |
 
 ---
 

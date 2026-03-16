@@ -52,6 +52,16 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <Link
+                  href="https://docs.voicebox.sh"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-foreground transition-colors"
+                >
+                  Documentation
+                </Link>
+              </li>
+              <li>
+                <Link
                   href={GITHUB_REPO}
                   target="_blank"
                   rel="noopener noreferrer"

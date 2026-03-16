@@ -32,9 +32,9 @@ export function Navbar() {
 
   return (
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+      <div className="mx-auto grid max-w-7xl grid-cols-3 items-center px-6 py-3">
         {/* Logo + wordmark */}
-        <a href="/" className="flex items-center gap-2.5">
+        <a href="/" className="flex items-center gap-2.5 justify-self-start">
           <Image
             src="/voicebox-logo-app.webp"
             alt="Voicebox"
@@ -45,8 +45,8 @@ export function Navbar() {
           <span className="text-[15px] font-semibold text-foreground">Voicebox</span>
         </a>
 
-        {/* Nav links */}
-        <div className="hidden sm:flex items-center gap-1">
+        {/* Nav links - centered */}
+        <div className="hidden sm:flex items-center gap-1 justify-self-center">
           <a
             href="#features"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -65,6 +65,14 @@ export function Navbar() {
           >
             Download
           </a>
+          <a
+            href="https://docs.voicebox.sh"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Docs
+          </a>
         </div>
 
         {/* GitHub star button */}
@@ -72,7 +80,7 @@ export function Navbar() {
           href={GITHUB_REPO}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-border"
+          className="flex items-center gap-2 justify-self-end rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-border"
         >
           <Github className="h-4 w-4" />
           <span className="text-[13px] font-medium">Star</span>
