@@ -1,0 +1,257 @@
+---
+title: "TTS Engines"
+description: "How to add new text-to-speech engines to Voicebox"
+---
+
+Adding an engine touches ~10 files across 4 layers. The backend protocol work is straightforward — the real time sink is dependency hell, upstream library bugs, and PyInstaller bundling.
+
+## Architecture Overview
+
+The backend is split into layers:
+
+| Layer | Purpose | Files Touched |
+|-------|---------|---------------|
+| `routes/` | Thin HTTP handlers | None (auto-dispatch) |
+| `services/` | Business logic | None (auto-dispatch) |
+| `backends/` | Engine implementations | `your_engine_backend.py` |
+| `utils/` | Shared utilities | As needed |
+
+New engines only need to touch `backends/` and `models.py` on the backend side — the route and service layers use a model config registry that handles dispatch automatically.
+
+## Phase 1: Backend Implementation
+
+### 1.1 Create the Backend File
+
+Create `backend/backends/<engine>_backend.py` (~200-300 lines) implementing the `TTSBackend` protocol:
+
+```python
+class YourBackend:
+    """Must satisfy the TTSBackend protocol."""
+
+    async def load_model(self, model_size: str = "default") -> None: ...
+    async def create_voice_prompt(self, audio_path: str, reference_text: str, use_cache: bool = True) -> tuple[dict, bool]: ...
+    async def combine_voice_prompts(self, audio_paths: list[str], ref_texts: list[str]) -> tuple[np.ndarray, str]: ...
+    async def generate(self, text: str, voice_prompt: dict, language: str = "en", seed: int | None = None, instruct: str | None = None) -> tuple[np.ndarray, int]: ...
+    def unload_model(self) -> None: ...
+    def is_loaded(self) -> bool: ...
+    def _get_model_path(self, model_size: str) -> str: ...
+```
+
+**Key decisions per engine:**
+
+| Decision | Options | Examples |
+|----------|---------|---------|
+| **Voice prompt storage** | Pre-computed tensors vs deferred file paths | Qwen stores tensor dicts; Chatterbox stores paths |
+| **Caching** | Use voice prompt cache or skip it | LuxTTS caches with prefix; Chatterbox skips caching |
+| **Device selection** | CUDA / MPS / CPU | Chatterbox forces CPU on macOS (MPS bugs) |
+| **Model download** | Library handles it vs manual `snapshot_download` | Turbo uses manual download to bypass `token=True` bug |
+| **Sample rate** | Engine-specific | LuxTTS outputs 48kHz, everything else is 24kHz |
+
+### 1.2 Voice Prompt Patterns
+
+**Pattern A: Pre-computed tensors** (Qwen, LuxTTS)
+```python
+encoded = model.encode_prompt(audio_path)
+return encoded, False  # (prompt_dict, was_cached)
+```
+
+**Pattern B: Deferred file paths** (Chatterbox, MLX)
+```python
+return {"ref_audio": audio_path, "ref_text": reference_text}, False
+```
+
+**Pattern C: Hybrid** (possible for new engines)
+```python
+embedding = model.extract_speaker(audio_path)
+return {"embedding": embedding, "ref_audio": audio_path}, False
+```
+
+If caching, prefix your cache keys:
+```python
+cache_key = "yourengine_" + get_cache_key(audio_path, reference_text)
+```
+
+### 1.3 Register the Engine
+
+In `backend/backends/__init__.py`:
+
+**Add a `ModelConfig` entry:**
+
+```python
+ModelConfig(
+    model_name="your-engine",
+    display_name="Your Engine",
+    engine="your_engine",
+    hf_repo_id="org/model-repo",
+    size_mb=3200,
+    needs_trim=False,  # set True if output needs trim_tts_output()
+    languages=["en", "fr", "de"],
+),
+```
+
+**Add to `TTS_ENGINES` dict:**
+
+```python
+TTS_ENGINES = {
+    ...
+    "your_engine": "Your Engine",
+}
+```
+
+**Add factory branch:**
+
+```python
+elif engine == "your_engine":
+    from .your_backend import YourBackend
+    backend = YourBackend()
+```
+
+### 1.4 Update Request Models
+
+In `backend/models.py`:
+- Add engine name to `GenerationRequest.engine` regex pattern
+- Add any new language codes to the language regex
+
+## Phase 2: Route and Service Integration
+
+With the model config registry, route and service layers have **zero per-engine dispatch points**. All endpoints use registry helpers like `get_model_config()`, `load_engine_model()`, `engine_needs_trim()`, `check_model_loaded()`, etc.
+
+**You don't need to touch any route or service files** unless your engine needs custom behavior in the generate pipeline.
+
+### Post-Processing
+
+If your model produces trailing silence, set `needs_trim=True` on your `ModelConfig`. The generation service applies `trim_tts_output()` automatically.
+
+## Phase 3: Frontend Integration
+
+### 3.1 TypeScript Types
+
+In `app/src/lib/api/types.ts`:
+- Add to the `engine` union type on `GenerationRequest`
+
+### 3.2 Language Maps
+
+In `app/src/lib/constants/languages.ts`:
+- Add entry to `ENGINE_LANGUAGES` record
+- Add any new language codes to `ALL_LANGUAGES` if needed
+
+### 3.3 Engine/Model Selector
+
+In `app/src/components/Generation/EngineModelSelector.tsx`:
+- Add entry to `ENGINE_OPTIONS` and `ENGINE_DESCRIPTIONS`
+- Add to `ENGLISH_ONLY_ENGINES` if applicable
+
+### 3.4 Form Hook
+
+In `app/src/lib/hooks/useGenerationForm.ts`:
+- Add to Zod schema enum for `engine`
+- Add engine-to-model-name mapping
+- Update payload construction for engine-specific fields
+
+### 3.5 Model Management
+
+In `app/src/components/ServerSettings/ModelManagement.tsx`:
+- Add description to `MODEL_DESCRIPTIONS` record
+
+## Phase 4: Dependencies
+
+### 4.1 Python Dependencies
+
+Add to `backend/requirements.txt`. Watch for:
+
+**Pinned dependency conflicts** — If the model package pins old versions, install with `--no-deps`:
+```bash
+pip install --no-deps chatterbox-tts
+```
+
+Then list sub-dependencies manually in `requirements.txt`.
+
+**Non-PyPI packages:**
+```
+linacodec @ git+https://github.com/user/repo.git
+```
+
+**Custom package indexes:**
+```
+--find-links https://k2-fsa.github.io/icefall/piper_phonemize.html
+```
+
+### 4.2 Identifying Hidden Sub-Dependencies
+
+1. Install the package normally in a throwaway venv
+2. Run `pip show <package>` to get its `Requires:` list
+3. Cross-reference against existing requirements.txt
+4. Test that the engine loads and generates
+
+## Phase 5: PyInstaller Bundling
+
+This is where most of the pain lives. Common issues:
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| `inspect.getsource()` at import | "could not get source code" | `--collect-all <package>` |
+| Data files (yaml, .pth.tar) | FileNotFoundError at runtime | `--collect-all <package>` |
+| Native data paths (espeak-ng) | Library looks at `/usr/share/...` | Set env var in frozen builds |
+| `importlib.metadata` lookups | "No package metadata found" | `--copy-metadata <package>` |
+| Dynamic imports | ModuleNotFoundError | `--hidden-import <module>` |
+
+### Testing Frozen Builds
+
+You can't skip this. Models that work in `python -m uvicorn` will break in the PyInstaller binary.
+
+1. Build: `just build`
+2. Run and try download + load + generate
+3. Check stderr for the actual error
+4. Fix, rebuild, repeat
+
+## Phase 6: Common Upstream Workarounds
+
+### torch.load device mismatch
+```python
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    kwargs.setdefault("map_location", "cpu")
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+```
+
+### Float64/Float32 dtype mismatch
+```python
+original_fn = SomeClass.some_method
+def patched_fn(self, *args, **kwargs):
+    result = original_fn(self, *args, **kwargs)
+    return result.float()
+SomeClass.some_method = patched_fn
+```
+
+### HuggingFace token bug
+```python
+from huggingface_hub import snapshot_download
+local_path = snapshot_download(repo_id=REPO, token=None)
+model = ModelClass.from_local(local_path, device=device)
+```
+
+### MPS tensor issues
+Skip MPS entirely if operators aren't supported:
+```python
+def _get_device(self):
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"  # Skip MPS
+```
+
+## Upcoming Engines
+
+Based on the current model landscape, these are candidates for future integration:
+
+| Model | Languages | Size | Key Features | Status |
+|-------|-----------|------|--------------|--------|
+| **CosyVoice2-0.5B** | Multilingual | ~500MB | Instruct support (`inference_instruct2()`) | Ready |
+| **Fish Speech** | 50+ | Medium | Word-level control via inline text | Ready |
+| **Kokoro-82M** | English | 82M | CPU realtime, Apache 2.0 | Ready |
+| **XTTS-v2** | 17+ | Medium | Zero-shot cloning | Ready |
+| **HumeAI TADA** | EN (1B), Multi (3B) | Medium | 700s+ coherent audio, synced transcripts | Needs vetting |
+| **MOSS-TTS** | Multilingual | Medium | Text-to-voice design, multi-speaker dialogue | Needs vetting |
+| **Pocket TTS** | English | ~100M | CPU-first, >1× realtime | Needs vetting |
+
+The multi-engine architecture is now in place, making new model integration straightforward (~1 day for a well-documented model with a PyPI package).

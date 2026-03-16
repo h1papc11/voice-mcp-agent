@@ -1,0 +1,18 @@
+{
+  "title": "Overview",
+  "defaultOpen": true,
+  "pages": [
+    "introduction",
+    "installation",
+    "quick-start",
+    "voice-cloning",
+    "stories-editor",
+    "recording-transcription",
+    "generation-history",
+    "remote-mode",
+    "creating-voice-profiles",
+    "generating-speech",
+    "building-stories",
+    "troubleshooting"
+  ]
+}

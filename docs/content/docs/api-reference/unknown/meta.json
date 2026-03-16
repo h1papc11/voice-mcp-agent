@@ -1,0 +1,27 @@
+{
+  "title": "Endpoints",
+  "pages": [
+    "root__get",
+    "health_health_get",
+    "list_profiles_profiles_get",
+    "create_profile_profiles_post",
+    "get_profile_profiles__profile_id__get",
+    "update_profile_profiles__profile_id__put",
+    "delete_profile_profiles__profile_id__delete",
+    "add_profile_sample_profiles__profile_id__samples_post",
+    "get_profile_samples_profiles__profile_id__samples_get",
+    "delete_profile_sample_profiles_samples__sample_id__delete",
+    "generate_speech_generate_post",
+    "list_history_history_get",
+    "get_generation_history__generation_id__get",
+    "delete_generation_history__generation_id__delete",
+    "get_stats_history_stats_get",
+    "transcribe_audio_transcribe_post",
+    "get_audio_audio__generation_id__get",
+    "load_model_models_load_post",
+    "unload_model_models_unload_post",
+    "get_model_progress_models_progress__model_name__get",
+    "get_model_status_models_status_get",
+    "trigger_model_download_models_download_post"
+  ]
+}
