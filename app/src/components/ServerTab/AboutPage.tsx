@@ -124,7 +124,7 @@ export function AboutPage() {
                 rel="noopener noreferrer"
                 className="hover:text-muted-foreground/60 transition-colors"
               >
-                BSL 1.1
+                MIT
               </a>
             </p>
           </FadeIn>
