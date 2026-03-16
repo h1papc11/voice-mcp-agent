@@ -82,7 +82,7 @@ def _migrate_story_items(engine, inspector, tables: set[str]) -> None:
                         text("UPDATE story_items SET start_time_ms = :time WHERE id = :id"),
                         {"time": current_time_ms, "id": item_id},
                     )
-                    current_time_ms += int(duration * 1000) + 200
+                    current_time_ms += int((duration or 0) * 1000) + 200
                 conn.commit()
 
             # Recreate table without the position column (SQLite lacks DROP COLUMN)
