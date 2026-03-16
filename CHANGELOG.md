@@ -7,6 +7,50 @@
 
 ## [Unreleased]
 
+This release rewrites the backend into a modular architecture, migrates the documentation site to Fumadocs, and ships a batch of bug fixes and UI polish across the stack.
+
+The backend's 3,000-line monolith `main.py` has been decomposed into domain routers, a services layer, and a proper database package. A style guide and ruff configuration now enforce consistency. On the frontend, model loading status is now visible in the UI, effects presets get a dropdown, and several race conditions and accessibility gaps are closed.
+
+### Backend Refactor ([#285](https://github.com/jamiepine/voicebox/pull/285))
+- Extracted all routes from `main.py` into 13 domain routers under `backend/routes/` — `main.py` dropped from ~3,100 lines to ~10
+- Moved CRUD and service modules into `backend/services/`, platform detection into `backend/utils/`
+- Split monolithic `database.py` into a `database/` package with separate `models`, `session`, `migrations`, and `seed` modules
+- Added `backend/STYLE_GUIDE.md` and `pyproject.toml` with ruff linting config
+- Removed dead code: unused `_get_cuda_dll_excludes`, stale `studio.py`, `example_usage.py`, old `Makefile`
+- Deduplicated shared logic across TTS backends into `backends/base.py`
+- Improved startup logging with version, platform, data directory, and database stats
+- Fixed startup database session leak — sessions now rollback and close in `finally` block
+- Isolated shutdown unload calls so one backend failure doesn't block the others
+- Handled null duration in `story_items` migration
+- Reject model migration when target is a subdirectory of source cache
+
+### Documentation Rewrite ([#288](https://github.com/jamiepine/voicebox/pull/288))
+- Migrated docs site from Mintlify to Fumadocs (Next.js-based)
+- Rewrote introduction and root page with content from README
+- Added "Edit on GitHub" links and last-updated timestamps on all pages
+- Generated OpenAPI spec and auto-generated API reference pages
+- Removed stale planning docs (`CUDA_BACKEND_SWAP`, `EXTERNAL_PROVIDERS`, `MLX_AUDIO`, `TTS_PROVIDER_ARCHITECTURE`, etc.)
+- Sidebar groups now expand by default; root redirects to `/docs`
+- Added OG image metadata and `/og` preview page
+
+### UI & Frontend
+- Added model loading status indicator and effects preset dropdown ([3187344](https://github.com/jamiepine/voicebox/commit/3187344))
+- Fixed take-label race condition during regeneration
+- Added accessible focus styling to select component
+- Softened select focus indicator opacity
+- Addressed 4 critical and 12 major issues from CodeRabbit review
+
+### Platform Fixes
+- Replaced `netstat` with `TcpStream` + PowerShell for Windows port detection ([#277](https://github.com/jamiepine/voicebox/pull/277))
+- Fixed Docker frontend build and cleaned up Docker docs
+- Fixed macOS download links to use `.dmg` instead of `.app.tar.gz`
+- Added dynamic download redirect routes to landing site
+
+### Release Tooling
+- Added `draft-release-notes` and `release-bump` agent skills
+- Wired CI release workflow to extract notes from `CHANGELOG.md` for GitHub Releases
+- Backfilled changelog with all historical releases
+
 ## [0.2.3] - 2026-03-15
 
 The "it works in dev but not in prod" release. This version fixes a series of PyInstaller bundling issues that prevented model downloading, loading, generation, and progress tracking from working in production builds.

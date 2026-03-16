@@ -1,4 +1,4 @@
-import type { PlatformLifecycle } from '@/platform/types';
+import type { PlatformLifecycle, ServerLogEntry } from '@/platform/types';
 
 class WebLifecycle implements PlatformLifecycle {
   onServerReady?: () => void;
@@ -26,6 +26,11 @@ class WebLifecycle implements PlatformLifecycle {
 
   async setupWindowCloseHandler(): Promise<void> {
     // No-op for web - no window close handling needed
+  }
+
+  subscribeToServerLogs(_callback: (_entry: ServerLogEntry) => void): () => void {
+    // No-op for web - server logs are not available
+    return () => {};
   }
 }
 

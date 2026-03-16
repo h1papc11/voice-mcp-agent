@@ -413,6 +413,10 @@ async fn start_server(
                     tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
                         let line_str = String::from_utf8_lossy(&line);
                         println!("Server output: {}", line_str);
+                        let _ = app.emit("server-log", serde_json::json!({
+                            "stream": "stdout",
+                            "line": line_str.trim_end(),
+                        }));
 
                         if line_str.contains("Uvicorn running") || line_str.contains("Application startup complete") {
                             println!("Server is ready!");
@@ -422,6 +426,10 @@ async fn start_server(
                     tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                         let line_str = String::from_utf8_lossy(&line).to_string();
                         eprintln!("Server: {}", line_str);
+                        let _ = app.emit("server-log", serde_json::json!({
+                            "stream": "stderr",
+                            "line": line_str.trim_end(),
+                        }));
 
                         // Collect error lines for debugging
                         if line_str.contains("ERROR") || line_str.contains("Error") || line_str.contains("Failed") {
@@ -482,15 +490,26 @@ async fn start_server(
         }
     }
 
-    // Spawn task to continue reading output
+    // Spawn task to continue reading output and emit to frontend
+    let app_handle = app.clone();
     tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
                 tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                    println!("Server: {}", String::from_utf8_lossy(&line));
+                    let line_str = String::from_utf8_lossy(&line);
+                    println!("Server: {}", line_str);
+                    let _ = app_handle.emit("server-log", serde_json::json!({
+                        "stream": "stdout",
+                        "line": line_str.trim_end(),
+                    }));
                 }
                 tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                    eprintln!("Server error: {}", String::from_utf8_lossy(&line));
+                    let line_str = String::from_utf8_lossy(&line);
+                    eprintln!("Server error: {}", line_str);
+                    let _ = app_handle.emit("server-log", serde_json::json!({
+                        "stream": "stderr",
+                        "line": line_str.trim_end(),
+                    }));
                 }
                 _ => {}
             }

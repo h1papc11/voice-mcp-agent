@@ -127,7 +127,13 @@ def build_server(cuda=False):
             "uvicorn",
             "--hidden-import",
             "sqlalchemy",
-            "--hidden-import",
+            # librosa uses lazy_loader which generates .pyi stub files at
+            # install time and reads them at runtime to discover submodules.
+            # --hidden-import alone doesn't bundle the stubs, causing
+            # "Cannot load imports from non-existent stub" at runtime.
+            "--collect-all",
+            "lazy_loader",
+            "--collect-all",
             "librosa",
             "--hidden-import",
             "soundfile",
