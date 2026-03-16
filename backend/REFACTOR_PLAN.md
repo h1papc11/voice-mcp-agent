@@ -2,48 +2,26 @@
 
 ## Current State
 
-2,856-line god file (`main.py`), ~500 lines of copy-pasted backend methods, 3x duplicated generation orchestration, dead modules, fake async, scattered constants. 72 routes all registered in one file. Works fine, but will fight us on every new feature.
+`main.py` is still a ~2,800-line god file with 72 routes, 3x duplicated generation orchestration, fake async CRUD modules, and scattered constants. The backend dedup is done — adding new engines is now trivial.
 
 ---
 
-## Phase 1: Dead Code & Low-Hanging Fruit
+## Phase 1: Dead Code & Low-Hanging Fruit ✓
 
-Remove noise so the real structure is easier to see.
-
-- Delete `studio.py` (66 lines, every method raises `NotImplementedError`, never imported)
-- Delete `migrate_add_instruct.py` (48 lines, superseded by `database.py` migrations)
-- Delete `utils/validation.py` (66 lines, none of the 3 functions are called anywhere)
-- Remove duplicate `_profile_to_response()` in `main.py:1983-2005`, use the one from `profiles.py`
-- Remove duplicate `import asyncio` in `main.py`
-- Remove pointless one-line wrappers (`_get_profiles_dir()`, `_get_generations_dir()`) in `profiles.py`, `history.py`, `export_import.py` — call `config.*` directly
-- Deduplicate `LANGUAGE_CODE_TO_NAME` (defined in both `pytorch_backend.py:18` and `mlx_backend.py:24`) — move to `backends/__init__.py`
-- Deduplicate `WHISPER_HF_REPOS` (defined in both `pytorch_backend.py:379` and `mlx_backend.py:416`) — move to `backends/__init__.py`
-- Update `README.md` to reflect actual file structure (it still references `studio.py` and the old two-backend layout)
+Deleted `studio.py`, `migrate_add_instruct.py`, `utils/validation.py`. Removed duplicate `_profile_to_response`, duplicate `import asyncio`, pointless wrapper functions. Consolidated `LANGUAGE_CODE_TO_NAME` and `WHISPER_HF_REPOS` into `backends/__init__.py`. Updated README.
 
 ---
 
-## Phase 2: Backend Deduplication
+## Phase 2: Backend Deduplication ✓
 
-The backends have 5-7 copies of identical or near-identical methods. This is the highest-value structural change because it removes ~500 lines and makes adding new engines trivial.
+Created `backends/base.py` with shared utilities:
+- `is_model_cached()` — parameterized HF cache check (replaced 7 copies)
+- `get_torch_device()` — parameterized device detection (replaced 5 copies)
+- `combine_voice_prompts()` — load + normalize + concatenate (replaced 5 copies)
+- `model_load_progress()` — context manager for progress tracking lifecycle (replaced 7 copies)
+- `patch_chatterbox_f32()` — shared dtype monkey-patches (replaced 2 copies)
 
-### Extract shared methods
-
-Create `backends/base.py` with:
-
-- **`is_model_cached(hf_repo, hf_revision)`** — the HuggingFace cache directory check. Currently copy-pasted in `pytorch_backend.py:81`, `mlx_backend.py:68`, `chatterbox_backend.py:66`, `chatterbox_turbo_backend.py:66`, `luxtts_backend.py:57`, and both STT backends. One function, parameterized by repo/revision.
-
-- **`combine_voice_prompts(samples, sample_rate, backend_type)`** — load audio, normalize, concatenate, join texts. Identical in all 5 TTS backends (`pytorch:301`, `mlx:291`, `chatterbox:266`, `chatterbox_turbo:269`, `luxtts:208`). The only variation is which audio loading function is used (torchaudio vs mlx_audio) — pass the loader as a parameter or detect from backend type.
-
-- **`get_device(backend_type)`** — device detection. Currently 5 slightly different implementations. Parameterize the differences:
-  - PyTorch: checks CUDA > XPU > DirectML > MPS > CPU
-  - Chatterbox/Chatterbox Turbo: forces CPU on macOS, otherwise CUDA > CPU
-  - LuxTTS: checks MPS > CUDA > CPU
-
-- **`model_load_wrapper(load_fn, ...)`** — the progress tracking boilerplate shared by all 7 `_load_model_sync` implementations. Every backend does the same setup/teardown dance with `progress_manager`, `task_manager`, `HFProgressTracker`, and tqdm patching. Extract the wrapper, backends just supply the actual model loading callable.
-
-### Extract Chatterbox f32 patch
-
-Move the S3Tokenizer / VoiceEncoder monkey-patches from `chatterbox_backend.py:189-210` and `chatterbox_turbo_backend.py:193-214` into a shared `backends/chatterbox_patches.py` (or a function in `base.py`). Both files have identical code.
+Net result: -1,078 lines across the backend.
 
 ---
 
