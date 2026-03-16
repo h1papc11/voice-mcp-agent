@@ -88,16 +88,27 @@ class TauriLifecycle implements PlatformLifecycle {
   }
 
   subscribeToServerLogs(callback: (entry: ServerLogEntry) => void): () => void {
+    let disposed = false;
     let unlisten: (() => void) | null = null;
 
-    listen<ServerLogEntry>('server-log', (event) => {
+    void listen<ServerLogEntry>('server-log', (event) => {
       callback(event.payload);
-    }).then((fn) => {
-      unlisten = fn;
-    });
+    })
+      .then((fn) => {
+        if (disposed) {
+          fn();
+          return;
+        }
+        unlisten = fn;
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to server logs:', error);
+      });
 
     return () => {
+      disposed = true;
       unlisten?.();
+      unlisten = null;
     };
   }
 }

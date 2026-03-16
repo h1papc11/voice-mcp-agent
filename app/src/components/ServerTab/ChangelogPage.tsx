@@ -57,8 +57,8 @@ function renderMarkdown(md: string): React.ReactNode[] {
       }
       elements.push(
         <ul key={elements.length} className="space-y-1 my-2">
-          {items.map((item) => (
-            <li key={item} className="text-sm text-muted-foreground flex gap-2">
+          {items.map((item, idx) => (
+            <li key={idx} className="text-sm text-muted-foreground flex gap-2">
               <span className="text-muted-foreground/50 select-none shrink-0">&bull;</span>
               <span>{inlineMarkdown(item)}</span>
             </li>
@@ -96,9 +96,9 @@ function renderTable(tableLines: string[], keyBase: number): React.ReactNode {
       <table className="text-sm w-full">
         <thead>
           <tr className="border-b">
-            {headers.map((h) => (
+            {headers.map((h, hIdx) => (
               <th
-                key={h}
+                key={hIdx}
                 className="text-left py-1.5 pr-4 text-muted-foreground font-medium text-xs"
               >
                 {inlineMarkdown(h)}
@@ -107,10 +107,10 @@ function renderTable(tableLines: string[], keyBase: number): React.ReactNode {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.join('|')} className="border-b border-border/50">
-              {row.map((cell) => (
-                <td key={cell} className="py-1.5 pr-4 text-muted-foreground">
+          {rows.map((row, rowIdx) => (
+            <tr key={rowIdx} className="border-b border-border/50">
+              {row.map((cell, cellIdx) => (
+                <td key={cellIdx} className="py-1.5 pr-4 text-muted-foreground">
                   {inlineMarkdown(cell)}
                 </td>
               ))}

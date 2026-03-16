@@ -48,7 +48,7 @@ export function SettingRow({
         <div className="min-w-0">
           <label
             htmlFor={htmlFor}
-            className="text-sm font-medium leading-none cursor-pointer select-none"
+            className={`text-sm font-medium leading-none select-none ${htmlFor ? 'cursor-pointer' : ''}`}
           >
             {title}
           </label>

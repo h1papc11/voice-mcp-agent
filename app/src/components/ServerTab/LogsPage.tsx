@@ -96,7 +96,7 @@ export function LogsPage() {
             )}
           </div>
         ) : (
-          entries.map((entry, i) => <LogLine key={`${entry.timestamp}-${i}`} entry={entry} />)
+          entries.map((entry) => <LogLine key={entry.id} entry={entry} />)
         )}
       </div>
     </div>

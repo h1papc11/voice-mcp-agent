@@ -171,17 +171,21 @@ export function GpuPage() {
     };
   }, [cudaDownloading, serverUrl, refetchCudaStatus]);
 
+  const clearHealthPolling = useCallback(() => {
+    if (healthPollRef.current) {
+      clearInterval(healthPollRef.current);
+      healthPollRef.current = null;
+    }
+  }, []);
+
   const startHealthPolling = useCallback(() => {
-    if (healthPollRef.current) return;
+    clearHealthPolling();
 
     healthPollRef.current = setInterval(async () => {
       try {
         const result = await apiClient.getHealth();
         if (result.status === 'healthy') {
-          if (healthPollRef.current) {
-            clearInterval(healthPollRef.current);
-            healthPollRef.current = null;
-          }
+          clearHealthPolling();
           setRestartPhase('ready');
           queryClient.invalidateQueries();
           setTimeout(() => setRestartPhase('idle'), 2000);
@@ -190,7 +194,23 @@ export function GpuPage() {
         // Server still down, keep polling
       }
     }, 1000);
-  }, [queryClient]);
+  }, [queryClient, clearHealthPolling]);
+
+  const restartServerWithPolling = useCallback(
+    async (errorMessage: string) => {
+      setRestartPhase('stopping');
+      try {
+        await platform.lifecycle.restartServer();
+        setRestartPhase('waiting');
+        startHealthPolling();
+      } catch (e: unknown) {
+        clearHealthPolling();
+        setRestartPhase('idle');
+        throw new Error(e instanceof Error ? e.message : errorMessage);
+      }
+    },
+    [platform, startHealthPolling, clearHealthPolling],
+  );
 
   const handleDownload = async () => {
     setError(null);
@@ -209,24 +229,9 @@ export function GpuPage() {
 
   const handleRestart = async () => {
     setError(null);
-    setRestartPhase('stopping');
     try {
-      setRestartPhase('waiting');
-      startHealthPolling();
-      await platform.lifecycle.restartServer();
-      if (healthPollRef.current) {
-        clearInterval(healthPollRef.current);
-        healthPollRef.current = null;
-      }
-      setRestartPhase('ready');
-      queryClient.invalidateQueries();
-      setTimeout(() => setRestartPhase('idle'), 2000);
+      await restartServerWithPolling('Restart failed');
     } catch (e: unknown) {
-      setRestartPhase('idle');
-      if (healthPollRef.current) {
-        clearInterval(healthPollRef.current);
-        healthPollRef.current = null;
-      }
       setError(e instanceof Error ? e.message : 'Restart failed');
     }
   };
@@ -236,22 +241,8 @@ export function GpuPage() {
     setRestartPhase('stopping');
     try {
       await apiClient.deleteCudaBackend();
-      setRestartPhase('waiting');
-      startHealthPolling();
-      await platform.lifecycle.restartServer();
-      if (healthPollRef.current) {
-        clearInterval(healthPollRef.current);
-        healthPollRef.current = null;
-      }
-      setRestartPhase('ready');
-      queryClient.invalidateQueries();
-      setTimeout(() => setRestartPhase('idle'), 2000);
+      await restartServerWithPolling('Failed to switch to CPU');
     } catch (e: unknown) {
-      setRestartPhase('idle');
-      if (healthPollRef.current) {
-        clearInterval(healthPollRef.current);
-        healthPollRef.current = null;
-      }
       setError(e instanceof Error ? e.message : 'Failed to switch to CPU');
       refetchCudaStatus();
     }

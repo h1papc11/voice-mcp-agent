@@ -133,6 +133,13 @@ export function GeneralPage() {
                 setKeepServerRunningOnClose(checked);
                 platform.lifecycle.setKeepServerRunning(checked).catch((error) => {
                   console.error('Failed to sync setting to Rust:', error);
+                  setKeepServerRunningOnClose(!checked);
+                  toast({
+                    title: 'Failed to update setting',
+                    description: 'Could not sync setting to backend.',
+                    variant: 'destructive',
+                  });
+                  return;
                 });
                 toast({
                   title: 'Setting updated',

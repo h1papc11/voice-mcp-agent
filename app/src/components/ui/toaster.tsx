@@ -25,7 +25,7 @@ export function Toaster() {
           <ToastClose />
         </Toast>
       ))}
-      <ToastViewport className={isPlayerOpen ? 'sm:bottom-32' : ''} />
+      <ToastViewport className={isPlayerOpen ? 'sm:bottom-44' : ''} />
     </ToastProvider>
   );
 }
