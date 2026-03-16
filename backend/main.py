@@ -41,17 +41,24 @@ def _safe_content_disposition(disposition_type: str, filename: str) -> str:
     Uses RFC 5987 ``filename*`` parameter so that browsers can decode
     UTF-8 filenames while the ``filename`` fallback stays ASCII-only.
     """
-    ascii_name = "".join(
-        c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")
-    ).strip() or "download"
+    ascii_name = "".join(c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")).strip() or "download"
     utf8_name = quote(filename, safe="")
-    return (
-        f'{disposition_type}; filename="{ascii_name}"; '
-        f"filename*=UTF-8''{utf8_name}"
-    )
+    return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
 
-from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
+from . import (
+    database,
+    models,
+    profiles,
+    history,
+    tts,
+    transcribe,
+    config,
+    export_import,
+    channels,
+    stories,
+    __version__,
+)
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
 from .profiles import _profile_to_response
 from .utils.progress import get_progress_manager
@@ -72,13 +79,13 @@ app = FastAPI(
 # Set VOICEBOX_CORS_ORIGINS env var to a comma-separated list of origins
 # to allow additional origins (e.g. for remote server mode).
 _default_origins = [
-    "http://localhost:5173",     # Vite dev server
+    "http://localhost:5173",  # Vite dev server
     "http://127.0.0.1:5173",
     "http://localhost:17493",
     "http://127.0.0.1:17493",
-    "tauri://localhost",         # Tauri webview (macOS)
-    "https://tauri.localhost",   # Tauri webview (Windows/Linux)
-    "http://tauri.localhost",    # Tauri webview (Windows, some builds)
+    "tauri://localhost",  # Tauri webview (macOS)
+    "https://tauri.localhost",  # Tauri webview (Windows/Linux)
+    "http://tauri.localhost",  # Tauri webview (Windows, some builds)
 ]
 _env_origins = os.environ.get("VOICEBOX_CORS_ORIGINS", "")
 _cors_origins = _default_origins + [o.strip() for o in _env_origins.split(",") if o.strip()]
@@ -92,10 +99,6 @@ app.add_middleware(
 )
 
 
-# ============================================
-# ROOT & HEALTH ENDPOINTS
-# ============================================
-
 @app.get("/")
 async def root():
     """Root endpoint."""
@@ -105,6 +108,7 @@ async def root():
 @app.post("/shutdown")
 async def shutdown():
     """Gracefully shutdown the server."""
+
     async def shutdown_async():
         await asyncio.sleep(0.1)  # Give response time to send
         os.kill(os.getpid(), signal.SIGTERM)
@@ -117,6 +121,7 @@ async def shutdown():
 async def watchdog_disable():
     """Disable the parent process watchdog so the server keeps running."""
     from backend.server import disable_watchdog
+
     disable_watchdog()
     return {"message": "Watchdog disabled"}
 
@@ -133,14 +138,15 @@ async def health():
 
     # Check for GPU availability (CUDA, MPS, Intel Arc XPU, or DirectML)
     has_cuda = torch.cuda.is_available()
-    has_mps = hasattr(torch.backends, 'mps') and torch.backends.mps.is_available()
+    has_mps = hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
 
     # Intel Arc / Intel Xe via intel-extension-for-pytorch (IPEX)
     has_xpu = False
     xpu_name = None
     try:
         import intel_extension_for_pytorch as ipex  # noqa: F401
-        if hasattr(torch, 'xpu') and torch.xpu.is_available():
+
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
             has_xpu = True
             try:
                 xpu_name = torch.xpu.get_device_name(0)
@@ -154,6 +160,7 @@ async def health():
     directml_name = None
     try:
         import torch_directml
+
         if torch_directml.device_count() > 0:
             has_directml = True
             try:
@@ -180,7 +187,7 @@ async def health():
     vram_used = None
     if has_cuda:
         vram_used = torch.cuda.memory_allocated() / 1024 / 1024  # MB
-    
+
     # Check if model is loaded - use the same logic as model status endpoint
     model_loaded = False
     model_size = None
@@ -190,26 +197,28 @@ async def health():
             model_loaded = True
             # Get the actual loaded model size
             # Check _current_model_size first (more reliable for actually loaded models)
-            model_size = getattr(tts_model, '_current_model_size', None)
+            model_size = getattr(tts_model, "_current_model_size", None)
             if not model_size:
                 # Fallback to model_size attribute (which should be set when model loads)
-                model_size = getattr(tts_model, 'model_size', None)
+                model_size = getattr(tts_model, "model_size", None)
     except Exception:
         # If there's an error checking, assume not loaded
         model_loaded = False
         model_size = None
-    
+
     # Check if default model is downloaded (cached)
     model_downloaded = None
     try:
         # Check if the default model (1.7B) is cached
         from .backends import get_model_config
+
         default_config = get_model_config("qwen-tts-1.7B")
         default_model_id = default_config.hf_repo_id if default_config else "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
-        
+
         # Method 1: Try scan_cache_dir if available
         try:
             from huggingface_hub import scan_cache_dir
+
             cache_info = scan_cache_dir()
             for repo in cache_info.repos:
                 if repo.repo_id == default_model_id:
@@ -221,16 +230,16 @@ async def health():
             repo_cache = Path(cache_dir) / ("models--" + default_model_id.replace("/", "--"))
             if repo_cache.exists():
                 has_model_files = (
-                    any(repo_cache.rglob("*.bin")) or
-                    any(repo_cache.rglob("*.safetensors")) or
-                    any(repo_cache.rglob("*.pt")) or
-                    any(repo_cache.rglob("*.pth")) or
-                    any(repo_cache.rglob("*.npz"))  # MLX models may use npz
+                    any(repo_cache.rglob("*.bin"))
+                    or any(repo_cache.rglob("*.safetensors"))
+                    or any(repo_cache.rglob("*.pt"))
+                    or any(repo_cache.rglob("*.pth"))
+                    or any(repo_cache.rglob("*.npz"))  # MLX models may use npz
                 )
                 model_downloaded = has_model_files
     except Exception:
         pass
-    
+
     return models.HealthResponse(
         status="healthy",
         model_loaded=model_loaded,
@@ -313,10 +322,6 @@ async def filesystem_health():
     )
 
 
-# ============================================
-# VOICE PROFILE ENDPOINTS
-# ============================================
-
 @app.post("/profiles", response_model=models.VoiceProfileResponse)
 async def create_profile(
     data: models.VoiceProfileCreate,
@@ -346,16 +351,15 @@ async def import_profile(
     """Import a voice profile from a ZIP archive."""
     # Validate file size (max 100MB)
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
-    
+
     # Read file content
     content = await file.read()
-    
+
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
+            status_code=400, detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
         )
-    
+
     try:
         profile = await export_import.import_profile_from_zip(content, db)
         return profile
@@ -415,9 +419,9 @@ async def add_profile_sample(
     """Add a sample to a voice profile."""
     # Preserve the uploaded file's extension so librosa can detect format correctly.
     # Defaulting to .wav was causing soundfile to reject MP3/WebM content as invalid WAV.
-    _allowed_audio_exts = {'.wav', '.mp3', '.m4a', '.ogg', '.flac', '.aac', '.webm', '.opus'}
-    _uploaded_ext = Path(file.filename or '').suffix.lower()
-    file_suffix = _uploaded_ext if _uploaded_ext in _allowed_audio_exts else '.wav'
+    _allowed_audio_exts = {".wav", ".mp3", ".m4a", ".ogg", ".flac", ".aac", ".webm", ".opus"}
+    _uploaded_ext = Path(file.filename or "").suffix.lower()
+    file_suffix = _uploaded_ext if _uploaded_ext in _allowed_audio_exts else ".wav"
 
     with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp:
         content = await file.read()
@@ -541,33 +545,27 @@ async def export_profile(
         profile = await profiles.get_profile(profile_id, db)
         if not profile:
             raise HTTPException(status_code=404, detail="Profile not found")
-        
+
         # Export to ZIP
         zip_bytes = export_import.export_profile_to_zip(profile_id, db)
-        
+
         # Create safe filename
-        safe_name = "".join(c for c in profile.name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_name = "".join(c for c in profile.name if c.isalnum() or c in (" ", "-", "_")).strip()
         if not safe_name:
             safe_name = "profile"
         filename = f"profile-{safe_name}.voicebox.zip"
-        
+
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
-            headers={
-                "Content-Disposition": _safe_content_disposition("attachment", filename)
-            }
+            headers={"Content-Disposition": _safe_content_disposition("attachment", filename)},
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ============================================
-# AUDIO CHANNEL ENDPOINTS
-# ============================================
 
 @app.get("/channels", response_model=List[models.AudioChannelResponse])
 async def list_channels(db: Session = Depends(get_db)):
@@ -684,17 +682,13 @@ async def set_profile_channels(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# ============================================
-# GENERATION ENDPOINTS
-# ============================================
-
 @app.post("/generate", response_model=models.GenerationResponse)
 async def generate_speech(
     data: models.GenerationRequest,
     db: Session = Depends(get_db),
 ):
     """Generate speech from text using a voice profile.
-    
+
     Creates a history entry immediately with status='generating' and kicks off
     TTS in the background. The frontend can poll or use SSE to detect completion.
     """
@@ -707,6 +701,7 @@ async def generate_speech(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     from .backends import engine_has_model_sizes
+
     engine = data.engine or "qwen"
     model_size = data.model_size or "1.7B"
 
@@ -740,6 +735,7 @@ async def generate_speech(
     else:
         # Check profile default
         import json as _json
+
         profile_obj = db.query(DBVoiceProfile).filter_by(id=data.profile_id).first()
         if profile_obj and profile_obj.effects_chain:
             try:
@@ -748,21 +744,23 @@ async def generate_speech(
                 pass
 
     # Kick off TTS in background
-    enqueue_generation(run_generation(
-        generation_id=generation_id,
-        profile_id=data.profile_id,
-        text=data.text,
-        language=data.language,
-        engine=engine,
-        model_size=model_size,
-        seed=data.seed,
-        normalize=data.normalize,
-        effects_chain=effects_chain_config,
-        instruct=data.instruct,
-        mode="generate",
-        max_chunk_chars=data.max_chunk_chars,
-        crossfade_ms=data.crossfade_ms,
-    ))
+    enqueue_generation(
+        run_generation(
+            generation_id=generation_id,
+            profile_id=data.profile_id,
+            text=data.text,
+            language=data.language,
+            engine=engine,
+            model_size=model_size,
+            seed=data.seed,
+            normalize=data.normalize,
+            effects_chain=effects_chain_config,
+            instruct=data.instruct,
+            mode="generate",
+            max_chunk_chars=data.max_chunk_chars,
+            crossfade_ms=data.crossfade_ms,
+        )
+    )
 
     return generation
 
@@ -792,17 +790,19 @@ async def retry_generation(generation_id: str, db: Session = Depends(get_db)):
         text=gen.text,
     )
 
-    enqueue_generation(run_generation(
-        generation_id=generation_id,
-        profile_id=gen.profile_id,
-        text=gen.text,
-        language=gen.language,
-        engine=gen.engine or "qwen",
-        model_size=gen.model_size or "1.7B",
-        seed=gen.seed,
-        instruct=gen.instruct,
-        mode="retry",
-    ))
+    enqueue_generation(
+        run_generation(
+            generation_id=generation_id,
+            profile_id=gen.profile_id,
+            text=gen.text,
+            language=gen.language,
+            engine=gen.engine or "qwen",
+            model_size=gen.model_size or "1.7B",
+            seed=gen.seed,
+            instruct=gen.instruct,
+            mode="retry",
+        )
+    )
 
     return models.GenerationResponse.model_validate(gen)
 
@@ -834,18 +834,20 @@ async def regenerate_generation(generation_id: str, db: Session = Depends(get_db
 
     version_id = str(uuid.uuid4())
 
-    enqueue_generation(run_generation(
-        generation_id=generation_id,
-        profile_id=gen.profile_id,
-        text=gen.text,
-        language=gen.language,
-        engine=gen.engine or "qwen",
-        model_size=gen.model_size or "1.7B",
-        seed=gen.seed,
-        instruct=gen.instruct,
-        mode="regenerate",
-        version_id=version_id,
-    ))
+    enqueue_generation(
+        run_generation(
+            generation_id=generation_id,
+            profile_id=gen.profile_id,
+            text=gen.text,
+            language=gen.language,
+            engine=gen.engine or "qwen",
+            model_size=gen.model_size or "1.7B",
+            seed=gen.seed,
+            instruct=gen.instruct,
+            mode="regenerate",
+            version_id=version_id,
+        )
+    )
 
     return models.GenerationResponse.model_validate(gen)
 
@@ -853,7 +855,7 @@ async def regenerate_generation(generation_id: str, db: Session = Depends(get_db
 @app.get("/generate/{generation_id}/status")
 async def get_generation_status(generation_id: str, db: Session = Depends(get_db)):
     """SSE endpoint that streams generation status updates.
-    
+
     Polls the DB every second and yields the current status. Closes when
     the generation reaches 'completed' or 'failed'.
     """
@@ -914,11 +916,14 @@ async def stream_speech(
     model_size = data.model_size or "1.7B"
 
     from .backends import ensure_model_cached_or_raise, load_engine_model, engine_needs_trim
+
     await ensure_model_cached_or_raise(engine, model_size)
     await load_engine_model(engine, model_size)
 
     voice_prompt = await profiles.create_voice_prompt_for_profile(
-        data.profile_id, db, engine=engine,
+        data.profile_id,
+        db,
+        engine=engine,
     )
 
     from .utils.chunked_tts import generate_chunked
@@ -926,6 +931,7 @@ async def stream_speech(
     trim_fn = None
     if engine_needs_trim(engine):
         from .utils.audio import trim_tts_output
+
         trim_fn = trim_tts_output
 
     audio, sample_rate = await generate_chunked(
@@ -942,6 +948,7 @@ async def stream_speech(
 
     if data.normalize:
         from .utils.audio import normalize_audio
+
         audio = normalize_audio(audio)
 
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
@@ -958,10 +965,6 @@ async def stream_speech(
         headers={"Content-Disposition": 'attachment; filename="speech.wav"'},
     )
 
-
-# ============================================
-# HISTORY ENDPOINTS
-# ============================================
 
 @app.get("/history", response_model=models.HistoryListResponse)
 async def list_history(
@@ -995,16 +998,15 @@ async def import_generation(
     """Import a generation from a ZIP archive."""
     # Validate file size (max 50MB)
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-    
+
     # Read file content
     content = await file.read()
-    
+
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
+            status_code=400, detail=f"File too large. Maximum size is {MAX_FILE_SIZE / (1024 * 1024)}MB"
         )
-    
+
     try:
         result = await export_import.import_generation_from_zip(content, db)
         return result
@@ -1021,19 +1023,16 @@ async def get_generation(
 ):
     """Get a generation by ID."""
     # Get generation with profile name
-    result = db.query(
-        DBGeneration,
-        DBVoiceProfile.name.label('profile_name')
-    ).join(
-        DBVoiceProfile,
-        DBGeneration.profile_id == DBVoiceProfile.id
-    ).filter(
-        DBGeneration.id == generation_id
-    ).first()
-    
+    result = (
+        db.query(DBGeneration, DBVoiceProfile.name.label("profile_name"))
+        .join(DBVoiceProfile, DBGeneration.profile_id == DBVoiceProfile.id)
+        .filter(DBGeneration.id == generation_id)
+        .first()
+    )
+
     if not result:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
+
     gen, profile_name = result
     return models.HistoryResponse(
         id=gen.id,
@@ -1086,23 +1085,21 @@ async def export_generation(
         generation = db.query(DBGeneration).filter_by(id=generation_id).first()
         if not generation:
             raise HTTPException(status_code=404, detail="Generation not found")
-        
+
         # Export to ZIP
         zip_bytes = export_import.export_generation_to_zip(generation_id, db)
-        
+
         # Create safe filename from text
-        safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
         if not safe_text:
             safe_text = "generation"
         filename = f"generation-{safe_text}.voicebox.zip"
-        
+
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(zip_bytes),
             media_type="application/zip",
-            headers={
-                "Content-Disposition": _safe_content_disposition("attachment", filename)
-            }
+            headers={"Content-Disposition": _safe_content_disposition("attachment", filename)},
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1119,29 +1116,23 @@ async def export_generation_audio(
     generation = db.query(DBGeneration).filter_by(id=generation_id).first()
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
+
     audio_path = Path(generation.audio_path)
     if not audio_path.exists():
         raise HTTPException(status_code=404, detail="Audio file not found")
-    
+
     # Create safe filename from text
-    safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_text = "".join(c for c in generation.text[:30] if c.isalnum() or c in (" ", "-", "_")).strip()
     if not safe_text:
         safe_text = "generation"
     filename = f"{safe_text}.wav"
-    
+
     return FileResponse(
         audio_path,
         media_type="audio/wav",
-        headers={
-            "Content-Disposition": _safe_content_disposition("attachment", filename)
-        }
+        headers={"Content-Disposition": _safe_content_disposition("attachment", filename)},
     )
 
-
-# ============================================
-# TRANSCRIPTION ENDPOINTS
-# ============================================
 
 @app.post("/transcribe", response_model=models.TranscriptionResponse)
 async def transcribe_audio(
@@ -1154,13 +1145,14 @@ async def transcribe_audio(
         content = await file.read()
         tmp.write(content)
         tmp_path = tmp.name
-    
+
     try:
         # Get audio duration
         from .utils.audio import load_audio
+
         audio, sr = await asyncio.to_thread(load_audio, tmp_path)
         duration = len(audio) / sr
-        
+
         # Transcribe
         whisper_model = transcribe.get_whisper_model()
 
@@ -1175,6 +1167,7 @@ async def transcribe_audio(
 
         # Check if model is cached
         from huggingface_hub import constants as hf_constants
+
         repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + model_name.replace("/", "--"))
         if not repo_cache.exists():
             # Start download in background
@@ -1195,27 +1188,23 @@ async def transcribe_audio(
                 detail={
                     "message": f"Whisper model {model_size} is being downloaded. Please wait and try again.",
                     "model_name": progress_model_name,
-                    "downloading": True
-                }
+                    "downloading": True,
+                },
             )
 
         text = await whisper_model.transcribe(tmp_path, language)
-        
+
         return models.TranscriptionResponse(
             text=text,
             duration=duration,
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         # Clean up temp file
         Path(tmp_path).unlink(missing_ok=True)
 
-
-# ============================================
-# STORY ENDPOINTS
-# ============================================
 
 @app.get("/stories", response_model=List[models.StoryResponse])
 async def list_stories(db: Session = Depends(get_db)):
@@ -1320,7 +1309,9 @@ async def reorder_story_items(
     """Reorder story items and recalculate timecodes."""
     items = await stories.reorder_story_items(story_id, data.generation_ids, db)
     if items is None:
-        raise HTTPException(status_code=400, detail="Invalid reorder request - ensure all generation IDs belong to this story")
+        raise HTTPException(
+            status_code=400, detail="Invalid reorder request - ensure all generation IDs belong to this story"
+        )
     return items
 
 
@@ -1404,35 +1395,29 @@ async def export_story_audio(
         story = db.query(database.Story).filter_by(id=story_id).first()
         if not story:
             raise HTTPException(status_code=404, detail="Story not found")
-        
+
         # Export audio
         audio_bytes = await stories.export_story_audio(story_id, db)
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Story has no audio items")
-        
+
         # Create safe filename
-        safe_name = "".join(c for c in story.name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_name = "".join(c for c in story.name if c.isalnum() or c in (" ", "-", "_")).strip()
         if not safe_name:
             safe_name = "story"
         filename = f"{safe_name}.wav"
-        
+
         # Return as streaming response
         return StreamingResponse(
             io.BytesIO(audio_bytes),
             media_type="audio/wav",
-            headers={
-                "Content-Disposition": _safe_content_disposition("attachment", filename)
-            }
+            headers={"Content-Disposition": _safe_content_disposition("attachment", filename)},
         )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# ============================================
-# EFFECTS & VERSIONS
-# ============================================
 
 @app.post("/effects/preview/{generation_id}")
 async def preview_effects(
@@ -1473,6 +1458,7 @@ async def preview_effects(
 
     # Write to in-memory buffer
     import soundfile as sf
+
     buf = io.BytesIO()
     await asyncio.to_thread(lambda: sf.write(buf, processed, sample_rate, format="WAV"))
     buf.seek(0)
@@ -1491,15 +1477,15 @@ async def preview_effects(
 async def get_available_effects():
     """List all available effect types with parameter definitions."""
     from .utils.effects import get_available_effects as _get_effects
-    return models.AvailableEffectsResponse(effects=[
-        models.AvailableEffect(**e) for e in _get_effects()
-    ])
+
+    return models.AvailableEffectsResponse(effects=[models.AvailableEffect(**e) for e in _get_effects()])
 
 
 @app.get("/effects/presets", response_model=List[models.EffectPresetResponse])
 async def list_effect_presets(db: Session = Depends(get_db)):
     """List all effect presets (built-in + user-created)."""
     from . import effects as effects_mod
+
     return effects_mod.list_presets(db)
 
 
@@ -1507,6 +1493,7 @@ async def list_effect_presets(db: Session = Depends(get_db)):
 async def get_effect_preset(preset_id: str, db: Session = Depends(get_db)):
     """Get a specific effect preset."""
     from . import effects as effects_mod
+
     preset = effects_mod.get_preset(preset_id, db)
     if not preset:
         raise HTTPException(status_code=404, detail="Preset not found")
@@ -1520,6 +1507,7 @@ async def create_effect_preset(
 ):
     """Create a new effect preset."""
     from . import effects as effects_mod
+
     try:
         return effects_mod.create_preset(data, db)
     except ValueError as e:
@@ -1534,6 +1522,7 @@ async def update_effect_preset(
 ):
     """Update an effect preset."""
     from . import effects as effects_mod
+
     try:
         result = effects_mod.update_preset(preset_id, data, db)
         if not result:
@@ -1547,6 +1536,7 @@ async def update_effect_preset(
 async def delete_effect_preset(preset_id: str, db: Session = Depends(get_db)):
     """Delete a user effect preset."""
     from . import effects as effects_mod
+
     try:
         if not effects_mod.delete_preset(preset_id, db):
             raise HTTPException(status_code=404, detail="Preset not found")
@@ -1569,6 +1559,7 @@ async def list_generation_versions(
         raise HTTPException(status_code=404, detail="Generation not found")
 
     from . import versions as versions_mod
+
     return versions_mod.list_versions(generation_id, db)
 
 
@@ -1602,16 +1593,12 @@ async def apply_effects_to_generation(
     all_versions = versions_mod.list_versions(generation_id, db)
     source_version_id = data.source_version_id
     if source_version_id:
-        source_version = next(
-            (v for v in all_versions if v.id == source_version_id), None
-        )
+        source_version = next((v for v in all_versions if v.id == source_version_id), None)
         if not source_version:
             raise HTTPException(status_code=404, detail="Source version not found")
         source_path = source_version.audio_path
     else:
-        clean_version = next(
-            (v for v in all_versions if v.effects_chain is None), None
-        )
+        clean_version = next((v for v in all_versions if v.effects_chain is None), None)
         if not clean_version:
             source_path = gen.audio_path
         else:
@@ -1724,6 +1711,7 @@ async def update_profile_effects(
 
     if data.effects_chain is not None:
         from .utils.effects import validate_effects_chain
+
         chain_dicts = [e.model_dump() for e in data.effects_chain]
         error = validate_effects_chain(chain_dicts)
         if error:
@@ -1739,21 +1727,17 @@ async def update_profile_effects(
     return _profile_to_response(profile)
 
 
-# ============================================
-# FILE SERVING
-# ============================================
-
 @app.get("/audio/{generation_id}")
 async def get_audio(generation_id: str, db: Session = Depends(get_db)):
     """Serve generated audio file (serves the default version)."""
     generation = await history.get_generation(generation_id, db)
     if not generation:
         raise HTTPException(status_code=404, detail="Generation not found")
-    
+
     audio_path = Path(generation.audio_path)
     if not audio_path.exists():
         raise HTTPException(status_code=404, detail="Audio file not found")
-    
+
     return FileResponse(
         audio_path,
         media_type="audio/wav",
@@ -1765,25 +1749,21 @@ async def get_audio(generation_id: str, db: Session = Depends(get_db)):
 async def get_sample_audio(sample_id: str, db: Session = Depends(get_db)):
     """Serve profile sample audio file."""
     from .database import ProfileSample as DBProfileSample
-    
+
     sample = db.query(DBProfileSample).filter_by(id=sample_id).first()
     if not sample:
         raise HTTPException(status_code=404, detail="Sample not found")
-    
+
     audio_path = Path(sample.audio_path)
     if not audio_path.exists():
         raise HTTPException(status_code=404, detail="Audio file not found")
-    
+
     return FileResponse(
         audio_path,
         media_type="audio/wav",
         filename=f"sample_{sample_id}.wav",
     )
 
-
-# ============================================
-# MODEL MANAGEMENT
-# ============================================
 
 @app.post("/models/load")
 async def load_model(model_size: str = "1.7B"):
@@ -1828,14 +1808,14 @@ async def unload_model_by_name(model_name: str):
 async def get_model_progress(model_name: str):
     """Get model download progress via Server-Sent Events."""
     from fastapi.responses import StreamingResponse
-    
+
     progress_manager = get_progress_manager()
-    
+
     async def event_generator():
         """Generate SSE events for progress updates."""
         async for event in progress_manager.subscribe(model_name):
             yield event
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -1851,6 +1831,7 @@ async def get_model_progress(model_name: str):
 async def get_models_cache_dir():
     """Get the path to the HuggingFace model cache directory."""
     from huggingface_hub import constants as hf_constants
+
     return {"path": str(Path(hf_constants.HF_HUB_CACHE))}
 
 
@@ -1866,6 +1847,7 @@ def _get_dir_size(path: Path) -> int:
 def _copy_with_progress(src: Path, dst: Path, progress_manager, copied_so_far: int, total_bytes: int) -> int:
     """Copy a directory tree with byte-level progress tracking."""
     import shutil
+
     dst.mkdir(parents=True, exist_ok=True)
     for item in src.iterdir():
         dest_item = dst / item.name
@@ -1876,8 +1858,11 @@ def _copy_with_progress(src: Path, dst: Path, progress_manager, copied_so_far: i
             shutil.copy2(str(item), str(dest_item))
             copied_so_far += size
             progress_manager.update_progress(
-                "migration", copied_so_far, total_bytes,
-                filename=item.name, status="downloading",
+                "migration",
+                copied_so_far,
+                total_bytes,
+                filename=item.name,
+                status="downloading",
             )
     return copied_so_far
 
@@ -1924,15 +1909,20 @@ async def migrate_models(request: models.ModelMigrateRequest):
                         shutil.move(str(item), str(dest_item))
                         moved += 1
                         progress_manager.update_progress(
-                            "migration", i + 1, total,
-                            filename=item.name, status="downloading",
+                            "migration",
+                            i + 1,
+                            total,
+                            filename=item.name,
+                            status="downloading",
                         )
                     except Exception as e:
                         errors.append(f"{item.name}: {str(e)}")
             else:
                 # Cross-filesystem: copy with byte-level progress, then delete source
                 total_bytes = sum(_get_dir_size(d) for d in model_dirs)
-                progress_manager.update_progress("migration", 0, total_bytes, filename="Calculating...", status="downloading")
+                progress_manager.update_progress(
+                    "migration", 0, total_bytes, filename="Calculating...", status="downloading"
+                )
 
                 copied = 0
                 for item in model_dirs:
@@ -1987,20 +1977,21 @@ async def get_model_status():
     """Get status of all available models."""
     from huggingface_hub import constants as hf_constants
     from pathlib import Path
-    
+
     backend_type = get_backend_type()
     task_manager = get_task_manager()
-    
+
     # Get set of currently downloading model names
     active_download_names = {task.model_name for task in task_manager.get_active_downloads()}
-    
+
     # Try to import scan_cache_dir (might not be available in older versions)
     try:
         from huggingface_hub import scan_cache_dir
+
         use_scan_cache = True
     except ImportError:
         use_scan_cache = False
-    
+
     from .backends import get_all_model_configs, check_model_loaded
 
     registry_configs = get_all_model_configs()
@@ -2014,14 +2005,14 @@ async def get_model_status():
         }
         for cfg in registry_configs
     ]
-    
+
     # Build a mapping of model_name -> hf_repo_id so we can check if shared repos are downloading
     model_to_repo = {cfg["model_name"]: cfg["hf_repo_id"] for cfg in model_configs}
-    
+
     # Get the set of hf_repo_ids that are currently being downloaded
     # This handles the case where multiple models share the same repo (e.g., 0.6B and 1.7B on MLX)
     active_download_repos = {model_to_repo.get(name) for name in active_download_names if name in model_to_repo}
-    
+
     # Get HuggingFace cache info (if available)
     cache_info = None
     if use_scan_cache:
@@ -2030,15 +2021,15 @@ async def get_model_status():
         except Exception:
             # Function failed, continue without it
             pass
-    
+
     statuses = []
-    
+
     for config in model_configs:
         try:
             downloaded = False
             size_mb = None
             loaded = False
-            
+
             # Method 1: Try using scan_cache_dir if available
             if cache_info:
                 repo_id = config["hf_repo_id"]
@@ -2050,12 +2041,12 @@ async def get_model_status():
                         for rev in repo.revisions:
                             for f in rev.files:
                                 fname = f.file_name.lower()
-                                if fname.endswith(('.safetensors', '.bin', '.pt', '.pth', '.npz')):
+                                if fname.endswith((".safetensors", ".bin", ".pt", ".pth", ".npz")):
                                     has_model_weights = True
                                     break
                             if has_model_weights:
                                 break
-                        
+
                         # Also check for .incomplete files in blobs directory (downloads in progress)
                         has_incomplete = False
                         try:
@@ -2065,7 +2056,7 @@ async def get_model_status():
                                 has_incomplete = any(blobs_dir.glob("*.incomplete"))
                         except Exception:
                             pass
-                        
+
                         # Only mark as downloaded if we have model weights AND no incomplete files
                         if has_model_weights and not has_incomplete:
                             downloaded = True
@@ -2076,18 +2067,18 @@ async def get_model_status():
                             except Exception:
                                 pass
                         break
-            
+
             # Method 2: Fallback to checking cache directory directly (using HuggingFace's OS-specific cache location)
             if not downloaded:
                 try:
                     cache_dir = hf_constants.HF_HUB_CACHE
                     repo_cache = Path(cache_dir) / ("models--" + config["hf_repo_id"].replace("/", "--"))
-                    
+
                     if repo_cache.exists():
                         # Check for .incomplete files - if any exist, download is still in progress
                         blobs_dir = repo_cache / "blobs"
                         has_incomplete = blobs_dir.exists() and any(blobs_dir.glob("*.incomplete"))
-                        
+
                         if not has_incomplete:
                             # Check for actual model weight files (not just index files)
                             # in the snapshots directory (symlinks to completed blobs)
@@ -2095,73 +2086,78 @@ async def get_model_status():
                             has_model_files = False
                             if snapshots_dir.exists():
                                 has_model_files = (
-                                    any(snapshots_dir.rglob("*.bin")) or
-                                    any(snapshots_dir.rglob("*.safetensors")) or
-                                    any(snapshots_dir.rglob("*.pt")) or
-                                    any(snapshots_dir.rglob("*.pth")) or
-                                    any(snapshots_dir.rglob("*.npz"))
+                                    any(snapshots_dir.rglob("*.bin"))
+                                    or any(snapshots_dir.rglob("*.safetensors"))
+                                    or any(snapshots_dir.rglob("*.pt"))
+                                    or any(snapshots_dir.rglob("*.pth"))
+                                    or any(snapshots_dir.rglob("*.npz"))
                                 )
-                            
+
                             if has_model_files:
                                 downloaded = True
                                 # Calculate size (exclude .incomplete files)
                                 try:
                                     total_size = sum(
-                                        f.stat().st_size for f in repo_cache.rglob("*") 
-                                        if f.is_file() and not f.name.endswith('.incomplete')
+                                        f.stat().st_size
+                                        for f in repo_cache.rglob("*")
+                                        if f.is_file() and not f.name.endswith(".incomplete")
                                     )
                                     size_mb = total_size / (1024 * 1024)
                                 except Exception:
                                     pass
                 except Exception:
                     pass
-            
+
             # Method 3 removed - checking for config.json is too lenient
             # Methods 1 and 2 properly verify that model weight files exist
-            
+
             # Check if loaded in memory
             try:
                 loaded = config["check_loaded"]()
             except Exception:
                 loaded = False
-            
+
             # Check if this model (or its shared repo) is currently being downloaded
             is_downloading = config["hf_repo_id"] in active_download_repos
-            
+
             # If downloading, don't report as downloaded (partial files exist)
             if is_downloading:
                 downloaded = False
                 size_mb = None  # Don't show partial size during download
-            
-            statuses.append(models.ModelStatus(
-                model_name=config["model_name"],
-                display_name=config["display_name"],
-                hf_repo_id=config["hf_repo_id"],
-                downloaded=downloaded,
-                downloading=is_downloading,
-                size_mb=size_mb,
-                loaded=loaded,
-            ))
+
+            statuses.append(
+                models.ModelStatus(
+                    model_name=config["model_name"],
+                    display_name=config["display_name"],
+                    hf_repo_id=config["hf_repo_id"],
+                    downloaded=downloaded,
+                    downloading=is_downloading,
+                    size_mb=size_mb,
+                    loaded=loaded,
+                )
+            )
         except Exception as e:
             # If check fails, try to at least check if loaded
             try:
                 loaded = config["check_loaded"]()
             except Exception:
                 loaded = False
-            
+
             # Check if this model (or its shared repo) is currently being downloaded
             is_downloading = config["hf_repo_id"] in active_download_repos
-            
-            statuses.append(models.ModelStatus(
-                model_name=config["model_name"],
-                display_name=config["display_name"],
-                hf_repo_id=config["hf_repo_id"],
-                downloaded=False,  # Assume not downloaded if check failed
-                downloading=is_downloading,
-                size_mb=None,
-                loaded=loaded,
-            ))
-    
+
+            statuses.append(
+                models.ModelStatus(
+                    model_name=config["model_name"],
+                    display_name=config["display_name"],
+                    hf_repo_id=config["hf_repo_id"],
+                    downloaded=False,  # Assume not downloaded if check failed
+                    downloading=is_downloading,
+                    size_mb=None,
+                    loaded=loaded,
+                )
+            )
+
     return models.ModelStatusListResponse(models=statuses)
 
 
@@ -2179,7 +2175,7 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
         raise HTTPException(status_code=400, detail=f"Unknown model: {request.model_name}")
 
     load_func = get_model_load_func(config)
-    
+
     async def download_in_background():
         """Download model in background without blocking the HTTP request."""
         try:
@@ -2194,7 +2190,7 @@ async def trigger_model_download(request: models.ModelDownloadRequest):
 
     # Start tracking download
     task_manager.start_download(request.model_name)
-    
+
     # Initialize progress state so SSE endpoint has initial data to send.
     # This fixes a race condition where the frontend connects to SSE before
     # any progress callbacks have fired (especially for large models like Qwen
@@ -2256,7 +2252,7 @@ async def delete_model(model_name: str):
     import shutil
     import os
     from huggingface_hub import constants as hf_constants
-    
+
     from .backends import get_model_config, unload_model_by_config
 
     config = get_model_config(model_name)
@@ -2268,26 +2264,23 @@ async def delete_model(model_name: str):
     try:
         # Unload model if currently loaded
         unload_model_by_config(config)
-        
+
         # Find and delete the cache directory (using HuggingFace's OS-specific cache location)
         cache_dir = hf_constants.HF_HUB_CACHE
         repo_cache_dir = Path(cache_dir) / ("models--" + hf_repo_id.replace("/", "--"))
-        
+
         # Check if the cache directory exists
         if not repo_cache_dir.exists():
             raise HTTPException(status_code=404, detail=f"Model {model_name} not found in cache")
-        
+
         # Delete the entire cache directory for this model
         try:
             shutil.rmtree(repo_cache_dir)
         except OSError as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to delete model cache directory: {str(e)}"
-            )
-        
+            raise HTTPException(status_code=500, detail=f"Failed to delete model cache directory: {str(e)}")
+
         return {"message": f"Model {model_name} deleted successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -2307,33 +2300,29 @@ async def clear_cache():
         raise HTTPException(status_code=500, detail=f"Failed to clear cache: {str(e)}")
 
 
-# ============================================
-# TASK MANAGEMENT
-# ============================================
-
 @app.get("/tasks/active", response_model=models.ActiveTasksResponse)
 async def get_active_tasks():
     """Return all currently active downloads and generations."""
     task_manager = get_task_manager()
     progress_manager = get_progress_manager()
-    
+
     # Get active downloads from both task manager and progress manager
     # Task manager tracks which downloads are active
     # Progress manager has the actual progress data
     active_downloads = []
     task_manager_downloads = task_manager.get_active_downloads()
     progress_active = progress_manager.get_all_active()
-    
+
     # Combine data from both sources
     download_map = {task.model_name: task for task in task_manager_downloads}
     progress_map = {p["model_name"]: p for p in progress_active}
-    
+
     # Create unified list
     all_model_names = set(download_map.keys()) | set(progress_map.keys())
     for model_name in all_model_names:
         task = download_map.get(model_name)
         progress = progress_map.get(model_name)
-        
+
         if task:
             # Prefer task error, fall back to progress manager error
             error = task.error
@@ -2349,62 +2338,65 @@ async def get_active_tasks():
                     pm_data = progress_manager._progress.get(model_name)
                     if pm_data:
                         prog = pm_data
-            active_downloads.append(models.ActiveDownloadTask(
-                model_name=model_name,
-                status=task.status,
-                started_at=task.started_at,
-                error=error,
-                progress=prog.get("progress"),
-                current=prog.get("current"),
-                total=prog.get("total"),
-                filename=prog.get("filename"),
-            ))
+            active_downloads.append(
+                models.ActiveDownloadTask(
+                    model_name=model_name,
+                    status=task.status,
+                    started_at=task.started_at,
+                    error=error,
+                    progress=prog.get("progress"),
+                    current=prog.get("current"),
+                    total=prog.get("total"),
+                    filename=prog.get("filename"),
+                )
+            )
         elif progress:
             # Progress exists but no task - create from progress data
             timestamp_str = progress.get("timestamp")
             if timestamp_str:
                 try:
-                    started_at = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    started_at = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
                 except (ValueError, AttributeError):
                     started_at = datetime.utcnow()
             else:
                 started_at = datetime.utcnow()
-            
-            active_downloads.append(models.ActiveDownloadTask(
-                model_name=model_name,
-                status=progress.get("status", "downloading"),
-                started_at=started_at,
-                error=progress.get("error"),
-                progress=progress.get("progress"),
-                current=progress.get("current"),
-                total=progress.get("total"),
-                filename=progress.get("filename"),
-            ))
-    
+
+            active_downloads.append(
+                models.ActiveDownloadTask(
+                    model_name=model_name,
+                    status=progress.get("status", "downloading"),
+                    started_at=started_at,
+                    error=progress.get("error"),
+                    progress=progress.get("progress"),
+                    current=progress.get("current"),
+                    total=progress.get("total"),
+                    filename=progress.get("filename"),
+                )
+            )
+
     # Get active generations
     active_generations = []
     for gen_task in task_manager.get_active_generations():
-        active_generations.append(models.ActiveGenerationTask(
-            task_id=gen_task.task_id,
-            profile_id=gen_task.profile_id,
-            text_preview=gen_task.text_preview,
-            started_at=gen_task.started_at,
-        ))
-    
+        active_generations.append(
+            models.ActiveGenerationTask(
+                task_id=gen_task.task_id,
+                profile_id=gen_task.profile_id,
+                text_preview=gen_task.text_preview,
+                started_at=gen_task.started_at,
+            )
+        )
+
     return models.ActiveTasksResponse(
         downloads=active_downloads,
         generations=active_generations,
     )
 
 
-# ============================================
-# CUDA BACKEND MANAGEMENT
-# ============================================
-
 @app.get("/backend/cuda-status")
 async def get_cuda_status():
     """Get CUDA backend download/availability status."""
     from . import cuda_download
+
     return cuda_download.get_cuda_status()
 
 
@@ -2422,6 +2414,7 @@ async def download_cuda_backend():
             await cuda_download.download_cuda_binary()
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"CUDA download failed: {e}")
 
     create_background_task(_download())
@@ -2466,21 +2459,17 @@ async def get_cuda_download_progress():
     )
 
 
-# ============================================
-# STARTUP & SHUTDOWN
-# ============================================
-
 def _get_gpu_status() -> str:
     """Get GPU availability status."""
     backend_type = get_backend_type()
     if torch.cuda.is_available():
         device_name = torch.cuda.get_device_name(0)
         # Check if this is ROCm (AMD) or CUDA (NVIDIA)
-        is_rocm = hasattr(torch.version, 'hip') and torch.version.hip is not None
+        is_rocm = hasattr(torch.version, "hip") and torch.version.hip is not None
         if is_rocm:
             return f"ROCm ({device_name})"
         return f"CUDA ({device_name})"
-    elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         return "MPS (Apple Silicon)"
     elif backend_type == "mlx":
         return "Metal (Apple Silicon via MLX)"
@@ -2501,9 +2490,12 @@ async def startup_event():
     # from a previous process that was killed mid-generation
     try:
         from sqlalchemy import text as sa_text
+
         db = next(get_db())
         result = db.execute(
-            sa_text("UPDATE generations SET status = 'failed', error = 'Server was shut down during generation' WHERE status = 'generating'")
+            sa_text(
+                "UPDATE generations SET status = 'failed', error = 'Server was shut down during generation' WHERE status = 'generating'"
+            )
         )
         if result.rowcount > 0:
             print(f"Marked {result.rowcount} stale generation(s) as failed")
@@ -2517,6 +2509,7 @@ async def startup_event():
 
     # Auto-update CUDA binary if installed but outdated
     from .cuda_download import check_and_update_cuda_binary
+
     create_background_task(check_and_update_cuda_binary())
 
     # Initialize progress manager with main event loop for thread-safe operations
@@ -2530,6 +2523,7 @@ async def startup_event():
     # Ensure HuggingFace cache directory exists
     try:
         from huggingface_hub import constants as hf_constants
+
         cache_dir = Path(hf_constants.HF_HUB_CACHE)
         cache_dir.mkdir(parents=True, exist_ok=True)
         print(f"HuggingFace cache directory: {cache_dir}")
@@ -2546,10 +2540,6 @@ async def shutdown_event():
     tts.unload_tts_model()
     transcribe.unload_whisper_model()
 
-
-# ============================================
-# MAIN
-# ============================================
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="voicebox backend server")

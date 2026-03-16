@@ -14,9 +14,16 @@ import numpy as np
 from ..platform_detect import get_backend_type
 
 LANGUAGE_CODE_TO_NAME = {
-    "zh": "chinese", "en": "english", "ja": "japanese", "ko": "korean",
-    "de": "german", "fr": "french", "ru": "russian", "pt": "portuguese",
-    "es": "spanish", "it": "italian",
+    "zh": "chinese",
+    "en": "english",
+    "ja": "japanese",
+    "ko": "korean",
+    "de": "german",
+    "fr": "french",
+    "ru": "russian",
+    "pt": "portuguese",
+    "es": "spanish",
+    "it": "italian",
 }
 
 WHISPER_HF_REPOS = {
@@ -31,10 +38,11 @@ WHISPER_HF_REPOS = {
 @dataclass
 class ModelConfig:
     """Declarative config for a downloadable model variant."""
-    model_name: str          # e.g. "luxtts", "chatterbox-tts"
-    display_name: str        # e.g. "LuxTTS (Fast, CPU-friendly)"
-    engine: str              # e.g. "luxtts", "chatterbox"
-    hf_repo_id: str          # e.g. "YatharthS/LuxTTS"
+
+    model_name: str  # e.g. "luxtts", "chatterbox-tts"
+    display_name: str  # e.g. "LuxTTS (Fast, CPU-friendly)"
+    engine: str  # e.g. "luxtts", "chatterbox"
+    hf_repo_id: str  # e.g. "YatharthS/LuxTTS"
     model_size: str = "default"
     size_mb: int = 0
     needs_trim: bool = False
@@ -160,10 +168,6 @@ TTS_ENGINES = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Model config registry
-# ---------------------------------------------------------------------------
-
 def _get_qwen_model_configs() -> list[ModelConfig]:
     """Return Qwen model configs with backend-aware HF repo IDs."""
     backend_type = get_backend_type()
@@ -220,9 +224,29 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             size_mb=3200,
             needs_trim=True,
             languages=[
-                "zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it",
-                "he", "ar", "da", "el", "fi", "hi", "ms", "nl", "no", "pl",
-                "sv", "sw", "tr",
+                "zh",
+                "en",
+                "ja",
+                "ko",
+                "de",
+                "fr",
+                "ru",
+                "pt",
+                "es",
+                "it",
+                "he",
+                "ar",
+                "da",
+                "el",
+                "fi",
+                "hi",
+                "ms",
+                "nl",
+                "no",
+                "pl",
+                "sv",
+                "sw",
+                "tr",
             ],
         ),
         ModelConfig(
@@ -240,11 +264,41 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
 def _get_whisper_configs() -> list[ModelConfig]:
     """Return Whisper STT model configs."""
     return [
-        ModelConfig(model_name="whisper-base", display_name="Whisper Base", engine="whisper", hf_repo_id="openai/whisper-base", model_size="base"),
-        ModelConfig(model_name="whisper-small", display_name="Whisper Small", engine="whisper", hf_repo_id="openai/whisper-small", model_size="small"),
-        ModelConfig(model_name="whisper-medium", display_name="Whisper Medium", engine="whisper", hf_repo_id="openai/whisper-medium", model_size="medium"),
-        ModelConfig(model_name="whisper-large", display_name="Whisper Large", engine="whisper", hf_repo_id="openai/whisper-large-v3", model_size="large"),
-        ModelConfig(model_name="whisper-turbo", display_name="Whisper Turbo", engine="whisper", hf_repo_id="openai/whisper-large-v3-turbo", model_size="turbo"),
+        ModelConfig(
+            model_name="whisper-base",
+            display_name="Whisper Base",
+            engine="whisper",
+            hf_repo_id="openai/whisper-base",
+            model_size="base",
+        ),
+        ModelConfig(
+            model_name="whisper-small",
+            display_name="Whisper Small",
+            engine="whisper",
+            hf_repo_id="openai/whisper-small",
+            model_size="small",
+        ),
+        ModelConfig(
+            model_name="whisper-medium",
+            display_name="Whisper Medium",
+            engine="whisper",
+            hf_repo_id="openai/whisper-medium",
+            model_size="medium",
+        ),
+        ModelConfig(
+            model_name="whisper-large",
+            display_name="Whisper Large",
+            engine="whisper",
+            hf_repo_id="openai/whisper-large-v3",
+            model_size="large",
+        ),
+        ModelConfig(
+            model_name="whisper-turbo",
+            display_name="Whisper Turbo",
+            engine="whisper",
+            hf_repo_id="openai/whisper-large-v3-turbo",
+            model_size="turbo",
+        ),
     ]
 
 
@@ -259,6 +313,7 @@ def get_tts_model_configs() -> list[ModelConfig]:
 
 
 # Lookup helpers — these replace the if/elif chains in main.py
+
 
 def get_model_config(model_name: str) -> Optional[ModelConfig]:
     """Look up a model config by model_name."""
@@ -294,6 +349,7 @@ async def load_engine_model(engine: str, model_size: str = "default") -> None:
 async def ensure_model_cached_or_raise(engine: str, model_size: str = "default") -> None:
     """Check if a model is cached, raise HTTPException if not. Used by streaming endpoint."""
     from fastapi import HTTPException
+
     backend = get_tts_backend_for_engine(engine)
     cfg = None
     for c in get_tts_model_configs():
@@ -352,7 +408,7 @@ def check_model_loaded(config: ModelConfig) -> bool:
     try:
         if config.engine == "whisper":
             whisper_model = transcribe.get_whisper_model()
-            return whisper_model.is_loaded() and getattr(whisper_model, 'model_size', None) == config.model_size
+            return whisper_model.is_loaded() and getattr(whisper_model, "model_size", None) == config.model_size
 
         if config.engine == "qwen":
             tts_model = tts.get_tts_model()
@@ -378,10 +434,6 @@ def get_model_load_func(config: ModelConfig):
 
     return lambda: get_tts_backend_for_engine(config.engine).load_model()
 
-
-# ---------------------------------------------------------------------------
-# Backend factory
-# ---------------------------------------------------------------------------
 
 def get_tts_backend() -> TTSBackend:
     """
@@ -419,18 +471,23 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
             backend_type = get_backend_type()
             if backend_type == "mlx":
                 from .mlx_backend import MLXTTSBackend
+
                 backend = MLXTTSBackend()
             else:
                 from .pytorch_backend import PyTorchTTSBackend
+
                 backend = PyTorchTTSBackend()
         elif engine == "luxtts":
             from .luxtts_backend import LuxTTSBackend
+
             backend = LuxTTSBackend()
         elif engine == "chatterbox":
             from .chatterbox_backend import ChatterboxTTSBackend
+
             backend = ChatterboxTTSBackend()
         elif engine == "chatterbox_turbo":
             from .chatterbox_turbo_backend import ChatterboxTurboTTSBackend
+
             backend = ChatterboxTurboTTSBackend()
         else:
             raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
@@ -453,9 +510,11 @@ def get_stt_backend() -> STTBackend:
 
         if backend_type == "mlx":
             from .mlx_backend import MLXSTTBackend
+
             _stt_backend = MLXSTTBackend()
         else:
             from .pytorch_backend import PyTorchSTTBackend
+
             _stt_backend = PyTorchSTTBackend()
 
     return _stt_backend

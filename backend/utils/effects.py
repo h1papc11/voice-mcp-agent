@@ -35,10 +35,6 @@ from pedalboard import (
 )
 
 
-# ---------------------------------------------------------------------------
-# Effect registry: maps type names -> (pedalboard class, param definitions)
-# ---------------------------------------------------------------------------
-
 # Each param definition: (default, min, max, description)
 EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
     "chorus": {
@@ -46,11 +42,17 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "Chorus / Flanger",
         "description": "Modulated delay for flanging or chorus effects. Short centre_delay_ms (<10) gives flanger; longer gives chorus.",
         "params": {
-            "rate_hz":          {"default": 1.0,  "min": 0.01, "max": 20.0,  "step": 0.01, "description": "LFO speed (Hz)"},
-            "depth":            {"default": 0.5,  "min": 0.0,  "max": 1.0,   "step": 0.01, "description": "Modulation depth"},
-            "feedback":         {"default": 0.0,  "min": 0.0,  "max": 0.95,  "step": 0.01, "description": "Feedback amount"},
-            "centre_delay_ms":  {"default": 7.0,  "min": 0.5,  "max": 50.0,  "step": 0.1,  "description": "Centre delay (ms)"},
-            "mix":              {"default": 0.5,  "min": 0.0,  "max": 1.0,   "step": 0.01, "description": "Wet/dry mix"},
+            "rate_hz": {"default": 1.0, "min": 0.01, "max": 20.0, "step": 0.01, "description": "LFO speed (Hz)"},
+            "depth": {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Modulation depth"},
+            "feedback": {"default": 0.0, "min": 0.0, "max": 0.95, "step": 0.01, "description": "Feedback amount"},
+            "centre_delay_ms": {
+                "default": 7.0,
+                "min": 0.5,
+                "max": 50.0,
+                "step": 0.1,
+                "description": "Centre delay (ms)",
+            },
+            "mix": {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Wet/dry mix"},
         },
     },
     "reverb": {
@@ -58,11 +60,11 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "Reverb",
         "description": "Room reverb effect.",
         "params": {
-            "room_size":  {"default": 0.5,  "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "Room size"},
-            "damping":    {"default": 0.5,  "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "High frequency damping"},
-            "wet_level":  {"default": 0.33, "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "Wet level"},
-            "dry_level":  {"default": 0.4,  "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "Dry level"},
-            "width":      {"default": 1.0,  "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "Stereo width"},
+            "room_size": {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Room size"},
+            "damping": {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "description": "High frequency damping"},
+            "wet_level": {"default": 0.33, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Wet level"},
+            "dry_level": {"default": 0.4, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Dry level"},
+            "width": {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Stereo width"},
         },
     },
     "delay": {
@@ -70,9 +72,15 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "Delay",
         "description": "Echo / delay line.",
         "params": {
-            "delay_seconds": {"default": 0.3,  "min": 0.01, "max": 2.0,  "step": 0.01, "description": "Delay time (seconds)"},
-            "feedback":      {"default": 0.3,  "min": 0.0,  "max": 0.95, "step": 0.01, "description": "Feedback amount"},
-            "mix":           {"default": 0.3,  "min": 0.0,  "max": 1.0,  "step": 0.01, "description": "Wet/dry mix"},
+            "delay_seconds": {
+                "default": 0.3,
+                "min": 0.01,
+                "max": 2.0,
+                "step": 0.01,
+                "description": "Delay time (seconds)",
+            },
+            "feedback": {"default": 0.3, "min": 0.0, "max": 0.95, "step": 0.01, "description": "Feedback amount"},
+            "mix": {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01, "description": "Wet/dry mix"},
         },
     },
     "compressor": {
@@ -80,10 +88,16 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "Compressor",
         "description": "Dynamic range compression for consistent loudness.",
         "params": {
-            "threshold_db": {"default": -20.0, "min": -60.0, "max": 0.0,   "step": 0.5, "description": "Threshold (dB)"},
-            "ratio":        {"default": 4.0,   "min": 1.0,   "max": 20.0,  "step": 0.1, "description": "Compression ratio"},
-            "attack_ms":    {"default": 10.0,  "min": 0.1,   "max": 100.0, "step": 0.1, "description": "Attack time (ms)"},
-            "release_ms":   {"default": 100.0, "min": 10.0,  "max": 1000.0,"step": 1.0, "description": "Release time (ms)"},
+            "threshold_db": {"default": -20.0, "min": -60.0, "max": 0.0, "step": 0.5, "description": "Threshold (dB)"},
+            "ratio": {"default": 4.0, "min": 1.0, "max": 20.0, "step": 0.1, "description": "Compression ratio"},
+            "attack_ms": {"default": 10.0, "min": 0.1, "max": 100.0, "step": 0.1, "description": "Attack time (ms)"},
+            "release_ms": {
+                "default": 100.0,
+                "min": 10.0,
+                "max": 1000.0,
+                "step": 1.0,
+                "description": "Release time (ms)",
+            },
         },
     },
     "gain": {
@@ -99,7 +113,13 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "High-Pass Filter",
         "description": "Removes frequencies below the cutoff.",
         "params": {
-            "cutoff_frequency_hz": {"default": 80.0, "min": 20.0, "max": 8000.0, "step": 1.0, "description": "Cutoff frequency (Hz)"},
+            "cutoff_frequency_hz": {
+                "default": 80.0,
+                "min": 20.0,
+                "max": 8000.0,
+                "step": 1.0,
+                "description": "Cutoff frequency (Hz)",
+            },
         },
     },
     "lowpass": {
@@ -107,7 +127,13 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
         "label": "Low-Pass Filter",
         "description": "Removes frequencies above the cutoff.",
         "params": {
-            "cutoff_frequency_hz": {"default": 8000.0, "min": 200.0, "max": 20000.0, "step": 1.0, "description": "Cutoff frequency (Hz)"},
+            "cutoff_frequency_hz": {
+                "default": 8000.0,
+                "min": 200.0,
+                "max": 20000.0,
+                "step": 1.0,
+                "description": "Cutoff frequency (Hz)",
+            },
         },
     },
     "pitch_shift": {
@@ -120,10 +146,6 @@ EFFECT_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
 }
 
-
-# ---------------------------------------------------------------------------
-# Built-in presets
-# ---------------------------------------------------------------------------
 
 BUILTIN_PRESETS: Dict[str, Dict[str, Any]] = {
     "robotic": {
@@ -233,10 +255,6 @@ BUILTIN_PRESETS: Dict[str, Dict[str, Any]] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 def get_available_effects() -> List[Dict[str, Any]]:
     """Return the list of available effect types with their parameter definitions.
 
@@ -244,15 +262,14 @@ def get_available_effects() -> List[Dict[str, Any]]:
     """
     result = []
     for effect_type, info in EFFECT_REGISTRY.items():
-        result.append({
-            "type": effect_type,
-            "label": info["label"],
-            "description": info["description"],
-            "params": {
-                name: {k: v for k, v in pdef.items()}
-                for name, pdef in info["params"].items()
-            },
-        })
+        result.append(
+            {
+                "type": effect_type,
+                "label": info["label"],
+                "description": info["description"],
+                "params": {name: {k: v for k, v in pdef.items()} for name, pdef in info["params"].items()},
+            }
+        )
     return result
 
 

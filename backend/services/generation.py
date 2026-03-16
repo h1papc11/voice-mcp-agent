@@ -81,9 +81,7 @@ async def run_generation(
         if crossfade_ms is not None:
             gen_kwargs["crossfade_ms"] = crossfade_ms
 
-        audio, sample_rate = await generate_chunked(
-            tts_model, text, voice_prompt, **gen_kwargs
-        )
+        audio, sample_rate = await generate_chunked(tts_model, text, voice_prompt, **gen_kwargs)
 
         # --- Normalize (generate and regenerate always; retry skips) -----
         if normalize or mode == "regenerate":
@@ -139,11 +137,6 @@ async def run_generation(
         bg_db.close()
 
 
-# ---------------------------------------------------------------------
-# Mode-specific save helpers (sync, return final audio path)
-# ---------------------------------------------------------------------
-
-
 def _save_generate(
     *,
     generation_id: str,
@@ -163,9 +156,7 @@ def _save_generate(
     clean_audio_path = config.get_generations_dir() / f"{generation_id}.wav"
     save_audio(audio, str(clean_audio_path), sample_rate)
 
-    has_effects = effects_chain and any(
-        e.get("enabled", True) for e in effects_chain
-    )
+    has_effects = effects_chain and any(e.get("enabled", True) for e in effects_chain)
 
     versions_mod.create_version(
         generation_id=generation_id,
@@ -186,9 +177,7 @@ def _save_generate(
             print(f"Warning: invalid effects chain, skipping: {error_msg}")
         else:
             processed_audio = apply_effects(audio, sample_rate, effects_chain)
-            processed_path = (
-                config.get_generations_dir() / f"{generation_id}_processed.wav"
-            )
+            processed_path = config.get_generations_dir() / f"{generation_id}_processed.wav"
             save_audio(processed_audio, str(processed_path), sample_rate)
             final_audio_path = str(processed_path)
             versions_mod.create_version(

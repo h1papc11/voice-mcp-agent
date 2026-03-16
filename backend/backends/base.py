@@ -21,10 +21,6 @@ from ..utils.tasks import get_task_manager
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# HuggingFace cache checking
-# ---------------------------------------------------------------------------
-
 def is_model_cached(
     hf_repo: str,
     *,
@@ -46,9 +42,7 @@ def is_model_cached(
     try:
         from huggingface_hub import constants as hf_constants
 
-        repo_cache = Path(hf_constants.HF_HUB_CACHE) / (
-            "models--" + hf_repo.replace("/", "--")
-        )
+        repo_cache = Path(hf_constants.HF_HUB_CACHE) / ("models--" + hf_repo.replace("/", "--"))
 
         if not repo_cache.exists():
             return False
@@ -83,10 +77,6 @@ def is_model_cached(
         return False
 
 
-# ---------------------------------------------------------------------------
-# Device detection
-# ---------------------------------------------------------------------------
-
 def get_torch_device(
     *,
     allow_xpu: bool = False,
@@ -114,6 +104,7 @@ def get_torch_device(
     if allow_xpu:
         try:
             import intel_extension_for_pytorch  # noqa: F401
+
             if hasattr(torch, "xpu") and torch.xpu.is_available():
                 return "xpu"
         except ImportError:
@@ -122,6 +113,7 @@ def get_torch_device(
     if allow_directml:
         try:
             import torch_directml
+
             if torch_directml.device_count() > 0:
                 return torch_directml.device(0)
         except ImportError:
@@ -133,10 +125,6 @@ def get_torch_device(
 
     return "cpu"
 
-
-# ---------------------------------------------------------------------------
-# Voice prompt combination
-# ---------------------------------------------------------------------------
 
 async def combine_voice_prompts(
     audio_paths: List[str],
@@ -168,10 +156,6 @@ async def combine_voice_prompts(
 
     return mixed, combined_text
 
-
-# ---------------------------------------------------------------------------
-# Model loading progress tracking
-# ---------------------------------------------------------------------------
 
 @contextmanager
 def model_load_progress(
@@ -237,10 +221,6 @@ def model_load_progress(
         tracker_context.__exit__(None, None, None)
 
 
-# ---------------------------------------------------------------------------
-# Chatterbox f32 dtype patches
-# ---------------------------------------------------------------------------
-
 def patch_chatterbox_f32(model) -> None:
     """
     Patch float64 -> float32 dtype mismatches in upstream chatterbox.
@@ -261,6 +241,7 @@ def patch_chatterbox_f32(model) -> None:
 
     def _f32_log_mel(self_tokzr, audio, padding=0):
         import torch as _torch
+
         if _torch.is_tensor(audio):
             audio = audio.float()
         return _orig_log_mel(self_tokzr, audio, padding)

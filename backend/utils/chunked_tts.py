@@ -58,11 +58,6 @@ _ABBREVIATIONS = frozenset(
 _PARA_TAG_RE = re.compile(r"\[[^\]]*\]")
 
 
-# ---------------------------------------------------------------------------
-# Text splitting
-# ---------------------------------------------------------------------------
-
-
 def split_text_into_chunks(text: str, max_chars: int = DEFAULT_MAX_CHUNK_CHARS) -> List[str]:
     """Split *text* at natural boundaries into chunks of at most *max_chars*.
 
@@ -174,11 +169,6 @@ def _safe_hard_cut(segment: str, max_chars: int) -> int:
     return cut
 
 
-# ---------------------------------------------------------------------------
-# Audio concatenation
-# ---------------------------------------------------------------------------
-
-
 def concatenate_audio_chunks(
     chunks: List[np.ndarray],
     sample_rate: int,
@@ -209,11 +199,6 @@ def concatenate_audio_chunks(
             result = np.concatenate([result, chunk])
 
     return result
-
-
-# ---------------------------------------------------------------------------
-# Engine-agnostic chunked generation
-# ---------------------------------------------------------------------------
 
 
 async def generate_chunked(
@@ -264,7 +249,11 @@ async def generate_chunked(
     if len(chunks) <= 1:
         # Short text — single-shot fast path
         audio, sample_rate = await backend.generate(
-            text, voice_prompt, language, seed, instruct,
+            text,
+            voice_prompt,
+            language,
+            seed,
+            instruct,
         )
         if trim_fn is not None:
             audio = trim_fn(audio, sample_rate)
@@ -273,7 +262,9 @@ async def generate_chunked(
     # Long text — chunked generation
     logger.info(
         "Splitting %d chars into %d chunks (max %d chars each)",
-        len(text), len(chunks), max_chunk_chars,
+        len(text),
+        len(chunks),
+        max_chunk_chars,
     )
     audio_chunks: List[np.ndarray] = []
     sample_rate: int | None = None
@@ -281,7 +272,9 @@ async def generate_chunked(
     for i, chunk_text in enumerate(chunks):
         logger.info(
             "Generating chunk %d/%d (%d chars)",
-            i + 1, len(chunks), len(chunk_text),
+            i + 1,
+            len(chunks),
+            len(chunk_text),
         )
         # Vary the seed per chunk to avoid correlated RNG artefacts,
         # but keep it deterministic so the same (text, seed) pair
@@ -289,7 +282,11 @@ async def generate_chunked(
         chunk_seed = (seed + i) if seed is not None else None
 
         chunk_audio, chunk_sr = await backend.generate(
-            chunk_text, voice_prompt, language, chunk_seed, instruct,
+            chunk_text,
+            voice_prompt,
+            language,
+            chunk_seed,
+            instruct,
         )
         if trim_fn is not None:
             chunk_audio = trim_fn(chunk_audio, chunk_sr)
