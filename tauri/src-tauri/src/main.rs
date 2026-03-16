@@ -14,10 +14,11 @@ const SERVER_PORT: u16 = 17493;
 
 /// Find a voicebox-server process listening on a given port (Windows only).
 ///
-/// Uses `TcpListener::bind` to confirm the port is occupied, then falls back
-/// to `tasklist` to scan for a voicebox process. Returns the PID if found.
-/// This replaces the previous `netstat -ano` approach which could fail on
-/// systems with corrupted system DLLs (see #277).
+/// Uses PowerShell `Get-NetTCPConnection` to look up the PID owning the port,
+/// then verifies via `tasklist` that it's a voicebox process. The caller is
+/// responsible for checking port occupancy first (e.g. `TcpStream::connect_timeout`).
+/// Replaces the previous `netstat -ano` approach which failed on systems with
+/// corrupted system DLLs (see #277).
 #[cfg(windows)]
 fn find_voicebox_pid_on_port(port: u16) -> Option<u32> {
     use std::process::Command;
