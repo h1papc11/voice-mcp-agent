@@ -202,8 +202,14 @@ def _register_lifecycle(application: FastAPI) -> None:
     @application.on_event("shutdown")
     async def shutdown_event():
         logger.info("Voicebox server shutting down...")
-        tts.unload_tts_model()
-        transcribe.unload_whisper_model()
+        try:
+            tts.unload_tts_model()
+        except Exception:
+            logger.exception("Failed to unload TTS model")
+        try:
+            transcribe.unload_whisper_model()
+        except Exception:
+            logger.exception("Failed to unload Whisper model")
 
 
 app = create_app()
