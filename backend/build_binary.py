@@ -332,51 +332,6 @@ def build_server(cuda=False):
     logger.info("Binary built in %s", backend_dir / "dist" / binary_name)
 
 
-def _get_cuda_dll_excludes():
-    """Get list of CUDA DLL filenames to exclude from CPU builds.
-
-    When building locally with CUDA torch installed, PyInstaller bundles ~3GB of
-    CUDA DLLs from torch/lib/. Returns a list of DLL filenames to exclude.
-    """
-    try:
-        import torch
-
-        torch_lib = Path(torch.__file__).parent / "lib"
-    except ImportError:
-        return []
-
-    cuda_prefixes = (
-        "torch_cuda",
-        "cublas",
-        "cublasLt",
-        "cudnn",
-        "cusparse",
-        "cufft",
-        "cusolver",
-        "cusolverMg",
-        "curand",
-        "nvrtc",
-        "nvJitLink",
-        "nccl",
-        "nvperf",
-        "nvrtc-builtins",
-    )
-
-    exclude_dlls = []
-    if torch_lib.exists():
-        for f in torch_lib.iterdir():
-            if f.suffix == ".dll" and any(f.name.startswith(p) for p in cuda_prefixes):
-                exclude_dlls.append(f.name)
-
-    if exclude_dlls:
-        total_mb = (
-            sum((torch_lib / dll).stat().st_size for dll in exclude_dlls if (torch_lib / dll).exists()) / 1024 / 1024
-        )
-        logger.info("CPU build: will exclude %d CUDA DLLs (%.0f MB)", len(exclude_dlls), total_mb)
-
-    return exclude_dlls
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build voicebox-server binary")
     parser.add_argument(
