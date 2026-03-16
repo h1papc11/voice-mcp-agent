@@ -48,7 +48,7 @@ Windows SmartScreen may warn that the app is unrecognized.
     lsof -i :17493
 
     # Windows
-    netstat -ano | findstr :17493
+    powershell -Command "Get-NetTCPConnection -LocalPort 17493 -State Listen"
     ```
 
     Kill the process using the port:
