@@ -64,7 +64,7 @@ function AudioBars({ mode }: { mode: 'idle' | 'generating' | 'playing' }) {
     <div className="flex items-center gap-[2px] h-5">
       {[0, 1, 2, 3, 4].map((i) => (
         <motion.div
-          key={i}
+          key={`${mode}-${i}`}
           className={`w-[3px] rounded-full ${barColor}`}
           animate={
             mode === 'generating'
@@ -440,7 +440,7 @@ export function HistoryTable() {
                     role={isPlayable ? 'button' : undefined}
                     tabIndex={isPlayable ? 0 : undefined}
                     className={cn(
-                      'flex items-stretch gap-4 h-26 p-3',
+                      'flex items-stretch gap-4 h-26 p-3 outline-none',
                       isPlayable && 'hover:bg-muted/70 cursor-pointer rounded-md',
                       isVersionsExpanded && 'rounded-b-none',
                     )}
