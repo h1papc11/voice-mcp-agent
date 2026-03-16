@@ -11,7 +11,8 @@ interface SettingsTab {
     | '/settings/generation'
     | '/settings/gpu'
     | '/settings/logs'
-    | '/settings/changelog';
+    | '/settings/changelog'
+    | '/settings/about';
   tauriOnly?: boolean;
 }
 
@@ -21,6 +22,7 @@ const tabs: SettingsTab[] = [
   { label: 'GPU', path: '/settings/gpu', tauriOnly: true },
   { label: 'Logs', path: '/settings/logs', tauriOnly: true },
   { label: 'Changelog', path: '/settings/changelog' },
+  { label: 'About', path: '/settings/about' },
 ];
 
 export function SettingsLayout() {

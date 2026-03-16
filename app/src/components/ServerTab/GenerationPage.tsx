@@ -1,9 +1,15 @@
+import { FolderOpen } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Toggle } from '@/components/ui/toggle';
+import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
 import { SettingRow, SettingSection } from './SettingRow';
 
 export function GenerationPage() {
+  const platform = usePlatform();
+  const serverUrl = useServerStore((state) => state.serverUrl);
   const maxChunkChars = useServerStore((state) => state.maxChunkChars);
   const setMaxChunkChars = useServerStore((state) => state.setMaxChunkChars);
   const crossfadeMs = useServerStore((state) => state.crossfadeMs);
@@ -12,6 +18,32 @@ export function GenerationPage() {
   const setNormalizeAudio = useServerStore((state) => state.setNormalizeAudio);
   const autoplayOnGenerate = useServerStore((state) => state.autoplayOnGenerate);
   const setAutoplayOnGenerate = useServerStore((state) => state.setAutoplayOnGenerate);
+  const [opening, setOpening] = useState(false);
+  const [generationsPath, setGenerationsPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${serverUrl}/health/filesystem`)
+      .then((res) => res.json())
+      .then((data) => {
+        const genDir = data.directories?.find((d: { path: string }) =>
+          d.path.includes('generations'),
+        );
+        if (genDir?.path) setGenerationsPath(genDir.path);
+      })
+      .catch(() => {});
+  }, [serverUrl]);
+
+  const openGenerationsFolder = useCallback(async () => {
+    if (!generationsPath) return;
+    setOpening(true);
+    try {
+      await platform.filesystem.openPath(generationsPath);
+    } catch (e) {
+      console.error('Failed to open generations folder:', e);
+    } finally {
+      setOpening(false);
+    }
+  }, [platform, generationsPath]);
 
   return (
     <div className="space-y-8 max-w-2xl">
@@ -82,6 +114,22 @@ export function GenerationPage() {
               checked={autoplayOnGenerate}
               onCheckedChange={setAutoplayOnGenerate}
             />
+          }
+        />
+
+        <SettingRow
+          title="Generations folder"
+          description={generationsPath ?? 'Where generated audio files are stored on disk.'}
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openGenerationsFolder}
+              disabled={opening || !generationsPath}
+            >
+              <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+              Open
+            </Button>
           }
         />
       </SettingSection>

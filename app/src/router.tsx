@@ -10,6 +10,7 @@ import { AudioTab } from '@/components/AudioTab/AudioTab';
 import { EffectsTab } from '@/components/EffectsTab/EffectsTab';
 import { MainEditor } from '@/components/MainEditor/MainEditor';
 import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
+import { AboutPage } from '@/components/ServerTab/AboutPage';
 import { ChangelogPage } from '@/components/ServerTab/ChangelogPage';
 import { GeneralPage } from '@/components/ServerTab/GeneralPage';
 import { GenerationPage } from '@/components/ServerTab/GenerationPage';
@@ -169,6 +170,12 @@ const settingsLogsRoute = createRoute({
   component: LogsPage,
 });
 
+const settingsAboutRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/about',
+  component: AboutPage,
+});
+
 // Redirect old /server path to /settings
 const serverRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -192,6 +199,7 @@ const routeTree = rootRoute.addChildren([
     settingsGpuRoute,
     settingsLogsRoute,
     settingsChangelogRoute,
+    settingsAboutRoute,
   ]),
   serverRedirectRoute,
 ]);
