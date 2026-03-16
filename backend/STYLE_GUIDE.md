@@ -275,7 +275,7 @@ async def create_profile(data: VoiceProfileCreate, db: Session = Depends(get_db)
 
 ### Rules for the refactor
 
-1. **Don't declare `async def` unless the function awaits something.** The current CRUD modules break this -- they will be fixed per REFACTOR_PLAN Phase 5.
+1. **Don't declare `async def` unless the function awaits something.** Several service modules still declare `async def` without awaiting -- these should be migrated to sync functions with `asyncio.to_thread()` at the route layer, or to real async SQLAlchemy.
 2. **CPU-bound work** (audio processing, numpy operations) goes through `asyncio.to_thread()`:
    ```python
    audio, sr = await asyncio.to_thread(load_audio, source_path)
@@ -367,68 +367,28 @@ Framework: **pytest** with `pytest-asyncio`.
 
 ---
 
-## Project Layout (Post-Refactor Target)
-
-From REFACTOR_PLAN.md Phase 4:
+## Project Layout
 
 ```
 backend/
-  app.py                    # FastAPI app, middleware, startup/shutdown
-  main.py                   # Entry point (imports app, runs uvicorn)
-  config.py                 # Data dirs, shared constants
-  errors.py                 # Custom exception classes
-  routes/
-    __init__.py
-    health.py
-    profiles.py
-    channels.py
-    generations.py
-    history.py
-    stories.py
-    effects.py
-    audio.py
-    models.py
-    tasks.py
-    cuda.py
-  services/
-    generation.py
-    task_queue.py
-    model_status.py
-  database/
-    __init__.py
-    models.py
-    session.py
-    seed.py
-  backends/
-    __init__.py
-    base.py
-    pytorch_backend.py
-    mlx_backend.py
-    luxtts_backend.py
-    chatterbox_backend.py
-    chatterbox_turbo_backend.py
-  utils/
-    audio.py
-    effects.py
-    progress.py
-    tasks.py
-    hf_progress.py
-    hf_offline_patch.py
-    cache.py
-    images.py
-    chunked_tts.py
-  tests/
-    conftest.py
-    test_cors.py
-    test_profiles.py
-    ...
+  app.py              # FastAPI app factory, CORS, lifecycle events
+  main.py             # Entry point (imports app, runs uvicorn)
+  config.py           # Data directory paths
+  models.py           # Pydantic request/response schemas
+  server.py           # Tauri sidecar launcher, parent-pid watchdog
+  routes/             # Thin HTTP handlers (validation, delegation, response formatting)
+  services/           # Business logic, CRUD, orchestration
+  backends/           # TTS/STT engine implementations
+  database/           # ORM models, session management, migrations, seeds
+  utils/              # Shared utilities (audio, effects, caching, progress)
+  tests/              # pytest suite
 ```
 
 ---
 
 ## Ruff Adoption
 
-The `pyproject.toml` at the project root configures ruff for linting and formatting. Run:
+`pyproject.toml` configures ruff for linting and formatting. Run:
 
 ```bash
 # Lint (check)
@@ -441,20 +401,4 @@ ruff check backend/ --fix
 ruff format backend/
 ```
 
-During the refactor, introduce ruff fixes file-by-file as you touch them. Don't run `--fix` across the entire codebase in one shot -- that creates unreviewable diffs.
-
----
-
-## Summary of Changes from Current State
-
-| Area | Before | After |
-|------|--------|-------|
-| Line length | Uncontrolled (up to 160) | 120, enforced by ruff |
-| Import order | Ad-hoc | isort-grouped, enforced |
-| Type syntax | Mixed `List`/`list`, sporadic `__future__` | Native `list[]`, `X \| None`, no `__future__` |
-| Logging | ~80% `print()` | `logging` module everywhere |
-| Error handling | 3 inconsistent patterns | Domain exceptions + route-layer HTTPException |
-| Async CRUD | Fake `async def` | Sync functions (Phase 5) or real async |
-| Linting | None | Ruff with auto-fix |
-| Formatting | None | Ruff format (Black-compatible) |
-| Tests | Mix of pytest + manual scripts | pytest throughout, shared conftest |
+Introduce ruff fixes file-by-file as you touch them. Don't run `--fix` across the entire codebase in one shot -- that creates unreviewable diffs.
