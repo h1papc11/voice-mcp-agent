@@ -11,7 +11,7 @@ from typing import Protocol, Optional, Tuple, List
 from typing_extensions import runtime_checkable
 import numpy as np
 
-from ..platform_detect import get_backend_type
+from ..utils.platform_detect import get_backend_type
 
 LANGUAGE_CODE_TO_NAME = {
     "zh": "chinese",
@@ -375,7 +375,7 @@ async def ensure_model_cached_or_raise(engine: str, model_size: str = "default")
 def unload_model_by_config(config: ModelConfig) -> bool:
     """Unload a model given its config. Returns True if it was loaded, False otherwise."""
     from . import get_tts_backend_for_engine
-    from .. import tts, transcribe
+    from ..services import tts, transcribe
 
     if config.engine == "whisper":
         whisper_model = transcribe.get_whisper_model()
@@ -403,7 +403,7 @@ def unload_model_by_config(config: ModelConfig) -> bool:
 def check_model_loaded(config: ModelConfig) -> bool:
     """Check if a model is currently loaded."""
     from . import get_tts_backend_for_engine
-    from .. import tts, transcribe
+    from ..services import tts, transcribe
 
     try:
         if config.engine == "whisper":
@@ -424,7 +424,7 @@ def check_model_loaded(config: ModelConfig) -> bool:
 def get_model_load_func(config: ModelConfig):
     """Return a callable that loads/downloads the model."""
     from . import get_tts_backend_for_engine
-    from .. import tts, transcribe
+    from ..services import tts, transcribe
 
     if config.engine == "whisper":
         return lambda: transcribe.get_whisper_model().load_model(config.model_size)

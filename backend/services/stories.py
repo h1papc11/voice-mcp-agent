@@ -10,7 +10,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from .models import (
+from ..models import (
     StoryCreate,
     StoryResponse,
     StoryDetailResponse,
@@ -22,14 +22,14 @@ from .models import (
     StoryItemSplit,
     StoryItemVersionUpdate,
 )
-from .database import (
+from ..database import (
     Story as DBStory,
     StoryItem as DBStoryItem,
     Generation as DBGeneration,
     VoiceProfile as DBVoiceProfile,
 )
 from .history import _get_versions_for_generation
-from .utils.audio import load_audio, save_audio
+from ..utils.audio import load_audio, save_audio
 import numpy as np
 
 
@@ -754,7 +754,7 @@ async def set_story_item_version(
 
     # Validate version_id belongs to this generation if provided
     if data.version_id:
-        from .database import GenerationVersion as DBGenerationVersion
+        from ..database import GenerationVersion as DBGenerationVersion
 
         version = (
             db.query(DBGenerationVersion)
@@ -820,7 +820,7 @@ async def export_story_audio(
         # Resolve audio path: use pinned version if set, otherwise generation default
         resolved_audio_path = generation.audio_path
         if getattr(item, "version_id", None):
-            from .database import GenerationVersion as DBGenerationVersion
+            from ..database import GenerationVersion as DBGenerationVersion
 
             version = db.query(DBGenerationVersion).filter_by(id=item.version_id).first()
             if version:

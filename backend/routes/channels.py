@@ -3,7 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .. import channels, models
+from .. import models
+from ..services import channels
 from ..database import get_db
 
 router = APIRouter()

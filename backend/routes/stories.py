@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import database, models, stories
+from .. import database, models
+from ..services import stories
 from ..app import safe_content_disposition
 from ..database import get_db
 

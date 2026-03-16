@@ -6,7 +6,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from .. import models, transcribe
+from .. import models
+from ..services import transcribe
 from ..services.task_queue import create_background_task
 from ..utils.tasks import get_task_manager
 

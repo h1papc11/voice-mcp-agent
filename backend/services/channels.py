@@ -7,14 +7,14 @@ from datetime import datetime
 import uuid
 from sqlalchemy.orm import Session
 
-from .models import (
+from ..models import (
     AudioChannelCreate,
     AudioChannelUpdate,
     AudioChannelResponse,
     ChannelVoiceAssignment,
     ProfileChannelAssignment,
 )
-from .database import (
+from ..database import (
     AudioChannel as DBAudioChannel,
     ChannelDeviceMapping as DBChannelDeviceMapping,
     ProfileChannelMapping as DBProfileChannelMapping,

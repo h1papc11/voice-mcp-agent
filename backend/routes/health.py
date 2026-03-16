@@ -8,9 +8,10 @@ import torch
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from .. import config, models, tts
+from .. import config, models
+from ..services import tts
 from ..database import get_db
-from ..platform_detect import get_backend_type
+from ..utils.platform_detect import get_backend_type
 
 router = APIRouter()
 

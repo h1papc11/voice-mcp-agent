@@ -10,9 +10,9 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
-from .models import GenerationRequest, GenerationResponse, HistoryQuery, HistoryResponse, HistoryListResponse, GenerationVersionResponse, EffectConfig
-from .database import Generation as DBGeneration, GenerationVersion as DBGenerationVersion, VoiceProfile as DBVoiceProfile
-from . import config
+from ..models import GenerationRequest, GenerationResponse, HistoryQuery, HistoryResponse, HistoryListResponse, GenerationVersionResponse, EffectConfig
+from ..database import Generation as DBGeneration, GenerationVersion as DBGenerationVersion, VoiceProfile as DBVoiceProfile
+from .. import config
 
 
 def _get_versions_for_generation(generation_id: str, db: Session) -> tuple:

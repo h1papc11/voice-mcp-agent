@@ -10,23 +10,23 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
-from .models import (
+from ..models import (
     VoiceProfileCreate,
     VoiceProfileResponse,
     ProfileSampleCreate,
     ProfileSampleResponse,
 )
-from .database import (
+from ..database import (
     VoiceProfile as DBVoiceProfile,
     ProfileSample as DBProfileSample,
     Generation as DBGeneration,
 )
-from .models import EffectConfig
-from .utils.audio import validate_reference_audio, load_audio, save_audio
-from .utils.images import validate_image, process_avatar
-from .utils.cache import _get_cache_dir, clear_profile_cache
+from ..models import EffectConfig
+from ..utils.audio import validate_reference_audio, load_audio, save_audio
+from ..utils.images import validate_image, process_avatar
+from ..utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
-from . import config
+from .. import config
 import json as _json
 
 
@@ -389,7 +389,7 @@ async def create_voice_prompt_for_profile(
     Returns:
         Voice prompt dictionary
     """
-    from .backends import get_tts_backend_for_engine
+    from ..backends import get_tts_backend_for_engine
 
     samples = db.query(DBProfileSample).filter_by(profile_id=profile_id).all()
 

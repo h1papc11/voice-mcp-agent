@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import config, history, models
+from .. import config, models
+from ..services import history
 from ..database import Generation as DBGeneration, get_db
 
 router = APIRouter()
@@ -28,7 +29,7 @@ async def preview_effects(
     if (gen.status or "completed") != "completed":
         raise HTTPException(status_code=400, detail="Generation is not completed")
 
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
     from ..utils.effects import apply_effects, validate_effects_chain
     from ..utils.audio import load_audio
 
@@ -73,7 +74,7 @@ async def get_available_effects():
 @router.get("/effects/presets", response_model=list[models.EffectPresetResponse])
 async def list_effect_presets(db: Session = Depends(get_db)):
     """List all effect presets (built-in + user-created)."""
-    from .. import effects as effects_mod
+    from ..services import effects as effects_mod
 
     return effects_mod.list_presets(db)
 
@@ -81,7 +82,7 @@ async def list_effect_presets(db: Session = Depends(get_db)):
 @router.get("/effects/presets/{preset_id}", response_model=models.EffectPresetResponse)
 async def get_effect_preset(preset_id: str, db: Session = Depends(get_db)):
     """Get a specific effect preset."""
-    from .. import effects as effects_mod
+    from ..services import effects as effects_mod
 
     preset = effects_mod.get_preset(preset_id, db)
     if not preset:
@@ -95,7 +96,7 @@ async def create_effect_preset(
     db: Session = Depends(get_db),
 ):
     """Create a new effect preset."""
-    from .. import effects as effects_mod
+    from ..services import effects as effects_mod
 
     try:
         return effects_mod.create_preset(data, db)
@@ -110,7 +111,7 @@ async def update_effect_preset(
     db: Session = Depends(get_db),
 ):
     """Update an effect preset."""
-    from .. import effects as effects_mod
+    from ..services import effects as effects_mod
 
     try:
         result = effects_mod.update_preset(preset_id, data, db)
@@ -124,7 +125,7 @@ async def update_effect_preset(
 @router.delete("/effects/presets/{preset_id}")
 async def delete_effect_preset(preset_id: str, db: Session = Depends(get_db)):
     """Delete a user effect preset."""
-    from .. import effects as effects_mod
+    from ..services import effects as effects_mod
 
     try:
         if not effects_mod.delete_preset(preset_id, db):
@@ -147,7 +148,7 @@ async def list_generation_versions(
     if not gen:
         raise HTTPException(status_code=404, detail="Generation not found")
 
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
 
     return versions_mod.list_versions(generation_id, db)
 
@@ -168,7 +169,7 @@ async def apply_effects_to_generation(
     if (gen.status or "completed") != "completed":
         raise HTTPException(status_code=400, detail="Generation is not completed")
 
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
     from ..utils.effects import apply_effects, validate_effects_chain
     from ..utils.audio import load_audio, save_audio
 
@@ -227,7 +228,7 @@ async def set_default_version(
     db: Session = Depends(get_db),
 ):
     """Set a specific version as the default for a generation."""
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
 
     version = versions_mod.get_version(version_id, db)
     if not version or version.generation_id != generation_id:
@@ -246,7 +247,7 @@ async def delete_generation_version(
     db: Session = Depends(get_db),
 ):
     """Delete a version. Cannot delete the last remaining version."""
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
 
     version = versions_mod.get_version(version_id, db)
     if not version or version.generation_id != generation_id:

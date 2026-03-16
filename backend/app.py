@@ -15,9 +15,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.parse import quote
 
-from . import __version__, database, tts, transcribe, config
+from . import __version__, database
+from .services import tts, transcribe
 from .database import get_db
-from .platform_detect import get_backend_type
+from .utils.platform_detect import get_backend_type
 from .utils.progress import get_progress_manager
 from .services.task_queue import create_background_task, init_queue
 from .routes import register_routers

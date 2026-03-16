@@ -12,11 +12,11 @@ from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from .models import VoiceProfileResponse
-from .database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration, GenerationVersion as DBGenerationVersion
+from ..models import VoiceProfileResponse
+from ..database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration, GenerationVersion as DBGenerationVersion
 from .profiles import create_profile, add_profile_sample
-from .models import VoiceProfileCreate
-from . import config
+from ..models import VoiceProfileCreate
+from .. import config
 
 
 def _get_unique_profile_name(name: str, db: Session) -> str:
@@ -346,7 +346,7 @@ async def import_generation_from_zip(file_bytes: bytes, db: Session) -> dict:
     import tempfile
     import shutil
     from datetime import datetime
-    from . import config
+    from .. import config
     
     zip_buffer = io.BytesIO(file_bytes)
     

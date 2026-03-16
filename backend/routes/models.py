@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..platform_detect import get_backend_type
+from ..utils.platform_detect import get_backend_type
 from ..services.task_queue import create_background_task
 from ..utils.progress import get_progress_manager
 from ..utils.tasks import get_task_manager
@@ -50,7 +50,7 @@ def _copy_with_progress(src: Path, dst: Path, progress_manager, copied_so_far: i
 @router.post("/models/load")
 async def load_model(model_size: str = "1.7B"):
     """Manually load TTS model."""
-    from .. import tts
+    from ..services import tts
 
     try:
         tts_model = tts.get_tts_model()
@@ -63,7 +63,7 @@ async def load_model(model_size: str = "1.7B"):
 @router.post("/models/unload")
 async def unload_model():
     """Unload the default Qwen TTS model to free memory."""
-    from .. import tts
+    from ..services import tts
 
     try:
         tts.unload_tts_model()

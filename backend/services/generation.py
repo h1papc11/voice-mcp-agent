@@ -19,7 +19,8 @@ from __future__ import annotations
 import traceback
 from typing import Literal, Optional
 
-from .. import config, history, profiles
+from .. import config
+from . import history, profiles
 from ..database import get_db
 from ..utils.tasks import get_task_manager
 
@@ -151,7 +152,7 @@ def _save_generate(
     Returns the final audio path (processed if effects were applied,
     otherwise clean).
     """
-    from .. import versions as versions_mod
+    from . import versions as versions_mod
 
     clean_audio_path = config.get_generations_dir() / f"{generation_id}.wav"
     save_audio(audio, str(clean_audio_path), sample_rate)
@@ -221,7 +222,7 @@ def _save_regenerate(
 
     Returns the audio path.
     """
-    from .. import versions as versions_mod
+    from . import versions as versions_mod
 
     suffix = version_id[:8] if version_id else generation_id[:8]
     audio_path = config.get_generations_dir() / f"{generation_id}_{suffix}.wav"

@@ -9,10 +9,11 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import channels, config, export_import, models, profiles
+from .. import config, models
 from ..app import safe_content_disposition
 from ..database import VoiceProfile as DBVoiceProfile, get_db
-from ..profiles import _profile_to_response
+from ..services import channels, export_import, profiles
+from ..services.profiles import _profile_to_response
 
 router = APIRouter()
 

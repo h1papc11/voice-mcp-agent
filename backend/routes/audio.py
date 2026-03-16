@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from .. import history, models
+from .. import models
+from ..services import history
 from ..database import get_db
 
 router = APIRouter()
@@ -15,7 +16,7 @@ router = APIRouter()
 @router.get("/audio/version/{version_id}")
 async def get_version_audio(version_id: str, db: Session = Depends(get_db)):
     """Serve audio for a specific version."""
-    from .. import versions as versions_mod
+    from ..services import versions as versions_mod
 
     version = versions_mod.get_version(version_id, db)
     if not version:

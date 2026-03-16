@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import history, models, profiles, tts
+from .. import models
+from ..services import history, profiles, tts
 from ..database import Generation as DBGeneration, VoiceProfile as DBVoiceProfile, get_db
 from ..services.generation import run_generation
 from ..services.task_queue import enqueue_generation

@@ -11,8 +11,8 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from .database import EffectPreset as DBEffectPreset
-from .models import EffectPresetResponse, EffectPresetCreate, EffectPresetUpdate, EffectConfig
+from ..database import EffectPreset as DBEffectPreset
+from ..models import EffectPresetResponse, EffectPresetCreate, EffectPresetUpdate, EffectConfig
 
 
 def _preset_response(p: DBEffectPreset) -> EffectPresetResponse:
