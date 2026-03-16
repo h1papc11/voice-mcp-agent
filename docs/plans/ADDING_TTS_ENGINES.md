@@ -192,7 +192,7 @@ Add to `backend/requirements.txt`. Watch for:
 
 **Pinned dependency conflicts** — If the model package pins old versions of numpy, torch, or transformers, install with `--no-deps` and list sub-dependencies manually. This is what Chatterbox requires:
 ```
-# In justfile/Makefile (NOT requirements.txt):
+# In justfile (NOT requirements.txt):
 pip install --no-deps chatterbox-tts
 
 # In requirements.txt — list the transitive deps:
@@ -337,7 +337,7 @@ The tracker monkey-patches tqdm to intercept HuggingFace's internal progress bar
 - [ ] `backend/backends/__init__.py` — `ModelConfig` entry + `TTS_ENGINES` + `get_tts_backend_for_engine()` elif
 - [ ] `backend/models.py` — engine name in regex, any new language codes
 - [ ] `backend/requirements.txt` — dependencies added (check for `--no-deps` needs)
-- [ ] `justfile` / `Makefile` — `--no-deps` install step if needed
+- [ ] `justfile` — `--no-deps` install step if needed
 
 ### API (`backend/main.py`)
 No changes needed — the model config registry handles all dispatch automatically.

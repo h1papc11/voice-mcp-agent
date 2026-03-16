@@ -25,39 +25,16 @@ Net result: -1,078 lines across the backend.
 
 ---
 
-## Phase 3: Generation Service
+## Phase 3: Generation Service ✓
 
-The three generation closures in `main.py` (`_run_generation:782`, `_run_retry:923`, `_run_regenerate:1018`) share ~80% of their logic. Extract into a service module.
+Extracted the three near-identical generation closures (`_run_generation`, `_run_retry`, `_run_regenerate`) and the background queue machinery from `main.py` into a new `services/` layer:
 
-### Create `services/generation.py`
+- `services/task_queue.py` — `create_background_task()`, `enqueue_generation()`, `init_queue()`, and the serial `_generation_worker`. Replaces the module-level globals and helpers that were in `main.py:63-92`.
+- `services/generation.py` — single `run_generation()` function with a `mode` parameter (`"generate"`, `"retry"`, `"regenerate"`). Mode-specific persistence is handled by three small sync helpers (`_save_generate`, `_save_retry`, `_save_regenerate`). The shared pipeline (model loading, voice prompt creation, chunked inference, normalization, error handling, task manager lifecycle) is written once.
 
-Single orchestration function with mode parameter:
+Route handlers in `main.py` are now thin: validate input, create/update DB row, resolve effects chain, then `enqueue_generation(run_generation(...))`.
 
-```python
-async def run_generation(
-    generation_id: str,
-    profile_id: str,
-    text: str,
-    language: str,
-    engine: str,
-    model_size: str,
-    seed: Optional[int],
-    normalize: bool,
-    effects_chain: Optional[list],
-    instruct_text: Optional[str],
-    mode: Literal["generate", "retry", "regenerate"],
-    version_label: Optional[str] = None,
-):
-```
-
-Differences between modes are small and can be handled with conditionals:
-- `retry`: reuses same seed, skips effects/versions
-- `regenerate`: seed=None, creates a new version with auto-label
-- `generate`: full pipeline including effects version
-
-### Move background queue management
-
-Move `_generation_queue`, `_generation_worker`, `_enqueue_generation`, `_background_tasks`, and `_create_background_task` (currently `main.py:63-92`) into the service module or a dedicated `services/task_queue.py`.
+Net result: ~240 lines of duplicated closure code replaced by a single 230-line service module + 50-line queue module.
 
 ---
 
@@ -164,6 +141,29 @@ Option A is simpler and non-disruptive. Option B is cleaner long-term but touche
 - Standardize error handling across routes (currently three different patterns)
 - Rename `effects.py` (preset CRUD) to avoid confusion with `utils/effects.py` (DSP engine) — either rename to `effect_presets.py` or fold into routes
 - Clean up test suite — the 4 manual integration scripts in `tests/` should either be converted to pytest or moved to a `scripts/` dir
+
+---
+
+## Phase 7: Style Guide & Tooling ✓
+
+Added a Python style guide (`backend/STYLE_GUIDE.md`) and automated linting/formatting with ruff. Removed the redundant Makefile — the justfile is now the single task runner.
+
+### Style guide
+
+Codifies conventions for the refactor: Google-style docstrings, native 3.12 type syntax (`list[str]`, `X | None` — no `from __future__` or `typing.List`), `logging` module instead of `print()`, two-layer error handling (domain exceptions + route-layer HTTPException), import grouping (stdlib / third-party / local with isort enforcement), 120-char line length.
+
+### Ruff config (`pyproject.toml`)
+
+Added project-root `pyproject.toml` with ruff linter + formatter config. Rule sets: `F`, `E`, `W`, `I` (isort), `N` (naming), `UP` (pyupgrade to 3.12), `B` (bugbear), `SIM`, `RET`, `T20` (print detection), `PT` (pytest style), `RUF`. `T201` (print) is ignored during migration — remove once logging conversion is done.
+
+Initial scan: 1,103 lint violations (879 auto-fixable), 38 files needing reformatting. Mostly whitespace (W293), type annotation modernization (UP045/UP006), and import sorting (I001). To be fixed file-by-file as files are touched, not in a big-bang pass.
+
+### Justfile updates
+
+- `just check` now runs both JS (Biome) and Python (ruff) checks
+- Added `just check-python`, `just lint-python`, `just format-python`, `just fix-python`, `just test`
+- `just setup-python` installs `ruff`, `pytest`, `pytest-asyncio` as dev tools
+- Deleted `Makefile` and updated all references in `CHANGELOG.md`, `PATCH_NOTES.md`, `docs/plans/ADDING_TTS_ENGINES.md`
 
 ---
 

@@ -52,7 +52,7 @@ setup-python:
         {{ pip }} install -r {{ backend_dir }}/requirements-mlx.txt
     fi
     {{ pip }} install git+https://github.com/QwenLM/Qwen3-TTS.git
-    {{ pip }} install pyinstaller -q
+    {{ pip }} install pyinstaller ruff pytest pytest-asyncio -q
     echo "Python environment ready."
 
 [windows]
@@ -75,7 +75,7 @@ setup-python:
     & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
     & "{{ pip }}" install --no-deps chatterbox-tts
     & "{{ pip }}" install git+https://github.com/QwenLM/Qwen3-TTS.git
-    & "{{ pip }}" install pyinstaller -q
+    & "{{ pip }}" install pyinstaller ruff pytest pytest-asyncio -q
     Write-Host "Python environment ready."
 
 # Install JavaScript dependencies
@@ -234,21 +234,50 @@ build-web:
 
 # ─── Code Quality ────────────────────────────────────────────────────
 
-# Run all checks (lint + format + typecheck)
-check:
+# Run all checks (JS + Python lint + format)
+check: check-js check-python
+
+# JS/TS: lint + format + typecheck (Biome)
+check-js:
     bun run check
 
-# Lint with Biome
-lint:
+# Python: lint + format check (ruff)
+check-python: _ensure-venv
+    {{ venv_bin }}/ruff check {{ backend_dir }}
+    {{ venv_bin }}/ruff format --check {{ backend_dir }}
+
+# Lint with Biome (JS) + ruff (Python)
+lint: _ensure-venv
     bun run lint
+    {{ venv_bin }}/ruff check {{ backend_dir }}
 
-# Format with Biome
-format:
+# Format with Biome (JS) + ruff (Python)
+format: _ensure-venv
     bun run format
+    {{ venv_bin }}/ruff format {{ backend_dir }}
 
-# Fix lint + format issues
-fix:
+# Fix lint + format issues (JS + Python)
+fix: _ensure-venv
     bun run check:fix
+    {{ venv_bin }}/ruff check {{ backend_dir }} --fix
+    {{ venv_bin }}/ruff format {{ backend_dir }}
+
+# Python lint only
+lint-python: _ensure-venv
+    {{ venv_bin }}/ruff check {{ backend_dir }}
+
+# Python format only
+format-python: _ensure-venv
+    {{ venv_bin }}/ruff format {{ backend_dir }}
+
+# Python auto-fix lint issues
+fix-python: _ensure-venv
+    {{ venv_bin }}/ruff check {{ backend_dir }} --fix
+    {{ venv_bin }}/ruff format {{ backend_dir }}
+
+# Run Python tests
+test: _ensure-venv
+    {{ venv_bin }}/python -m pytest {{ backend_dir }}/tests -v
 
 # ─── Database ─────────────────────────────────────────────────────────
 

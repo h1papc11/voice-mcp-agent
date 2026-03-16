@@ -31,7 +31,7 @@ Two-part fix:
 
 ## Testing
 To test this fix:
-1. Build Voicebox from source: `make build`
+1. Build Voicebox from source: `just build`
 2. Disconnect from internet
 3. Try generating speech
 4. Should work without network requests
@@ -40,13 +40,13 @@ To test this fix:
 
 ```bash
 # Install dependencies
-pip install -r requirements.txt
+just setup
 
 # Build the app
-make build
+just build
 
 # Or build just the server
-make build-server
+just build-server
 ```
 
 ## Notes
