@@ -9,6 +9,8 @@
     "autoupdater",
     "voice-profiles",
     "tts-generation",
+    "tts-engines",
+    "effects-pipeline",
     "history",
     "stories",
     "transcription",

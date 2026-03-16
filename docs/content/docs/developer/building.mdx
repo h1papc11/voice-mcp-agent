@@ -1,270 +1,190 @@
 ---
 title: "Building"
-description: "Build Voicebox for production"
+description: "How Voicebox is built for production"
 ---
 
 ## Overview
 
-Voicebox uses a multi-step build process to create platform-specific installers.
+Voicebox uses a two-stage build process:
 
-## Quick Build
+1. **Python Server Binary** — PyInstaller bundles the FastAPI backend into a standalone executable
+2. **Tauri Desktop App** — Bundles the React frontend, Rust wrapper, and Python server as a sidecar
 
-```bash
-# Build for your current platform (automatically builds server binary first)
-make build
-
-# Or manually
-bun run build
-```
-
-This automatically:
-1. Builds the Python server binary (`bun run build:server`)
-2. Builds the Tauri app (`cd tauri && bun run tauri build`)
-
-## Build Process
-
-The build process consists of two steps, but `bun run build` handles both automatically:
-
-### 1. Server Binary Build (Automatic)
-
-The Python backend is compiled into a standalone executable using PyInstaller. This happens automatically when you run `bun run build`.
-
-**Platform-specific binaries:**
-- macOS (Apple Silicon): `voicebox-server-aarch64-apple-darwin` (includes MLX backend)
-- macOS (Intel): `voicebox-server-x86_64-apple-darwin` (PyTorch backend)
-- Windows: `voicebox-server-x86_64-pc-windows-msvc.exe` (PyTorch backend)
-- Linux: `voicebox-server-x86_64-unknown-linux-gnu` (PyTorch backend)
-
-<Note>
-  The build script automatically detects your platform and includes the appropriate backend (MLX for Apple Silicon, PyTorch for others).
-</Note>
-
-**Manual build (if needed):**
-```bash
-bun run build:server
-```
-
-### 2. Tauri App Build (Automatic)
-
-The Tauri app build is also handled automatically, which:
-1. Builds the React frontend (Vite)
-2. Compiles the Rust backend
-3. Bundles the server binary as a sidecar
-4. Creates platform-specific installers
-
-**Manual build (if needed):**
-```bash
-cd tauri && bun run tauri build
-```
-
-### 3. Output
-
-Installers are created in `tauri/src-tauri/target/release/bundle/`:
-
-**macOS:**
-- `dmg/` - Disk image installer
-- `macos/` - App bundle
-
-**Windows:**
-- `msi/` - MSI installer
-- `nsis/` - NSIS installer
-
-**Linux:**
-- `deb/` - Debian package
-- `appimage/` - AppImage
-
-## Advanced Options
-
-### Building for Specific Platform
+## Build Commands
 
 ```bash
-# Build for macOS (Apple Silicon)
-bun run tauri build -- --target aarch64-apple-darwin
-
-# Build for macOS (Intel)
-bun run tauri build -- --target x86_64-apple-darwin
-
-# Build for Windows
-bun run tauri build -- --target x86_64-pc-windows-msvc
-
-# Build for Linux
-bun run tauri build -- --target x86_64-unknown-linux-gnu
+just build          # Build everything (server + Tauri)
+just build-server   # Build Python server binary only
+just build-tauri    # Build Tauri app only
 ```
 
-### Using Local Qwen3-TTS
+## Server Binary Build
 
-If you're developing Qwen3-TTS locally:
+### Build Script
+
+`scripts/build-server.sh` orchestrates the build:
 
 ```bash
-export QWEN_TTS_PATH=~/path/to/Qwen3-TTS
-bun run build:server  # Build server binary only
-# or
-bun run build  # Build everything
+# Determine platform (e.g., x86_64-apple-darwin)
+PLATFORM=$(rustc --print host-tuple)
+
+# Run PyInstaller via build_binary.py
+cd backend
+python build_binary.py
+
+# Copy to Tauri's binaries directory
+cp dist/voicebox-server ../tauri/src-tauri/binaries/voicebox-server-${PLATFORM}
 ```
 
-This makes PyInstaller use your local version instead of the pip package.
+### PyInstaller Configuration
 
-### Debug Build
+`backend/build_binary.py` contains the PyInstaller configuration:
+
+**Entry Point:** Uses `server.py` (not `main.py`) for Tauri sidecar support
+
+**Key Options:**
+- `--onefile` — Single executable
+- `--hidden-import` — Explicitly import modules PyInstaller can't detect
+- `--collect-all` — Bundle data files and native libraries for packages like `mlx`, `zipvoice`
+- `--exclude-module` — Strip NVIDIA packages from CPU builds
+
+**Platform-Specific Logic:**
+
+```python
+# Apple Silicon — include MLX backend
+if is_apple_silicon() and not cuda:
+    args.extend([
+        "--hidden-import", "mlx",
+        "--collect-all", "mlx",        # Bundles .dylib and .metallib files
+    ])
+
+# CUDA builds — include torch.cuda
+if cuda:
+    args.extend(["--hidden-import", "torch.cuda"])
+
+# CPU builds — exclude NVIDIA packages to save ~3GB
+else:
+    for pkg in ["nvidia", "nvidia.cublas", "nvidia.cudnn", ...]:
+        args.extend(["--exclude-module", pkg])
+```
+
+**Environment Variable:**
+
+```bash
+export QWEN_TTS_PATH=~/path/to/Qwen3-TTS  # Use local Qwen3-TTS source
+```
+
+### CUDA Binary
+
+The CUDA-enabled server is built separately due to size (~2.43 GB vs ~410 MB CPU version):
+
+```bash
+cd backend
+python build_binary.py --cuda
+```
+
+The resulting binary is too large for GitHub Releases, so it's split into parts for distribution (see Auto-Updater docs for the download mechanism).
+
+## Tauri App Build
+
+Tauri bundles everything together:
 
 ```bash
 cd tauri
-bun run tauri build --debug
+bun run tauri build
 ```
 
-Creates a debug build with symbols and logging.
+**What happens:**
+1. Vite builds the React frontend
+2. Rust compiles the Tauri wrapper
+3. Sidecar binary is copied from `src-tauri/binaries/`
+4. Platform-specific installer created (DMG, MSI, AppImage)
 
-## Build Configuration
+**Output locations:**
 
-### Tauri Config
-
-Edit `tauri/src-tauri/tauri.conf.json`:
-
-```json
-{
-  "bundle": {
-    "identifier": "com.voicebox.app",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  }
-}
-```
+<Files>
+  <Folder name="tauri/src-tauri/target/release/bundle" defaultOpen>
+    <File name="dmg/" />
+    <File name="msi/" />
+    <File name="nsis/" />
+    <File name="appimage/" />
+  </Folder>
+</Files>
 
 ### Sidecar Configuration
 
-The Python server is bundled as a sidecar:
+The server binary is declared as an external binary in `tauri.conf.json`:
 
 ```json
 {
   "tauri": {
     "bundle": {
-      "externalBin": [
-        "binaries/voicebox-server"
-      ]
+      "externalBin": ["binaries/voicebox-server"]
     }
   }
 }
 ```
 
-## Code Signing
+Tauri looks for `voicebox-server-${PLATFORM}` in `src-tauri/binaries/` and bundles it.
 
-### macOS
+## GitHub Actions Release
 
-To sign the app for distribution:
+`.github/workflows/release.yml` automates the full build:
 
-```bash
-# Set signing identity
-export APPLE_SIGNING_IDENTITY="Developer ID Application: Your Name"
+### Matrix Strategy
 
-# Build with signing
-bun run tauri build
-```
+| Platform | Target | Backend | Notes |
+|----------|--------|---------|-------|
+| macos-latest | aarch64-apple-darwin | MLX | Apple Silicon native |
+| macos-15-intel | x86_64-apple-darwin | PyTorch | Intel Macs |
+| windows-latest | x86_64-pc-windows-msvc | PyTorch | Windows with CUDA optional |
 
-For notarization:
+### Build Steps
 
-```bash
-# Set credentials
-export APPLE_ID="your@email.com"
-export APPLE_PASSWORD="app-specific-password"
+1. **Setup** — Python, Rust, Bun, dependencies
+2. **Build Server** — `build-server.sh` (Unix) or `build_binary.py` (Windows)
+3. **Build Tauri** — `tauri-action` with signing keys
+4. **Upload** — Release artifacts and `latest.json`
 
-# Build and notarize
-bun run tauri build
-```
+### Code Signing
 
-### Windows
+**macOS:**
+- Apple Developer certificate imported from secrets
+- Notarization via App Store Connect API
 
-For Windows code signing:
+**Windows:**
+- Tauri handles signing via `TAURI_SIGNING_PRIVATE_KEY`
 
-```bash
-# Set certificate
-export WINDOWS_CERTIFICATE_PATH="/path/to/cert.pfx"
-export WINDOWS_CERTIFICATE_PASSWORD="password"
+### CUDA Binary (Separate Job)
 
-# Build with signing
-bun run tauri build
-```
+The `build-cuda-windows` job runs separately:
 
-## Release Process
+1. Install PyTorch with CUDA 12.1
+2. Build with `build_binary.py --cuda`
+3. Split binary with `scripts/split_binary.py`
+4. Upload parts as release artifacts
 
-The full release process is automated:
-
-```bash
-# 1. Bump version
-bumpversion patch  # or minor/major
-
-# 2. Build all platforms (CI/CD handles this)
-git push --tags
-
-# 3. GitHub Actions creates releases
-```
-
-See [CONTRIBUTING.md](/development/contributing) for the full release workflow.
+This binary is downloaded on-demand by users who enable CUDA in settings.
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Server Binary Build Fails">
-    **Common issues:**
-    - Missing Python dependencies: `pip install -r requirements.txt`
-    - PyInstaller not found: `pip install pyinstaller`
-    - Qwen3-TTS not installed: `pip install git+https://github.com/QwenLM/Qwen3-TTS.git`
-
-    **Solution:**
-    ```bash
-    cd backend
-    source venv/bin/activate
-    pip install -r requirements.txt
-    pip install pyinstaller
-    ```
+  <Accordion title="Binary not found in dist/">
+    PyInstaller failed to create the output. Check:
+    - Python venv is activated
+    - All dependencies installed: `pip install -r requirements.txt`
+    - PyInstaller installed: `pip install pyinstaller`
   </Accordion>
 
-  <Accordion title="Tauri Build Fails">
-    **Common issues:**
-    - Rust not installed: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-    - Server binary missing: Usually auto-built, but can run manually: `./scripts/build-server.sh`
-    - Node modules outdated: `bun install`
-
-    **Solution:**
-    ```bash
-    # Clean and rebuild
-    cd tauri/src-tauri
-    cargo clean
-    cd ../..
-    bun run build  # Automatically builds server binary first
-    ```
+  <Accordion title="MLX/Metal libraries missing in bundle">
+    macOS Apple Silicon builds need `--collect-all mlx` to include `.dylib` and `.metallib` files, not just `--collect-data`.
   </Accordion>
 
-  <Accordion title="App Won't Launch After Build">
-    **Check:**
-    - Server binary has execute permissions
-    - All dependencies are bundled
-    - Check logs in the app's data directory
+  <Accordion title="CUDA DLLs bloating CPU build">
+    If building CPU version but CUDA torch is installed locally, the script auto-detects and swaps to CPU torch temporarily, then restores CUDA torch after.
+  </Accordion>
 
-    **macOS:**
-    ```bash
-    tail -f ~/Library/Application\ Support/com.voicebox.app/logs/server.log
-    ```
-
-    **Windows:**
-    ```bash
-    type %APPDATA%\com.voicebox.app\logs\server.log
-    ```
+  <Accordion title="Tauri can't find sidecar">
+    Ensure binary exists at `tauri/src-tauri/binaries/voicebox-server-${PLATFORM}` before running Tauri build.
   </Accordion>
 </AccordionGroup>
-
-## CI/CD
-
-GitHub Actions automatically builds releases when tags are pushed:
-
-```yaml
-# .github/workflows/release.yml
-on:
-  push:
-    tags:
-      - 'v*'
-```
-
-See the [repository](https://github.com/jamiepine/voicebox) for the full CI/CD configuration.

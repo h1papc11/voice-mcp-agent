@@ -2,6 +2,7 @@ import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { MarkdownCopyButton, ViewOptionsPopover } from '@/components/ai/page-actions';
 import { APIPage } from '@/components/api-page';
 import { getPageImage, source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
@@ -12,6 +13,8 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   if (!page) notFound();
 
   const MDX = page.data.body;
+  const markdownUrl = `${page.url}.mdx`;
+  const githubUrl = `https://github.com/jamiepine/voicebox/blob/main/docs/content/docs/${page.path}`;
 
   return (
     <DocsPage
@@ -26,11 +29,24 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
       lastUpdate={page.data.lastModified}
     >
       <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
+      <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
+      <div className="flex flex-row gap-2 items-center">
+        <MarkdownCopyButton markdownUrl={markdownUrl} />
+        <ViewOptionsPopover markdownUrl={markdownUrl} githubUrl={githubUrl} />
+      </div>
+      <div
+        role="separator"
+        style={{
+          height: '1px',
+          background: 'currentColor',
+          opacity: 0.15,
+          marginTop: '8px',
+          marginBottom: '24px',
+        }}
+      />
       <DocsBody>
         <MDX
           components={getMDXComponents({
-            // this allows you to link to other pages with relative file paths
             a: createRelativeLink(source, page),
           })}
         />

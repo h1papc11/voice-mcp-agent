@@ -23,20 +23,20 @@ Before you start contributing, make sure you have:
 
 ## Ways to Contribute
 
-<CardGroup cols={2}>
-  <Card title="Report Bugs" icon="bug">
+<Cards>
+  <Card title="Report Bugs">
     Found a bug? Open an issue with reproduction steps
   </Card>
-  <Card title="Request Features" icon="lightbulb">
+  <Card title="Request Features">
     Have an idea? Start a discussion or open an issue
   </Card>
-  <Card title="Improve Docs" icon="book">
+  <Card title="Improve Docs">
     Fix typos, add examples, or clarify instructions
   </Card>
-  <Card title="Write Code" icon="code">
+  <Card title="Write Code">
     Fix bugs, add features, or optimize performance
   </Card>
-</CardGroup>
+</Cards>
 
 ## Development Workflow
 
@@ -164,27 +164,28 @@ When creating a pull request:
 
 ## Project Structure
 
-Understanding the codebase:
-
-```
-voicebox/
-├── app/              # Shared React frontend
-│   ├── src/
-│   │   ├── components/   # UI components
-│   │   ├── lib/          # Utilities and API client
-│   │   ├── hooks/        # React hooks
-│   │   └── stores/       # Zustand state stores
-├── backend/          # Python FastAPI server
-│   ├── main.py       # API routes
-│   ├── tts.py        # Voice synthesis logic
-│   ├── database.py   # SQLite operations
-│   └── models.py     # Pydantic models
-├── tauri/            # Desktop app wrapper
-│   └── src-tauri/    # Rust backend
-├── web/              # Web deployment
-├── landing/          # Marketing website
-└── scripts/          # Build & release scripts
-```
+<Files>
+  <Folder name="voicebox" defaultOpen>
+    <Folder name="app/src">
+      <File name="components/" />
+      <File name="lib/" />
+      <File name="hooks/" />
+      <File name="stores/" />
+    </Folder>
+    <Folder name="backend">
+      <File name="main.py" />
+      <File name="tts.py" />
+      <File name="database.py" />
+      <File name="models.py" />
+    </Folder>
+    <Folder name="tauri">
+      <File name="src-tauri/" />
+    </Folder>
+    <File name="web/" />
+    <File name="landing/" />
+    <File name="scripts/" />
+  </Folder>
+</Files>
 
 ## Areas for Contribution
 

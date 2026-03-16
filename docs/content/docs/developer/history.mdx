@@ -30,11 +30,13 @@ class Generation(Base):
 
 Generated audio is stored in:
 
-```
-data/
-└── generations/
-    └── {generation_id}.wav
-```
+<Files>
+  <Folder name="data" defaultOpen>
+    <Folder name="generations">
+      <File name="{generation_id}.wav" />
+    </Folder>
+  </Folder>
+</Files>
 
 ## Core Functions
 
@@ -171,11 +173,12 @@ async def delete_generations_by_profile(profile_id: str, db: Session) -> int:
 
 Generations can be exported as ZIP archives:
 
-```
-generation_export.zip
-├── generation.json   # Metadata
-└── audio.wav         # Audio file
-```
+<Files>
+  <Folder name="generation_export.zip" defaultOpen>
+    <File name="generation.json" />
+    <File name="audio.wav" />
+  </Folder>
+</Files>
 
 ### Importing a Generation
 

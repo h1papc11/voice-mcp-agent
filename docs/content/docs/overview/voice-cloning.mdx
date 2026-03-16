@@ -28,20 +28,20 @@ Voicebox uses **Qwen3-TTS** from Alibaba to achieve near-perfect voice cloning f
 
 ### Sample Quality
 
-<CardGroup cols={2}>
-  <Card title="Do" icon="check">
+<Cards>
+  <Card title="Do">
     - Use 10-30 seconds of audio
     - Clear, consistent speaking
     - Minimal background noise
     - Natural speaking pace
   </Card>
-  <Card title="Don't" icon="xmark">
+  <Card title="Don't">
     - Very short clips (< 5 seconds)
     - Heavy background noise
     - Music or overlapping voices
     - Heavily processed audio
   </Card>
-</CardGroup>
+</Cards>
 
 ### Multiple Samples
 
@@ -51,9 +51,9 @@ Adding multiple samples from the same speaker can improve quality:
 - Different emotions (happy, serious)
 - Different recording conditions
 
-<Tip>
+<Callout type="info">
   The model will learn a more robust representation from diverse samples.
-</Tip>
+</Callout>
 
 ## Supported Languages
 
@@ -65,9 +65,9 @@ More languages coming soon.
 
 ## Limitations
 
-<Warning>
+<Callout type="warn">
   Voice cloning should only be used with consent. Ensure you have permission to clone someone's voice.
-</Warning>
+</Callout>
 
 - Quality depends on sample clarity
 - Works best with consistent speaking tone

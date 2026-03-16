@@ -41,9 +41,9 @@ In Remote Mode, the Voicebox desktop app (running on your local machine) communi
     uvicorn main:app --host 0.0.0.0 --port 17493
     ```
 
-    <Warning>
+    <Callout type="warn">
       This exposes the server to your network. Use a firewall or VPN for security.
-    </Warning>
+    </Callout>
   </Step>
 
   <Step title="Open Firewall">
@@ -108,9 +108,9 @@ In Remote Mode, the Voicebox desktop app (running on your local machine) communi
 
 ## Security Considerations
 
-<Warning>
+<Callout type="warn">
   The API currently has no authentication. Only use on trusted networks or with a VPN.
-</Warning>
+</Callout>
 
 **Best Practices:**
 - Use a VPN (WireGuard, Tailscale) instead of exposing to the internet
@@ -129,9 +129,9 @@ Expected performance on various GPUs:
 | RTX 3060 | ~5-7s per 10 words |
 | CPU (12-core) | ~20-30s per 10 words |
 
-<Tip>
+<Callout type="info">
   A GPU with 8GB+ VRAM is recommended for best performance.
-</Tip>
+</Callout>
 
 ## Troubleshooting
 

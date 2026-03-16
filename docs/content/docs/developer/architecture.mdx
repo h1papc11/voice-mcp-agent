@@ -26,19 +26,22 @@ These two layers communicate via HTTP, with the frontend making API requests to 
 
 ### Component Structure
 
-```
-app/src/
-├── components/       # React components
-│   ├── profiles/    # Voice profile UI
-│   ├── generation/  # Speech generation UI
-│   ├── stories/     # Timeline editor
-│   └── shared/      # Reusable components
-├── lib/             # Utilities
-│   ├── api/         # Generated API client
-│   └── utils/       # Helper functions
-├── hooks/           # React hooks
-└── stores/          # Zustand state stores
-```
+<Files>
+  <Folder name="app/src" defaultOpen>
+    <Folder name="components">
+      <File name="profiles/" />
+      <File name="generation/" />
+      <File name="stories/" />
+      <File name="shared/" />
+    </Folder>
+    <Folder name="lib">
+      <File name="api/" />
+      <File name="utils/" />
+    </Folder>
+    <Folder name="hooks" />
+    <Folder name="stores" />
+  </Folder>
+</Files>
 
 ### State Management
 
@@ -64,16 +67,69 @@ const useProfileStore = create((set) => ({
 
 ### API Structure
 
-```python
-# main.py - API routes
-@app.post("/generate")
-async def generate_speech(request: GenerateRequest):
-    # 1. Validate request
-    # 2. Load voice profile
-    # 3. Generate audio with TTS
-    # 4. Save to database
-    # 5. Return response
-```
+<Files>
+  <Folder name="backend" defaultOpen>
+    <File name="app.py" />
+    <File name="main.py" />
+    <File name="config.py" />
+    <File name="models.py" />
+    <File name="server.py" />
+    <Folder name="routes">
+      <File name="profiles.py" />
+      <File name="generate.py" />
+      <File name="history.py" />
+      <File name="..." />
+    </Folder>
+    <Folder name="services">
+      <File name="generation.py" />
+      <File name="task_queue.py" />
+      <File name="..." />
+    </Folder>
+    <Folder name="backends">
+      <File name="__init__.py" />
+      <File name="base.py" />
+      <File name="..." />
+    </Folder>
+    <Folder name="database">
+      <File name="models.py" />
+      <File name="session.py" />
+    </Folder>
+    <Folder name="utils">
+      <File name="audio.py" />
+      <File name="effects.py" />
+      <File name="..." />
+    </Folder>
+  </Folder>
+</Files>
+
+### Request Flow
+
+HTTP request → **routes/** (validate input, parse params) → **services/** (business logic, orchestration) → **backends/** (TTS/STT inference) → **utils/** (audio processing)
+
+Route handlers are intentionally thin. They validate input, delegate to a service function, and format the response. All business logic lives in `services/`.
+
+### Key Modules
+
+- **app.py** — FastAPI app factory, CORS, lifecycle events
+- **main.py** — Entry point (imports app, runs uvicorn)
+- **server.py** — Tauri sidecar launcher, parent-pid watchdog
+- **services/generation.py** — Single function handling all generation modes (generate, retry, regenerate)
+- **services/task_queue.py** — Serial generation queue for GPU inference
+- **backends/__init__.py** — Protocol definitions and backend factory
+- **backends/base.py** — Shared utilities across all engine implementations
+
+### Backend Selection
+
+The server detects the best inference backend at startup:
+
+| Platform | Backend | Acceleration |
+|----------|---------|-------------|
+| macOS (Apple Silicon) | MLX | Metal / Neural Engine |
+| Windows / Linux (NVIDIA) | PyTorch | CUDA |
+| Linux (AMD) | PyTorch | ROCm |
+| Intel Arc | PyTorch | IPEX / XPU |
+| Windows (any GPU) | PyTorch | DirectML |
+| Any | PyTorch | CPU fallback |
 
 ### Data Model
 
@@ -89,11 +145,13 @@ The database uses three main tables:
 
 ### Rust Backend
 
-```rust
-// Sidecar process management
-// File system access
-// Native integrations
-```
+<Files>
+  <Folder name="tauri/src-tauri" defaultOpen>
+    <File name="Cargo.toml" />
+    <File name="src/" />
+    <Folder name="binaries" />
+  </Folder>
+</Files>
 
 ### Responsibilities
 
@@ -196,11 +254,11 @@ When a user generates speech, the data flows through the following stages:
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Development Setup" icon="code" href="/development/setup">
+<Cards>
+  <Card title="Development Setup" href="/development/setup">
     Set up your dev environment
   </Card>
-  <Card title="Contributing" icon="code-pull-request" href="/development/contributing">
+  <Card title="Contributing" href="/development/contributing">
     Contribute to Voicebox
   </Card>
-</CardGroup>
+</Cards>

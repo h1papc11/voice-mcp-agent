@@ -49,14 +49,16 @@ class ProfileSample(Base):
 
 Profiles are stored in the data directory:
 
-```
-data/
-└── profiles/
-    └── {profile_id}/
-        ├── {sample_id_1}.wav
-        ├── {sample_id_2}.wav
-        └── ...
-```
+<Files>
+  <Folder name="data" defaultOpen>
+    <Folder name="profiles">
+      <Folder name="{profile_id}">
+        <File name="{sample_id_1}.wav" />
+        <File name="{sample_id_2}.wav" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
 
 ## Core Functions
 
@@ -158,14 +160,15 @@ Reference audio is validated before being accepted:
 
 Profiles can be exported as ZIP archives for sharing:
 
-```
-profile_export.zip
-├── profile.json     # Metadata
-├── samples/
-│   ├── sample_1.wav
-│   └── sample_1.json  # Reference text
-└── ...
-```
+<Files>
+  <Folder name="profile_export.zip" defaultOpen>
+    <File name="profile.json" />
+    <Folder name="samples">
+      <File name="sample_1.wav" />
+      <File name="sample_1.json" />
+    </Folder>
+  </Folder>
+</Files>
 
 ## API Endpoints
 
