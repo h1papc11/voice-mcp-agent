@@ -120,12 +120,53 @@ The `get_model_status` endpoint (`main.py:2251-2431`) is 180 lines of HuggingFac
 
 ## Phase 5: Database Cleanup
 
-### Split `database.py` (487 lines)
+### Adopt Alembic
 
-- `database/models.py` — ORM model definitions (11 models, ~140 lines)
-- `database/migrations.py` — migration logic (`_run_migrations`, ~200 lines)
-- `database/seed.py` — `_backfill_generation_versions` + `_seed_builtin_presets`
-- `database/session.py` — engine creation, `init_db()`, `get_db()`
+Replace the hand-rolled `_run_migrations()` (200 lines of manual ALTER TABLE + column existence checks) with Alembic.
+
+**Why:**
+- Current approach has no migration tracking — checks column existence on every startup
+- Can't express complex migrations (data transforms, renames) safely
+- No rollback path
+- Already at 12 migration blocks and growing
+
+**Migration steps:**
+
+1. `pip install alembic` and add to `requirements.txt`
+2. Run `alembic init alembic` to scaffold the config
+3. Point `alembic/env.py` at the existing SQLAlchemy `Base.metadata` and engine
+4. Create a baseline migration stamped as the current schema — this tells Alembic "the DB already has all this, don't recreate it":
+   ```bash
+   alembic revision --autogenerate -m "baseline"
+   # Then stamp existing DBs so they skip the baseline:
+   alembic stamp head
+   ```
+5. Replace `_run_migrations()` in `init_db()` with `alembic.command.upgrade(config, "head")`
+6. Move `_backfill_generation_versions` and `_seed_builtin_presets` into a post-migration hook or a dedicated seed step in `init_db()`
+7. Delete the 200 lines of manual migration code
+
+**Going forward**, new schema changes become:
+```bash
+# Auto-generate from model diff
+alembic revision --autogenerate -m "add_whatever_column"
+# Review the generated file, then it runs on next startup
+```
+
+**Target structure:**
+
+```
+backend/
+  alembic/
+    versions/
+      001_baseline.py
+    env.py
+  alembic.ini
+  database/
+    __init__.py       # re-exports for backward compat
+    models.py         # ORM model definitions (11 models, ~140 lines)
+    session.py        # engine creation, init_db(), get_db()
+    seed.py           # _backfill_generation_versions + _seed_builtin_presets
+```
 
 ### Fix async-over-sync CRUD modules
 
