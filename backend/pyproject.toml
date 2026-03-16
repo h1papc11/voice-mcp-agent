@@ -60,6 +60,8 @@ ignore = [
 # Entry points and scripts legitimately use print.
 "server.py" = ["T201"]
 "main.py" = ["T201"]
+# AMD GPU env vars must be set before torch import.
+"app.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend"]
