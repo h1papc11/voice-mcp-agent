@@ -7,16 +7,13 @@ Wraps the LuxTTS (ZipVoice) model for zero-shot voice cloning.
 
 import asyncio
 import logging
-from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
 from . import TTSBackend
-from ..utils.audio import normalize_audio, load_audio
+from .base import is_model_cached, get_torch_device, combine_voice_prompts as _combine_voice_prompts, model_load_progress
 from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_prompt
-from ..utils.progress import get_progress_manager
-from ..utils.tasks import get_task_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +30,7 @@ class LuxTTSBackend:
         self._device = None
 
     def _get_device(self) -> str:
-        """Get the best available device."""
-        import torch
-
-        if torch.cuda.is_available():
-            return "cuda"
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        return get_torch_device(allow_mps=True)
 
     def is_loaded(self) -> bool:
         return self.model is not None
@@ -55,35 +45,10 @@ class LuxTTSBackend:
         return LUXTTS_HF_REPO
 
     def _is_model_cached(self, model_size: str = "default") -> bool:
-        """Check if LuxTTS model weights are cached locally."""
-        try:
-            from huggingface_hub import constants as hf_constants
-
-            repo_cache = (
-                Path(hf_constants.HF_HUB_CACHE)
-                / ("models--" + LUXTTS_HF_REPO.replace("/", "--"))
-            )
-
-            if not repo_cache.exists():
-                return False
-
-            blobs_dir = repo_cache / "blobs"
-            if blobs_dir.exists() and any(blobs_dir.glob("*.incomplete")):
-                return False
-
-            snapshots_dir = repo_cache / "snapshots"
-            if snapshots_dir.exists():
-                has_weights = any(snapshots_dir.rglob("*.pt")) or any(
-                    snapshots_dir.rglob("*.safetensors")
-                ) or any(snapshots_dir.rglob("*.onnx")) or any(
-                    snapshots_dir.rglob("*.bin")
-                )
-                return has_weights
-
-            return False
-        except Exception as e:
-            logger.warning(f"Error checking LuxTTS cache: {e}")
-            return False
+        return is_model_cached(
+            LUXTTS_HF_REPO,
+            weight_extensions=(".pt", ".safetensors", ".onnx", ".bin"),
+        )
 
     async def load_model(self, model_size: str = "default") -> None:
         """Load the LuxTTS model."""
@@ -93,68 +58,25 @@ class LuxTTSBackend:
         await asyncio.to_thread(self._load_model_sync)
 
     def _load_model_sync(self):
-        """Synchronous model loading."""
-        from ..utils.hf_progress import HFProgressTracker, create_hf_progress_callback
-
-        progress_manager = get_progress_manager()
-        task_manager = get_task_manager()
         model_name = "luxtts"
-
         is_cached = self._is_model_cached()
 
-        # Set up HF progress tracking (intercepts tqdm for file-level progress)
-        progress_callback = create_hf_progress_callback(model_name, progress_manager)
-        tracker = HFProgressTracker(progress_callback, filter_non_downloads=is_cached)
-        tracker_context = tracker.patch_download()
-        tracker_context.__enter__()
-
-        if not is_cached:
-            task_manager.start_download(model_name)
-            progress_manager.update_progress(
-                model_name=model_name,
-                current=0,
-                total=0,
-                filename="Connecting to HuggingFace...",
-                status="downloading",
-            )
-
-        try:
+        with model_load_progress(model_name, is_cached):
             from zipvoice.luxvoice import LuxTTS
 
             device = self.device
             logger.info(f"Loading LuxTTS on {device}...")
 
-            # LuxTTS constructor downloads model and loads everything
-            try:
-                if device == "cpu":
-                    import os
-                    threads = os.cpu_count() or 4
-                    self.model = LuxTTS(
-                        model_path=LUXTTS_HF_REPO,
-                        device="cpu",
-                        threads=min(threads, 8),
-                    )
-                else:
-                    self.model = LuxTTS(
-                        model_path=LUXTTS_HF_REPO,
-                        device=device,
-                    )
-            finally:
-                tracker_context.__exit__(None, None, None)
+            if device == "cpu":
+                import os
+                threads = os.cpu_count() or 4
+                self.model = LuxTTS(
+                    model_path=LUXTTS_HF_REPO, device="cpu", threads=min(threads, 8),
+                )
+            else:
+                self.model = LuxTTS(model_path=LUXTTS_HF_REPO, device=device)
 
-            if not is_cached:
-                progress_manager.mark_complete(model_name)
-                task_manager.complete_download(model_name)
-
-            logger.info("LuxTTS loaded successfully")
-
-        except Exception as e:
-            import traceback
-            logger.error(f"Failed to load LuxTTS: {e}\n{traceback.format_exc()}")
-            if not is_cached:
-                progress_manager.mark_error(model_name, str(e))
-                task_manager.error_download(model_name, str(e))
-            raise
+        logger.info("LuxTTS loaded successfully")
 
     def unload_model(self) -> None:
         """Unload model to free memory."""
@@ -205,28 +127,8 @@ class LuxTTSBackend:
 
         return encoded, False
 
-    async def combine_voice_prompts(
-        self,
-        audio_paths: List[str],
-        reference_texts: List[str],
-    ) -> Tuple[np.ndarray, str]:
-        """
-        Combine multiple reference samples.
-
-        LuxTTS doesn't have native multi-prompt support, so we concatenate
-        the audio and let encode_prompt handle the combined clip.
-        """
-        combined_audio = []
-        for path in audio_paths:
-            audio, _sr = load_audio(path, sample_rate=24000)
-            audio = normalize_audio(audio)
-            combined_audio.append(audio)
-
-        mixed = np.concatenate(combined_audio)
-        mixed = normalize_audio(mixed)
-        combined_text = " ".join(reference_texts)
-
-        return mixed, combined_text
+    async def combine_voice_prompts(self, audio_paths, reference_texts):
+        return await _combine_voice_prompts(audio_paths, reference_texts, sample_rate=24000)
 
     async def generate(
         self,

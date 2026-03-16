@@ -17,23 +17,38 @@ Production-quality FastAPI backend for Qwen3-TTS voice cloning.
 
 ```
 backend/
-├── main.py              # FastAPI app with all routes
-├── models.py            # Pydantic request/response models
-├── platform_detect.py   # Platform detection for backend selection
-├── tts.py              # TTS backend abstraction (delegates to MLX or PyTorch)
-├── transcribe.py       # STT backend abstraction (delegates to MLX or PyTorch)
-├── backends/           # Backend implementations
-│   ├── __init__.py     # Backend factory and protocols
-│   ├── mlx_backend.py  # MLX backend (Apple Silicon)
-│   └── pytorch_backend.py  # PyTorch backend (Windows/Linux/Intel)
-├── profiles.py         # Voice profile CRUD
-├── history.py          # Generation history
-├── studio.py           # Audio editing (TODO)
-├── database.py         # SQLite ORM
+├── main.py                # FastAPI app with all routes
+├── server.py              # PyInstaller entry point, CLI arg parsing
+├── models.py              # Pydantic request/response models
+├── config.py              # Data directory configuration
+├── database.py            # SQLAlchemy ORM models + migrations
+├── platform_detect.py     # Platform detection for backend selection
+├── tts.py                 # TTS backend facade
+├── transcribe.py          # STT backend facade
+├── profiles.py            # Voice profile CRUD
+├── history.py             # Generation history CRUD
+├── channels.py            # Audio channel management
+├── stories.py             # Story/timeline management + audio export
+├── effects.py             # Effect preset CRUD
+├── versions.py            # Generation version management
+├── export_import.py       # ZIP export/import for profiles and generations
+├── backends/              # Backend implementations
+│   ├── __init__.py        # Protocols, model config registry, factory functions
+│   ├── mlx_backend.py     # MLX backend (Apple Silicon)
+│   ├── pytorch_backend.py # PyTorch backend (Windows/Linux/Intel)
+│   ├── chatterbox_backend.py       # Chatterbox Multilingual TTS
+│   ├── chatterbox_turbo_backend.py # Chatterbox Turbo TTS
+│   └── luxtts_backend.py  # LuxTTS backend
 └── utils/
-    ├── audio.py        # Audio processing utilities
-    ├── cache.py        # Voice prompt caching
-    └── validation.py   # Input validation
+    ├── audio.py           # Audio load/save/normalize/validate/trim
+    ├── cache.py           # Voice prompt caching (memory + disk)
+    ├── effects.py         # Audio effects engine (pedalboard)
+    ├── chunked_tts.py     # Text chunking + audio concatenation
+    ├── progress.py        # SSE progress tracking
+    ├── tasks.py           # Active task tracking
+    ├── hf_progress.py     # HuggingFace download progress tracking
+    ├── hf_offline_patch.py # HuggingFace offline mode patch (MLX)
+    └── images.py          # Avatar image processing
 ```
 
 ### Backend Selection
@@ -450,12 +465,8 @@ Error responses include details:
 
 - [ ] WebSocket support for generation progress
 - [ ] Batch generation endpoint
-- [ ] Audio effects (M3GAN, etc.)
 - [ ] Voice design (text-to-voice)
-- [ ] Audio studio timeline features
-- [ ] Project management
 - [ ] Authentication & rate limiting
-- [ ] Export/import profiles
 
 ## License
 

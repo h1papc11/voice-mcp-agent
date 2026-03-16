@@ -19,11 +19,6 @@ from .models import VoiceProfileCreate
 from . import config
 
 
-def _get_profiles_dir() -> Path:
-    """Get profiles directory from config."""
-    return config.get_profiles_dir()
-
-
 def _get_unique_profile_name(name: str, db: Session) -> str:
     """
     Get a unique profile name by appending a number if needed.
@@ -99,7 +94,7 @@ def export_profile_to_zip(profile_id: str, db: Session) -> bytes:
 
         # Create samples.json mapping
         samples_data = {}
-        profile_dir = _get_profiles_dir() / profile_id
+        profile_dir = config.get_profiles_dir() / profile_id
 
         for sample in samples:
             # Get filename from audio_path (should be {sample_id}.wav)
@@ -181,7 +176,7 @@ async def import_profile_from_zip(file_bytes: bytes, db: Session) -> VoiceProfil
             profile = await create_profile(profile_create, db)
 
             # Extract and add samples
-            profile_dir = _get_profiles_dir() / profile.id
+            profile_dir = config.get_profiles_dir() / profile.id
             profile_dir.mkdir(parents=True, exist_ok=True)
 
             # Handle avatar if present

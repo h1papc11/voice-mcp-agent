@@ -58,11 +58,6 @@ def _profile_to_response(
     )
 
 
-def _get_profiles_dir() -> Path:
-    """Get profiles directory from config."""
-    return config.get_profiles_dir()
-
-
 async def create_profile(
     data: VoiceProfileCreate,
     db: Session,
@@ -100,7 +95,7 @@ async def create_profile(
     db.refresh(db_profile)
 
     # Create profile directory
-    profile_dir = _get_profiles_dir() / db_profile.id
+    profile_dir = config.get_profiles_dir() / db_profile.id
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     return _profile_to_response(db_profile)
@@ -136,7 +131,7 @@ async def add_profile_sample(
     
     # Create sample ID and directory
     sample_id = str(uuid.uuid4())
-    profile_dir = _get_profiles_dir() / profile_id
+    profile_dir = config.get_profiles_dir() / profile_id
     profile_dir.mkdir(parents=True, exist_ok=True)
     
     # Copy audio file to profile directory
@@ -316,7 +311,7 @@ async def delete_profile(
     db.commit()
     
     # Delete profile directory
-    profile_dir = _get_profiles_dir() / profile_id
+    profile_dir = config.get_profiles_dir() / profile_id
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
     
@@ -516,7 +511,7 @@ async def upload_avatar(
         ext = ext_map.get(img_format, '.png')
 
     # Save processed image to profile directory
-    profile_dir = _get_profiles_dir() / profile_id
+    profile_dir = config.get_profiles_dir() / profile_id
     profile_dir.mkdir(parents=True, exist_ok=True)
     output_path = profile_dir / f"avatar{ext}"
 

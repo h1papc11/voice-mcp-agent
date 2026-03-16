@@ -18,7 +18,6 @@ import tempfile
 import io
 from pathlib import Path
 import uuid
-import asyncio
 import signal
 import os
 
@@ -54,6 +53,7 @@ def _safe_content_disposition(disposition_type: str, filename: str) -> str:
 
 from . import database, models, profiles, history, tts, transcribe, config, export_import, channels, stories, __version__
 from .database import get_db, Generation as DBGeneration, VoiceProfile as DBVoiceProfile
+from .profiles import _profile_to_response
 from .utils.progress import get_progress_manager
 from .utils.tasks import get_task_manager
 from .utils.cache import clear_voice_prompt_cache
@@ -1978,31 +1978,6 @@ async def update_profile_effects(
     db.refresh(profile)
 
     return _profile_to_response(profile)
-
-
-def _profile_to_response(profile) -> models.VoiceProfileResponse:
-    """Convert a DB profile to a VoiceProfileResponse with parsed effects_chain."""
-    import json as _json
-    import logging
-
-    effects_chain = None
-    if profile.effects_chain:
-        try:
-            raw = _json.loads(profile.effects_chain)
-            effects_chain = [models.EffectConfig(**e) for e in raw]
-        except Exception as e:
-            logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
-
-    return models.VoiceProfileResponse(
-        id=profile.id,
-        name=profile.name,
-        description=profile.description,
-        language=profile.language,
-        avatar_path=profile.avatar_path,
-        effects_chain=effects_chain,
-        created_at=profile.created_at,
-        updated_at=profile.updated_at,
-    )
 
 
 # ============================================

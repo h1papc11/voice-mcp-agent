@@ -15,11 +15,6 @@ from .database import Generation as DBGeneration, GenerationVersion as DBGenerat
 from . import config
 
 
-def _get_generations_dir() -> Path:
-    """Get generations directory from config."""
-    return config.get_generations_dir()
-
-
 def _get_versions_for_generation(generation_id: str, db: Session) -> tuple:
     """Get versions list and active version ID for a generation."""
     import json

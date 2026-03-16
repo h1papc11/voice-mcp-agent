@@ -45,8 +45,8 @@ def test_db():
 @pytest.fixture
 def mock_profiles_dir(monkeypatch, tmp_path):
     """Mock the profiles directory to use a temporary path."""
-    import profiles
-    monkeypatch.setattr(profiles, '_get_profiles_dir', lambda: tmp_path)
+    from backend import config
+    monkeypatch.setattr(config, 'get_profiles_dir', lambda: tmp_path)
     return tmp_path
 
 

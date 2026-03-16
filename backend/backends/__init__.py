@@ -13,6 +13,20 @@ import numpy as np
 
 from ..platform_detect import get_backend_type
 
+LANGUAGE_CODE_TO_NAME = {
+    "zh": "chinese", "en": "english", "ja": "japanese", "ko": "korean",
+    "de": "german", "fr": "french", "ru": "russian", "pt": "portuguese",
+    "es": "spanish", "it": "italian",
+}
+
+WHISPER_HF_REPOS = {
+    "base": "openai/whisper-base",
+    "small": "openai/whisper-small",
+    "medium": "openai/whisper-medium",
+    "large": "openai/whisper-large-v3",
+    "turbo": "openai/whisper-large-v3-turbo",
+}
+
 
 @dataclass
 class ModelConfig:
