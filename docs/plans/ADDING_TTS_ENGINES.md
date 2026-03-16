@@ -6,7 +6,9 @@ Guide for adding new TTS model backends. Based on the implementation of LuxTTS (
 
 ## Overview
 
-Adding an engine touches ~12 files across 4 layers (down from ~19 after the model config registry refactor). The backend protocol work is straightforward — the real time sink is dependency hell, upstream library bugs, and PyInstaller bundling.
+Adding an engine touches ~10 files across 4 layers. The backend protocol work is straightforward — the real time sink is dependency hell, upstream library bugs, and PyInstaller bundling.
+
+The backend is split into layers: `routes/` (thin HTTP handlers), `services/` (business logic), `backends/` (engine implementations), and `utils/` (shared utilities). New engines only need to touch `backends/` and `models.py` on the backend side — the route and service layers use a model config registry that handles dispatch automatically.
 
 ---
 
@@ -119,26 +121,24 @@ In `backend/models.py`:
 
 ---
 
-## Phase 2: API Integration (`main.py`)
+## Phase 2: Route and Service Integration
 
-With the model config registry, `main.py` has **zero per-engine dispatch points**. All endpoints use registry helpers like `get_model_config()`, `load_engine_model()`, `engine_needs_trim()`, `check_model_loaded()`, etc.
+With the model config registry, the route and service layers have **zero per-engine dispatch points**. All endpoints use registry helpers like `get_model_config()`, `load_engine_model()`, `engine_needs_trim()`, `check_model_loaded()`, etc.
 
-**You don't need to touch `main.py` at all** unless your engine needs custom behavior in the generate endpoint (e.g. a new post-processing step beyond `trim_tts_output`).
+**You don't need to touch any route or service files** unless your engine needs custom behavior in the generate pipeline (e.g. a new post-processing step beyond `trim_tts_output`).
 
 ### 2.1 What the registry handles automatically
 
-| Endpoint | Registry function used |
-|----------|----------------------|
-| `POST /generate` | `load_engine_model(engine, size)` + `engine_needs_trim(engine)` |
-| `POST /generate/stream` | `ensure_model_cached_or_raise(engine, size)` + `load_engine_model()` |
-| `GET /models/status` | `get_all_model_configs()` + `check_model_loaded(config)` |
-| `POST /models/download` | `get_model_config(name)` + `get_model_load_func(config)` |
-| `POST /models/{name}/unload` | `get_model_config(name)` + `unload_model_by_config(config)` |
-| `DELETE /models/{name}` | `get_model_config(name)` + `unload_model_by_config(config)` |
+| Route file | Registry function used |
+|------------|----------------------|
+| `routes/generations.py` | `load_engine_model(engine, size)` + `engine_needs_trim(engine)` |
+| `routes/models.py` | `get_all_model_configs()` + `check_model_loaded(config)` |
+| `routes/models.py` | `get_model_config(name)` + `get_model_load_func(config)` |
+| `services/generation.py` | `get_tts_backend_for_engine()` + `ensure_model_cached_or_raise()` |
 
 ### 2.2 Post-processing
 
-If your model produces trailing silence or hallucinated audio, set `needs_trim=True` on your `ModelConfig`. The generate endpoint checks `engine_needs_trim(engine)` and applies `trim_tts_output()` automatically.
+If your model produces trailing silence or hallucinated audio, set `needs_trim=True` on your `ModelConfig`. The generation service checks `engine_needs_trim(engine)` and applies `trim_tts_output()` automatically.
 
 ---
 
@@ -321,7 +321,7 @@ Used by both Chatterbox backends. LuxTTS works fine on MPS.
 
 To get download progress bars in the UI, wrap model loading with `HFProgressTracker`:
 ```python
-from backend.utils.hf_progress import HFProgressTracker
+from ..utils.hf_progress import HFProgressTracker
 tracker = HFProgressTracker(model_name, progress_manager)
 with tracker.patch_download():
     model = ModelClass.from_pretrained(repo_id)
@@ -339,7 +339,7 @@ The tracker monkey-patches tqdm to intercept HuggingFace's internal progress bar
 - [ ] `backend/requirements.txt` — dependencies added (check for `--no-deps` needs)
 - [ ] `justfile` — `--no-deps` install step if needed
 
-### API (`backend/main.py`)
+### Routes and services
 No changes needed — the model config registry handles all dispatch automatically.
 
 ### Frontend

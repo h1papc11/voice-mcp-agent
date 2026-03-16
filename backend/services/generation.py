@@ -55,12 +55,13 @@ async def run_generation(
     bg_db = next(get_db())
 
     try:
-        # --- Load model --------------------------------------------------
-        await load_engine_model(engine, model_size)
-
         tts_model = get_tts_backend_for_engine(engine)
 
-        # --- Build voice prompt ------------------------------------------
+        if not tts_model.is_loaded():
+            await history.update_generation_status(generation_id, "loading_model", bg_db)
+
+        await load_engine_model(engine, model_size)
+
         voice_prompt = await profiles.create_voice_prompt_for_profile(
             profile_id,
             bg_db,
@@ -68,7 +69,7 @@ async def run_generation(
             engine=engine,
         )
 
-        # --- Inference ---------------------------------------------------
+        await history.update_generation_status(generation_id, "generating", bg_db)
         trim_fn = trim_tts_output if engine_needs_trim(engine) else None
 
         gen_kwargs: dict = dict(
