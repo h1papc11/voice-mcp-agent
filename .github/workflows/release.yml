@@ -22,10 +22,6 @@ jobs:
             args: "--target x86_64-apple-darwin"
             python-version: "3.12"
             backend: "pytorch"
-          # - platform: 'ubuntu-22.04'
-          #   args: ''
-          #   python-version: '3.12'
-          #   backend: 'pytorch'
           - platform: "windows-latest"
             args: ""
             python-version: "3.12"
@@ -37,10 +33,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies (ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+        if: contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf llvm-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf llvm-dev libasound2-dev
 
       - name: Install LLVM (macOS)
         if: matrix.platform == 'macos-latest' || matrix.platform == 'macos-15-intel'
@@ -55,22 +51,22 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
+      - name: Install CPU-only PyTorch (Linux)
+        if: contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')
+        run: |
+          pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r backend/requirements.txt
+          pip install --no-deps chatterbox-tts
 
       - name: Install MLX dependencies (Apple Silicon only)
         if: matrix.backend == 'mlx'
         run: |
           pip install -r backend/requirements-mlx.txt
-
-      # - name: Install PyTorch with CUDA (Windows only)
-      #   if: matrix.platform == 'windows-latest'
-      #   run: |
-      #     pip install torch --index-url https://download.pytorch.org/whl/cu121 --force-reinstall --no-deps
-      #     pip install torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build Python server (Linux/macOS)
         if: matrix.platform != 'windows-latest'
@@ -127,7 +123,7 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -151,10 +147,71 @@ jobs:
             - **macOS (Apple Silicon)**: Download the `aarch64.dmg` file - uses MLX for fast native inference
             - **macOS (Intel)**: Download the `x64.dmg` file - uses PyTorch
             - **Windows**: Download the `.msi` installer
-            - **Linux**: Download the `.AppImage` or `.deb` package
+            - **Linux**: Compile from source (see README)
 
             The app includes automatic updates - future updates will be installed automatically.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
           includeUpdaterJson: true
+
+  build-cuda-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r backend/requirements.txt
+          pip install --no-deps chatterbox-tts
+
+      - name: Install PyTorch with CUDA 12.1
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cu121 --force-reinstall --no-deps
+          pip install torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+      - name: Verify CUDA support in torch
+        run: |
+          python -c "import torch; print(f'CUDA available in build: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
+
+      - name: Build CUDA server binary
+        shell: bash
+        working-directory: backend
+        run: python build_binary.py --cuda
+
+      - name: Split binary for GitHub Releases
+        shell: bash
+        run: |
+          python scripts/split_binary.py \
+            backend/dist/voicebox-server-cuda.exe \
+            --output release-assets/
+
+      - name: Upload split parts to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            release-assets/voicebox-server-cuda.part*.exe
+            release-assets/voicebox-server-cuda.sha256
+            release-assets/voicebox-server-cuda.manifest
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload binary as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicebox-server-cuda-windows
+          path: backend/dist/voicebox-server-cuda.exe
+          retention-days: 7

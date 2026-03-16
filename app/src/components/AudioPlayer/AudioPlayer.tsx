@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { Pause, Play, Repeat, Volume2, VolumeX, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import WaveSurfer from 'wavesurfer.js';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { apiClient } from '@/lib/api/client';
 import { formatAudioDuration } from '@/lib/utils/audio';
 import { debug } from '@/lib/utils/debug';
-import { usePlayerStore } from '@/stores/playerStore';
 import { usePlatform } from '@/platform/PlatformContext';
+import { usePlayerStore } from '@/stores/playerStore';
 
 export function AudioPlayer() {
   const platform = usePlatform();
+  const volumeLabelId = useId();
   const {
     audioUrl,
     audioId,
@@ -138,7 +139,11 @@ export function AudioPlayer() {
           barRadius: 2,
           height: 80,
           normalize: true,
-          backend: 'WebAudio',
+          // Use MediaElement backend (default). Unlike the WebAudio backend,
+          // MediaElement uses a standard <audio> element for playback which
+          // benefits from the browser/webview's built-in audio session recovery.
+          // This prevents audio loss when another app steals audio output or
+          // the system audio session is interrupted.
           interact: true, // Enable interaction (click to seek)
           mediaControls: false, // Don't show native controls
         });
@@ -156,8 +161,21 @@ export function AudioPlayer() {
       const wavesurfer = wavesurferRef.current;
       if (!wavesurfer) return;
 
-      // Update store when time changes
+      // Update store when time changes, stop if past duration
       wavesurfer.on('timeupdate', (time) => {
+        const dur = usePlayerStore.getState().duration;
+        if (dur > 0 && time >= dur) {
+          setCurrentTime(dur);
+          const loop = usePlayerStore.getState().isLooping;
+          if (loop) {
+            wavesurfer.seekTo(0);
+            wavesurfer.play();
+          } else {
+            wavesurfer.pause();
+            setIsPlaying(false);
+          }
+          return;
+        }
         setCurrentTime(time);
       });
 
@@ -174,15 +192,6 @@ export function AudioPlayer() {
         // Ensure volume is set
         const currentVolume = usePlayerStore.getState().volume;
         wavesurfer.setVolume(currentVolume);
-
-        // Get the underlying audio element and ensure it's not muted
-        // (unless we're using native playback, which will be set later)
-        const mediaElement = wavesurfer.getMediaElement();
-        if (mediaElement && !isUsingNativePlaybackRef.current) {
-          mediaElement.volume = currentVolume;
-          mediaElement.muted = false;
-          debug.log('Audio element volume:', mediaElement.volume, 'muted:', mediaElement.muted);
-        }
 
         // Auto-play when ready - check if we should use native playback
         // Get current values from the store and queries at runtime (not captured closure values)
@@ -250,21 +259,8 @@ export function AudioPlayer() {
             debug.log('Should use native playback:', shouldUseNative);
 
             if (!shouldUseNative) {
-              debug.log('No custom devices assigned, falling back to WaveSurfer');
-              // Reset native playback flag and unmute WaveSurfer
+              debug.log('No custom devices assigned, using standard playback');
               isUsingNativePlaybackRef.current = false;
-              const mediaElement = wavesurfer.getMediaElement();
-              if (mediaElement) {
-                const currentVolume = usePlayerStore.getState().volume;
-                mediaElement.volume = currentVolume;
-                mediaElement.muted = false;
-                debug.log(
-                  'WaveSurfer unmuted for normal playback - volume:',
-                  mediaElement.volume,
-                  'muted:',
-                  mediaElement.muted,
-                );
-              }
             } else {
               const deviceIds = assignedChannels.flatMap((ch: any) => ch.device_ids);
               debug.log('Device IDs to play to:', deviceIds);
@@ -285,19 +281,10 @@ export function AudioPlayer() {
                   // Mark that we're using native playback
                   isUsingNativePlaybackRef.current = true;
 
-                  // Mute WaveSurfer's audio element to prevent UI audio output
-                  // Keep WaveSurfer running for visualization
-                  const mediaElement = wavesurfer.getMediaElement();
-                  if (mediaElement) {
-                    mediaElement.volume = 0;
-                    mediaElement.muted = true;
-                    debug.log(
-                      'WaveSurfer muted for native playback - volume:',
-                      mediaElement.volume,
-                      'muted:',
-                      mediaElement.muted,
-                    );
-                  }
+                  // Mute WaveSurfer's audio output — native handles the actual sound
+                  // Keep WaveSurfer running for waveform visualization
+                  wavesurfer.setVolume(0);
+                  wavesurfer.setMuted(true);
 
                   // Start WaveSurfer playback for visualization (muted)
                   wavesurfer.play().catch((error) => {
@@ -320,38 +307,15 @@ export function AudioPlayer() {
               'Native playback failed during auto-play, falling back to WaveSurfer:',
               error,
             );
-            // Reset native playback flag and unmute WaveSurfer
             isUsingNativePlaybackRef.current = false;
-            const mediaElement = wavesurfer.getMediaElement();
-            if (mediaElement) {
-              const currentVolume = usePlayerStore.getState().volume;
-              mediaElement.volume = currentVolume;
-              mediaElement.muted = false;
-              debug.log(
-                'WaveSurfer unmuted after native playback failure - volume:',
-                mediaElement.volume,
-                'muted:',
-                mediaElement.muted,
-              );
-            }
             // Fall through to WaveSurfer playback
           }
-        } else {
-          debug.log('Not using native playback, using WaveSurfer');
-          // Reset native playback flag and unmute WaveSurfer
-          isUsingNativePlaybackRef.current = false;
-          const mediaElement = wavesurfer.getMediaElement();
-          if (mediaElement) {
-            const currentVolume = usePlayerStore.getState().volume;
-            mediaElement.volume = currentVolume;
-            mediaElement.muted = false;
-            debug.log(
-              'WaveSurfer unmuted for normal playback - volume:',
-              mediaElement.volume,
-              'muted:',
-              mediaElement.muted,
-            );
-          }
+        }
+
+        // Standard playback path — ensure WaveSurfer is unmuted
+        if (!isUsingNativePlaybackRef.current) {
+          wavesurfer.setMuted(false);
+          wavesurfer.setVolume(usePlayerStore.getState().volume);
         }
 
         // Only auto-play if shouldAutoPlay flag is set (user explicitly clicked to play)
@@ -359,7 +323,7 @@ export function AudioPlayer() {
         if (shouldAutoPlayNow) {
           // Clear the flag first
           usePlayerStore.getState().clearAutoPlayFlag();
-          
+
           // Use a small delay to ensure audio element is fully ready
           setTimeout(() => {
             wavesurfer.play().catch((error) => {
@@ -375,28 +339,6 @@ export function AudioPlayer() {
       // Handle play/pause
       wavesurfer.on('play', () => {
         setIsPlaying(true);
-        // Ensure audio element volume is set correctly
-        const mediaElement = wavesurfer.getMediaElement();
-        if (mediaElement) {
-          // Double-check: if using native playback, keep WaveSurfer muted
-          // Otherwise, ensure it's unmuted
-          if (isUsingNativePlaybackRef.current) {
-            mediaElement.volume = 0;
-            mediaElement.muted = true;
-            debug.log('Playing (native mode) - WaveSurfer muted for visualization only');
-          } else {
-            // Ensure WaveSurfer is unmuted for normal playback
-            const currentVolume = usePlayerStore.getState().volume;
-            mediaElement.volume = currentVolume;
-            mediaElement.muted = false;
-            debug.log(
-              'Playing (normal mode) - volume:',
-              mediaElement.volume,
-              'muted:',
-              mediaElement.muted,
-            );
-          }
-        }
       });
       wavesurfer.on('pause', () => setIsPlaying(false));
       wavesurfer.on('finish', () => {
@@ -478,11 +420,6 @@ export function AudioPlayer() {
       if (wavesurferRef.current) {
         debug.log('Destroying WaveSurfer instance');
         try {
-          const mediaElement = wavesurferRef.current.getMediaElement();
-          if (mediaElement) {
-            mediaElement.pause();
-            mediaElement.src = '';
-          }
           wavesurferRef.current.destroy();
         } catch (error) {
           debug.error('Error destroying WaveSurfer:', error);
@@ -523,13 +460,10 @@ export function AudioPlayer() {
     }
 
     // Reset native playback flag when loading new audio
-    // Also unmute WaveSurfer if it was muted
+    // Unmute WaveSurfer if it was muted for native playback
     if (isUsingNativePlaybackRef.current) {
-      const mediaElement = wavesurfer.getMediaElement();
-      if (mediaElement) {
-        mediaElement.muted = false;
-        mediaElement.volume = usePlayerStore.getState().volume;
-      }
+      wavesurfer.setMuted(false);
+      wavesurfer.setVolume(usePlayerStore.getState().volume);
     }
     isUsingNativePlaybackRef.current = false;
 
@@ -545,16 +479,7 @@ export function AudioPlayer() {
         wavesurfer.pause();
       }
 
-      // Stop the media element explicitly
-      const mediaElement = wavesurfer.getMediaElement();
-      if (mediaElement) {
-        debug.log('Stopping media element');
-        mediaElement.pause();
-        mediaElement.currentTime = 0;
-        mediaElement.src = '';
-      }
-
-      // Use empty() to completely destroy the waveform and media element
+      // Use empty() to completely destroy the waveform and reset media
       debug.log('Calling wavesurfer.empty() to destroy audio');
       wavesurfer.empty();
     } catch (error) {
@@ -609,20 +534,13 @@ export function AudioPlayer() {
   // Sync volume
   useEffect(() => {
     if (wavesurferRef.current) {
-      wavesurferRef.current.setVolume(volume);
-      // Also ensure the underlying audio element volume is set
-      const mediaElement = wavesurferRef.current.getMediaElement();
-      if (mediaElement) {
-        // If using native playback, keep WaveSurfer muted regardless of volume setting
-        if (isUsingNativePlaybackRef.current) {
-          mediaElement.volume = 0;
-          mediaElement.muted = true;
-          debug.log('Volume sync: Using native playback, keeping WaveSurfer muted');
-        } else {
-          mediaElement.volume = volume;
-          mediaElement.muted = volume === 0;
-          debug.log('Volume synced:', volume, 'muted:', mediaElement.muted);
-        }
+      // If using native playback, keep WaveSurfer muted regardless of volume setting
+      if (isUsingNativePlaybackRef.current) {
+        wavesurferRef.current.setVolume(0);
+        debug.log('Volume sync: Using native playback, keeping WaveSurfer muted');
+      } else {
+        wavesurferRef.current.setVolume(volume);
+        debug.log('Volume synced:', volume);
       }
     }
   }, [volume]);
@@ -664,7 +582,7 @@ export function AudioPlayer() {
   // Handle shouldAutoPlay flag - for story mode auto-advance
   const shouldAutoPlay = usePlayerStore((state) => state.shouldAutoPlay);
   const clearAutoPlayFlag = usePlayerStore((state) => state.clearAutoPlayFlag);
-  
+
   useEffect(() => {
     const wavesurfer = wavesurferRef.current;
     if (!wavesurfer || !shouldAutoPlay || duration === 0) {
@@ -743,11 +661,8 @@ export function AudioPlayer() {
           isUsingNativePlaybackRef.current = true;
 
           // Mute WaveSurfer and start it for visualization
-          const mediaElement = wavesurferRef.current.getMediaElement();
-          if (mediaElement) {
-            mediaElement.volume = 0;
-            mediaElement.muted = true;
-          }
+          wavesurferRef.current.setVolume(0);
+          wavesurferRef.current.setMuted(true);
 
           // Start WaveSurfer for visualization (muted)
           wavesurferRef.current.play().catch((error) => {
@@ -771,11 +686,8 @@ export function AudioPlayer() {
     } else {
       // Ensure WaveSurfer is not muted if not using native playback
       if (!isUsingNativePlaybackRef.current) {
-        const mediaElement = wavesurferRef.current.getMediaElement();
-        if (mediaElement) {
-          mediaElement.muted = false;
-          mediaElement.volume = volume;
-        }
+        wavesurferRef.current.setMuted(false);
+        wavesurferRef.current.setVolume(volume);
       }
 
       wavesurferRef.current.play().catch((error) => {
@@ -831,6 +743,9 @@ export function AudioPlayer() {
             disabled={isLoading || duration === 0}
             className="shrink-0"
             title={duration === 0 && !isLoading ? 'Audio not loaded' : ''}
+            aria-label={
+              duration === 0 && !isLoading ? 'Audio not loaded' : isPlaying ? 'Pause' : 'Play'
+            }
           >
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
           </Button>
@@ -845,6 +760,8 @@ export function AudioPlayer() {
                 max={100}
                 step={0.1}
                 className="w-full"
+                aria-label="Playback position"
+                aria-valuetext={`${formatAudioDuration(currentTime)} of ${formatAudioDuration(duration)}`}
               />
             )}
             {isLoading && (
@@ -862,7 +779,9 @@ export function AudioPlayer() {
 
           {/* Title */}
           {title && (
-            <div className="text-sm font-medium truncate max-w-[200px] shrink-0">{title}</div>
+            <div className="text-sm font-medium truncate max-w-[200px] shrink-0 hidden lg:block">
+              {title}
+            </div>
           )}
 
           {/* Loop Button */}
@@ -872,26 +791,37 @@ export function AudioPlayer() {
             onClick={toggleLoop}
             className={isLooping ? 'text-primary' : ''}
             title="Toggle loop"
+            aria-label={isLooping ? 'Stop looping' : 'Loop'}
           >
             <Repeat className="h-4 w-4" />
           </Button>
 
           {/* Volume Control */}
-          <div className="flex items-center gap-2 shrink-0 w-[120px]">
+          <div
+            className="flex items-center gap-2 shrink-0 w-[120px]"
+            role="group"
+            aria-label="Volume"
+          >
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setVolume(volume > 0 ? 0 : 1)}
               className="h-8 w-8"
+              aria-label={volume > 0 ? 'Mute' : 'Unmute'}
             >
               {volume > 0 ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </Button>
+            <span id={volumeLabelId} className="sr-only">
+              Volume level, {Math.round(volume * 100)}%
+            </span>
             <Slider
               value={[volume * 100]}
               onValueChange={handleVolumeChange}
               max={100}
               step={1}
               className="flex-1"
+              aria-labelledby={volumeLabelId}
+              aria-valuetext={`${Math.round(volume * 100)}%`}
             />
           </div>
 
@@ -902,6 +832,7 @@ export function AudioPlayer() {
             onClick={handleClose}
             className="shrink-0"
             title="Close player"
+            aria-label="Close player"
           >
             <X className="h-5 w-5" />
           </Button>

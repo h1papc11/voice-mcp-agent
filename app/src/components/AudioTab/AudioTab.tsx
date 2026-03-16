@@ -23,8 +23,8 @@ import {
 import { apiClient } from '@/lib/api/client';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
-import { usePlayerStore } from '@/stores/playerStore';
 import { usePlatform } from '@/platform/PlatformContext';
+import { usePlayerStore } from '@/stores/playerStore';
 
 interface AudioDevice {
   id: string;
@@ -124,6 +124,13 @@ export function AudioTab() {
     );
   }
 
+  const handleChannelDelete = async (e, channelId) => {
+    e.stopPropagation();
+    if (await confirm('Delete this channel?')) {
+      deleteChannel.mutate(channelId);
+    }
+  };
+
   const allChannels = channels || [];
   const allDevices = devices || [];
   const selectedChannel = selectedChannelId
@@ -161,7 +168,7 @@ export function AudioTab() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-3 p-2">
+            <div className="space-y-3">
               {allChannels.map((channel) => {
                 const isSelected = selectedChannelId === channel.id;
                 return (
@@ -241,12 +248,7 @@ export function AudioTab() {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (confirm('Delete this channel?')) {
-                                deleteChannel.mutate(channel.id);
-                              }
-                            }}
+                            onClick={(e) => handleChannelDelete(e, channel.id)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -341,7 +343,9 @@ export function AudioTab() {
             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted rounded-md">
               <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">
-                {platform.metadata.isTauri ? 'No audio devices found' : 'Audio device selection requires Tauri'}
+                {platform.metadata.isTauri
+                  ? 'No audio devices found'
+                  : 'Audio device selection requires Tauri'}
               </p>
             </div>
           )}

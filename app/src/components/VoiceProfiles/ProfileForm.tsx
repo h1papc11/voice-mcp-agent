@@ -3,6 +3,7 @@ import { Edit2, Mic, Monitor, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
+import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -30,6 +31,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { apiClient } from '@/lib/api/client';
+import type { EffectConfig } from '@/lib/api/types';
 import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
@@ -43,7 +46,7 @@ import {
 } from '@/lib/hooks/useProfiles';
 import { useSystemAudioCapture } from '@/lib/hooks/useSystemAudioCapture';
 import { useTranscription } from '@/lib/hooks/useTranscription';
-import { formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
+import { convertToWav, formatAudioDuration, getAudioDuration } from '@/lib/utils/audio';
 import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
 import { type ProfileFormDraft, useUIStore } from '@/stores/uiStore';
@@ -125,6 +128,8 @@ export function ProfileForm() {
   const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
   const isCreating = !editingProfileId;
   const serverUrl = useServerStore((state) => state.serverUrl);
+  const [profileEffectsChain, setProfileEffectsChain] = useState<EffectConfig[]>([]);
+  const [effectsDirty, setEffectsDirty] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -280,6 +285,8 @@ export function ProfileForm() {
         referenceText: undefined,
         avatarFile: undefined,
       });
+      setProfileEffectsChain(editingProfile.effects_chain ?? []);
+      setEffectsDirty(false);
     } else if (profileFormDraft && open) {
       // Restore from draft when opening in create mode
       form.reset({
@@ -435,6 +442,24 @@ export function ProfileForm() {
           }
         }
 
+        // Save effects chain if changed
+        if (effectsDirty) {
+          try {
+            await apiClient.updateProfileEffects(
+              editingProfileId,
+              profileEffectsChain.length > 0 ? profileEffectsChain : null,
+            );
+          } catch (fxError) {
+            toast({
+              title: 'Effects update failed',
+              description:
+                fxError instanceof Error ? fxError.message : 'Failed to save effects chain',
+              variant: 'destructive',
+            });
+            return;
+          }
+        }
+
         toast({
           title: 'Voice updated',
           description: `"${data.name}" has been updated successfully.`,
@@ -505,10 +530,23 @@ export function ProfileForm() {
           language: data.language,
         });
 
+        // Convert non-WAV uploads to WAV so the backend can always use soundfile.
+        // Recorded audio is already WAV (from useAudioRecording's convertToWav call).
+        let fileToUpload: File = sampleFile;
+        if (!sampleFile.type.includes('wav') && !sampleFile.name.toLowerCase().endsWith('.wav')) {
+          try {
+            const wavBlob = await convertToWav(sampleFile);
+            const wavName = sampleFile.name.replace(/\.[^.]+$/, '.wav');
+            fileToUpload = new File([wavBlob], wavName, { type: 'audio/wav' });
+          } catch {
+            // If browser can't decode the format, send the original and let the backend try.
+          }
+        }
+
         try {
           await addSample.mutateAsync({
             profileId: profile.id,
-            file: sampleFile,
+            file: fileToUpload,
             referenceText: referenceText,
           });
 
@@ -885,6 +923,23 @@ export function ProfileForm() {
                       </FormItem>
                     )}
                   />
+
+                  {editingProfileId && (
+                    <div className="space-y-2">
+                      <FormLabel>Default Effects</FormLabel>
+                      <p className="text-xs text-muted-foreground">
+                        Effects applied automatically to all new generations with this voice.
+                      </p>
+                      <EffectsChainEditor
+                        value={profileEffectsChain}
+                        onChange={(chain) => {
+                          setProfileEffectsChain(chain);
+                          setEffectsDirty(true);
+                        }}
+                        compact
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

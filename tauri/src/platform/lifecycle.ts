@@ -1,13 +1,16 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen, emit } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import type { PlatformLifecycle } from '@/platform/types';
 
 class TauriLifecycle implements PlatformLifecycle {
   onServerReady?: () => void;
 
-  async startServer(remote = false): Promise<string> {
+  async startServer(remote = false, modelsDir?: string | null): Promise<string> {
     try {
-      const result = await invoke<string>('start_server', { remote });
+      const result = await invoke<string>('start_server', {
+        remote,
+        modelsDir: modelsDir ?? undefined,
+      });
       console.log('Server started:', result);
       this.onServerReady?.();
       return result;
@@ -23,6 +26,20 @@ class TauriLifecycle implements PlatformLifecycle {
       console.log('Server stopped');
     } catch (error) {
       console.error('Failed to stop server:', error);
+      throw error;
+    }
+  }
+
+  async restartServer(modelsDir?: string | null): Promise<string> {
+    try {
+      const result = await invoke<string>('restart_server', {
+        modelsDir: modelsDir ?? undefined,
+      });
+      console.log('Server restarted:', result);
+      this.onServerReady?.();
+      return result;
+    } catch (error) {
+      console.error('Failed to restart server:', error);
       throw error;
     }
   }
@@ -46,6 +63,12 @@ class TauriLifecycle implements PlatformLifecycle {
         // Check if server was started by this app instance
         // @ts-expect-error - accessing module-level variable from another module
         const serverStartedByApp = window.__voiceboxServerStartedByApp ?? false;
+
+        console.log(
+          '[lifecycle] window-close-requested: keepRunning=%s, serverStartedByApp=%s',
+          keepRunning,
+          serverStartedByApp,
+        );
 
         if (!keepRunning && serverStartedByApp) {
           // Stop server before closing (only if we started it)
