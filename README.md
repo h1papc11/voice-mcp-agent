@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>The open-source voice synthesis studio.</strong><br/>
-  Clone voices. Generate speech. Build voice-powered apps.<br/>
+  Clone voices. Generate speech. Apply effects. Build voice-powered apps.<br/>
   All running locally on your machine.
 </p>
 
@@ -59,96 +59,145 @@
 
 ## What is Voicebox?
 
-Voicebox is a **local-first voice cloning studio** with DAW-like features for professional voice synthesis. Think of it as a **local, free and open-source alternative to ElevenLabs** — download models, clone voices, and generate speech entirely on your machine.
-
-Unlike cloud services that lock your voice data behind subscriptions, Voicebox gives you:
+Voicebox is a **local-first voice cloning studio** — a free and open-source alternative to ElevenLabs. Clone voices from a few seconds of audio, generate speech in 23 languages across 4 TTS engines, apply post-processing effects, and compose multi-voice projects with a timeline editor.
 
 - **Complete privacy** — models and voice data stay on your machine
-- **Professional tools** — multi-track timeline editor, audio trimming, conversation mixing
-- **Model flexibility** — currently powered by Qwen3-TTS, with support for XTTS, Bark, and other models coming soon
-- **API-first** — use the desktop app or integrate voice synthesis into your own projects
+- **4 TTS engines** — Qwen3-TTS, LuxTTS, Chatterbox Multilingual, and Chatterbox Turbo
+- **23 languages** — from English to Arabic, Japanese, Hindi, Swahili, and more
+- **Post-processing effects** — pitch shift, reverb, delay, chorus, compression, and filters
+- **Expressive speech** — paralinguistic tags like `[laugh]`, `[sigh]`, `[gasp]` via Chatterbox Turbo
+- **Unlimited length** — auto-chunking with crossfade for scripts, articles, and chapters
+- **Stories editor** — multi-track timeline for conversations, podcasts, and narratives
+- **API-first** — REST API for integrating voice synthesis into your own projects
 - **Native performance** — built with Tauri (Rust), not Electron
-- **Super fast on Mac** — MLX backend with native Metal acceleration for 4-5x faster inference on Apple Silicon
-
-Download a voice model, clone any voice from a few seconds of audio, and compose multi-voice projects with studio-grade editing tools. No Python install required, no cloud dependency, no limits.
+- **Runs everywhere** — macOS (MLX/Metal), Windows (CUDA), Linux, AMD ROCm, Intel Arc, Docker
 
 ---
 
 ## Download
 
-Voicebox is available now for macOS and Windows.
-
 | Platform | Download |
 |----------|----------|
-| macOS (Apple Silicon) | [Voicebox_aarch64.app.tar.gz](https://github.com/jamiepine/voicebox/releases/latest/download/Voicebox_aarch64.app.tar.gz) |
-| macOS (Intel) | [Voicebox_x64.app.tar.gz](https://github.com/jamiepine/voicebox/releases/latest/download/Voicebox_x64.app.tar.gz) |
-| Windows (MSI) | [Latest Windows MSI](https://github.com/jamiepine/voicebox/releases/latest) |
-| Windows (Setup) | [Latest Windows Setup](https://github.com/jamiepine/voicebox/releases/latest) |
+| macOS (Apple Silicon) | [Download DMG](https://github.com/jamiepine/voicebox/releases/latest/download/Voicebox_aarch64.dmg) |
+| macOS (Intel) | [Download DMG](https://github.com/jamiepine/voicebox/releases/latest/download/Voicebox_x64.dmg) |
+| Windows | [Latest Release](https://github.com/jamiepine/voicebox/releases/latest) |
+| Docker | `docker compose up` |
 
-> **Linux** — Pre-built binaries are not yet available. Linux users can compile from source, see [Development](#development) below.
+> **Linux** — Pre-built binaries are not yet available. See [voicebox.sh/linux-install](https://voicebox.sh/linux-install) for build-from-source instructions.
 
 ---
 
 ## Features
 
-### Voice Cloning with Qwen3-TTS
+### Multi-Engine Voice Cloning
 
-Powered by Alibaba's **Qwen3-TTS** — a breakthrough model that achieves near-perfect voice cloning from just a few seconds of audio.
+Four TTS engines with different strengths, switchable per-generation:
 
-- **Instant cloning** — Upload a sample, get a voice profile
-- **High fidelity** — Natural prosody, emotion, and cadence
-- **Multi-language** — English, Chinese, and more coming
-- **Lightning fast on Mac** — MLX backend leverages Apple Silicon's Neural Engine for super-fast generation
+| Engine | Languages | Strengths |
+|--------|-----------|-----------|
+| **Qwen3-TTS** (0.6B / 1.7B) | 10 | High-quality multilingual cloning, delivery instructions ("speak slowly", "whisper") |
+| **LuxTTS** | English | Lightweight (~1GB VRAM), 48kHz output, 150x realtime on CPU |
+| **Chatterbox Multilingual** | 23 | Broadest language coverage — Arabic, Danish, Finnish, Greek, Hebrew, Hindi, Malay, Norwegian, Polish, Swahili, Swedish, Turkish and more |
+| **Chatterbox Turbo** | English | Fast 350M model with paralinguistic emotion/sound tags |
+
+### Emotions & Paralinguistic Tags
+
+Type `/` in the text input to insert expressive tags that the model synthesizes inline with speech (Chatterbox Turbo):
+
+`[laugh]` `[chuckle]` `[gasp]` `[cough]` `[sigh]` `[groan]` `[sniff]` `[shush]` `[clear throat]`
+
+### Post-Processing Effects
+
+8 audio effects powered by Spotify's `pedalboard` library. Apply after generation, preview in real time, build reusable presets.
+
+| Effect | Description |
+|--------|-------------|
+| Pitch Shift | Up or down by up to 12 semitones |
+| Reverb | Configurable room size, damping, wet/dry mix |
+| Delay | Echo with adjustable time, feedback, and mix |
+| Chorus / Flanger | Modulated delay for metallic or lush textures |
+| Compressor | Dynamic range compression |
+| Gain | Volume adjustment (-40 to +40 dB) |
+| High-Pass Filter | Remove low frequencies |
+| Low-Pass Filter | Remove high frequencies |
+
+Ships with 4 built-in presets (Robotic, Radio, Echo Chamber, Deep Voice) and supports custom presets. Effects can be assigned per-profile as defaults.
+
+### Unlimited Generation Length
+
+Text is automatically split at sentence boundaries and each chunk is generated independently, then crossfaded together. Works with all engines.
+
+- Configurable auto-chunking limit (100–5,000 chars)
+- Crossfade slider (0–200ms) for smooth transitions
+- Max text length: 50,000 characters
+- Smart splitting respects abbreviations, CJK punctuation, and `[tags]`
+
+### Generation Versions
+
+Every generation supports multiple versions with provenance tracking:
+
+- **Original** — clean TTS output, always preserved
+- **Effects versions** — apply different effects chains from any source version
+- **Takes** — regenerate with a new seed for variation
+- **Source tracking** — each version records its lineage
+- **Favorites** — star generations for quick access
+
+### Async Generation Queue
+
+Generation is non-blocking. Submit and immediately start typing the next one.
+
+- Serial execution queue prevents GPU contention
+- Real-time SSE status streaming
+- Failed generations can be retried
+- Stale generations from crashes auto-recover on startup
 
 ### Voice Profile Management
 
-- **Create profiles** from audio files or record directly in-app
-- **Import/Export** profiles to share or back up
-- **Multi-sample support** — combine multiple samples for higher quality cloning
-- **Organize** with descriptions and language tags
-
-### Speech Generation
-
-- **Text-to-speech** with any cloned voice
-- **Batch generation** for long-form content
-- **Smart caching** — regenerate instantly with voice prompt caching
+- Create profiles from audio files or record directly in-app
+- Import/export profiles to share or back up
+- Multi-sample support for higher quality cloning
+- Per-profile default effects chains
+- Organize with descriptions and language tags
 
 ### Stories Editor
 
-Create multi-voice narratives, podcasts, and conversations with a timeline-based editor.
+Multi-voice timeline editor for conversations, podcasts, and narratives.
 
-- **Multi-track composition** — arrange multiple voice tracks in a single project
-- **Inline audio editing** — trim and split clips directly in the timeline
-- **Auto-playback** — preview stories with synchronized playhead
-- **Voice mixing** — build conversations with multiple participants
+- Multi-track composition with drag-and-drop
+- Inline audio trimming and splitting
+- Auto-playback with synchronized playhead
+- Version pinning per track clip
 
 ### Recording & Transcription
 
-- **In-app recording** with waveform visualization
-- **System audio capture** — record desktop audio on macOS and Windows
-- **Automatic transcription** powered by Whisper
-- **Export recordings** in multiple formats
+- In-app recording with waveform visualization
+- System audio capture (macOS and Windows)
+- Automatic transcription powered by Whisper (including Whisper Turbo)
+- Export recordings in multiple formats
 
-### Generation History
+### Model Management
 
-- **Full history** of all generated audio
-- **Search & filter** by voice, text, or date
-- **Re-generate** any past generation with one click
+- Per-model unload to free GPU memory without deleting downloads
+- Custom models directory via `VOICEBOX_MODELS_DIR`
+- Model folder migration with progress tracking
+- Download cancel/clear UI
 
-### Flexible Deployment
+### GPU Support
 
-- **Local mode** — Everything runs on your machine
-- **Remote mode** — Connect to a GPU server on your network
-- **One-click server** — Turn any machine into a Voicebox server
+| Platform | Backend | Notes |
+|----------|---------|-------|
+| macOS (Apple Silicon) | MLX (Metal) | 4-5x faster via Neural Engine |
+| Windows / Linux (NVIDIA) | PyTorch (CUDA) | Auto-downloads CUDA binary from within the app |
+| Linux (AMD) | PyTorch (ROCm) | Auto-configures HSA_OVERRIDE_GFX_VERSION |
+| Windows (any GPU) | DirectML | Universal Windows GPU support |
+| Intel Arc | IPEX/XPU | Intel discrete GPU acceleration |
+| Any | CPU | Works everywhere, just slower |
 
 ---
 
 ## API
 
-Voicebox exposes a full REST API, so you can integrate voice synthesis into your own apps.
-
-For the current local app and development workflow, the backend is typically available at `http://localhost:17493`.
-If you launch the backend manually with a different host or port, use that address instead.
+Voicebox exposes a full REST API for integrating voice synthesis into your own apps.
 
 ```bash
 # Generate speech
@@ -165,15 +214,9 @@ curl -X POST http://localhost:17493/profiles \
   -d '{"name": "My Voice", "language": "en"}'
 ```
 
-**Use cases:**
+**Use cases:** game dialogue, podcast production, accessibility tools, voice assistants, content automation.
 
-- Game dialogue systems
-- Podcast/video production pipelines
-- Accessibility tools
-- Voice assistants
-- Content creation automation
-
-Full API documentation is available at `http://localhost:17493/docs` in the default local workflow, or at `/docs` on whatever server address you configured.
+Full API documentation available at `http://localhost:17493/docs`.
 
 ---
 
@@ -185,42 +228,24 @@ Full API documentation is available at `http://localhost:17493/docs` in the defa
 | Frontend | React, TypeScript, Tailwind CSS |
 | State | Zustand, React Query |
 | Backend | FastAPI (Python) |
-| Voice Model | Qwen3-TTS (PyTorch or MLX) |
-| Transcription | Whisper (PyTorch or MLX) |
-| Inference Engine | MLX (Apple Silicon) / PyTorch (Windows/Linux/Intel) |
+| TTS Engines | Qwen3-TTS, LuxTTS, Chatterbox, Chatterbox Turbo |
+| Effects | Pedalboard (Spotify) |
+| Transcription | Whisper / Whisper Turbo (PyTorch or MLX) |
+| Inference | MLX (Apple Silicon) / PyTorch (CUDA/ROCm/XPU/CPU) |
 | Database | SQLite |
 | Audio | WaveSurfer.js, librosa |
-
-**Why this stack?**
-
-- **Tauri over Electron** — 10x smaller bundle, native performance, lower memory
-- **FastAPI** — Async Python with automatic OpenAPI schema generation
-- **Type-safe end-to-end** — Generated TypeScript client from OpenAPI spec
 
 ---
 
 ## Roadmap
 
-Voicebox is the beginning of something bigger. Here's what's coming:
-
-### Coming Soon
-
 | Feature | Description |
 |---------|-------------|
-| **Real-time Synthesis** | Stream audio as it generates, word by word |
-| **Conversation Mode** | Multi-speaker dialogues with automatic turn-taking |
-| **Voice Effects** | Pitch shift, reverb, M3GAN-style effects |
-| **Timeline Editor** | Audio studio with word-level precision editing |
+| **Real-time Streaming** | Stream audio as it generates, word by word |
+| **Voice Design** | Create new voices from text descriptions |
 | **More Models** | XTTS, Bark, and other open-source voice models |
-
-### Future Vision
-
-- **Voice Design** — Create new voices from text descriptions
-- **Project System** — Save and load complex multi-voice sessions
-- **Plugin Architecture** — Extend with custom models and effects
-- **Mobile Companion** — Control Voicebox from your phone
-
-Voicebox aims to be the **one-stop shop for everything voice** — cloning, synthesis, editing, effects, and beyond.
+| **Plugin Architecture** | Extend with custom models and effects |
+| **Mobile Companion** | Control Voicebox from your phone |
 
 ---
 
@@ -242,22 +267,12 @@ Install [just](https://github.com/casey/just): `brew install just` or `cargo ins
 
 **Prerequisites:** [Bun](https://bun.sh), [Rust](https://rustup.rs), [Python 3.11+](https://python.org), [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/), and [Xcode](https://developer.apple.com/xcode/) on macOS.
 
-### Platform Notes
-
-| Platform | GPU Backend | Notes |
-|----------|-------------|-------|
-| macOS (Apple Silicon) | MLX (Metal) | 4-5x faster inference via Neural Engine |
-| Windows (NVIDIA) | PyTorch (CUDA) | `just setup` auto-installs CUDA PyTorch |
-| Windows/Linux (no NVIDIA) | PyTorch (CPU) | Works but slower |
-
 ### Building Locally
 
 ```bash
 just build          # Build CPU server binary + Tauri app
 just build-local    # (Windows) Build CPU + CUDA server binaries + Tauri app
 ```
-
-`just build-local` produces a production-ready installer with the CUDA binary pre-placed for GPU switching.
 
 ### Project Structure
 
