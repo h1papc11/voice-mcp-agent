@@ -4,13 +4,17 @@ MLX backend implementation for TTS and STT using mlx-audio.
 
 from typing import Optional, List, Tuple
 import asyncio
+import logging
 import numpy as np
 import os
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
+
 # PATCH: Import and apply offline patch BEFORE any huggingface_hub usage
 # This prevents mlx_audio from making network requests when models are cached
 from ..utils.hf_offline_patch import patch_huggingface_hub_offline, ensure_original_qwen_config_cached
+
 patch_huggingface_hub_offline()
 ensure_original_qwen_config_cached()
 
@@ -21,23 +25,23 @@ from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_pr
 
 class MLXTTSBackend:
     """MLX-based TTS backend using mlx-audio."""
-    
+
     def __init__(self, model_size: str = "1.7B"):
         self.model = None
         self.model_size = model_size
         self._current_model_size = None
-    
+
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
         return self.model is not None
-    
+
     def _get_model_path(self, model_size: str) -> str:
         """
         Get the MLX model path.
-        
+
         Args:
             model_size: Model size (1.7B or 0.6B)
-            
+
         Returns:
             HuggingFace Hub model ID for MLX
         """
@@ -47,67 +51,68 @@ class MLXTTSBackend:
             # 0.6B not yet converted to MLX format
             "0.6B": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",  # Fallback to 1.7B
         }
-        
+
         if model_size not in mlx_model_map:
             raise ValueError(f"Unknown model size: {model_size}")
-        
+
         hf_model_id = mlx_model_map[model_size]
-        print(f"Will download MLX model from HuggingFace Hub: {hf_model_id}")
-        
+        logger.info("Will download MLX model from HuggingFace Hub: %s", hf_model_id)
+
         return hf_model_id
-    
+
     def _is_model_cached(self, model_size: str) -> bool:
         return is_model_cached(
             self._get_model_path(model_size),
             weight_extensions=(".safetensors", ".bin", ".npz"),
         )
-    
+
     async def load_model_async(self, model_size: Optional[str] = None):
         """
         Lazy load the MLX TTS model.
-        
+
         Args:
             model_size: Model size to load (1.7B or 0.6B)
         """
         if model_size is None:
             model_size = self.model_size
-            
+
         # If already loaded with correct size, return
         if self.model is not None and self._current_model_size == model_size:
             return
-        
+
         # Unload existing model if different size requested
         if self.model is not None and self._current_model_size != model_size:
             self.unload_model()
-        
+
         # Run blocking load in thread pool
         await asyncio.to_thread(self._load_model_sync, model_size)
-    
+
     # Alias for compatibility
     load_model = load_model_async
-    
+
     def _load_model_sync(self, model_size: str):
         """Synchronous model loading."""
         model_path = self._get_model_path(model_size)
         model_name = f"qwen-tts-{model_size}"
         is_cached = self._is_model_cached(model_size)
-        
+
         # Force offline mode when cached to avoid network requests
         original_hf_hub_offline = os.environ.get("HF_HUB_OFFLINE")
         if is_cached:
             os.environ["HF_HUB_OFFLINE"] = "1"
-            print(f"[PATCH] Model {model_size} is cached, forcing HF_HUB_OFFLINE=1 to avoid network requests")
-        
+            logger.info("[PATCH] Model %s is cached, forcing HF_HUB_OFFLINE=1 to avoid network requests", model_size)
+
         try:
             with model_load_progress(model_name, is_cached):
                 from mlx_audio.tts import load
-                print(f"Loading MLX TTS model {model_size}...")
-                
+
+                logger.info("Loading MLX TTS model %s...", model_size)
+
                 try:
                     self.model = load(model_path)
                 except Exception as load_error:
                     if is_cached and "offline" in str(load_error).lower():
-                        print(f"[PATCH] Offline load failed, trying with network: {load_error}")
+                        logger.warning("[PATCH] Offline load failed, trying with network: %s", load_error)
                         os.environ.pop("HF_HUB_OFFLINE", None)
                         self.model = load(model_path)
                     else:
@@ -117,19 +122,19 @@ class MLXTTSBackend:
                 os.environ["HF_HUB_OFFLINE"] = original_hf_hub_offline
             else:
                 os.environ.pop("HF_HUB_OFFLINE", None)
-        
+
         self._current_model_size = model_size
         self.model_size = model_size
-        print(f"MLX TTS model {model_size} loaded successfully")
-    
+        logger.info("MLX TTS model %s loaded successfully", model_size)
+
     def unload_model(self):
         """Unload the model to free memory."""
         if self.model is not None:
             del self.model
             self.model = None
             self._current_model_size = None
-            print("MLX TTS model unloaded")
-    
+            logger.info("MLX TTS model unloaded")
+
     async def create_voice_prompt(
         self,
         audio_path: str,
@@ -138,20 +143,20 @@ class MLXTTSBackend:
     ) -> Tuple[dict, bool]:
         """
         Create voice prompt from reference audio.
-        
+
         MLX backend stores voice prompt as a dict with audio path and text.
         The actual voice prompt processing happens during generation.
-        
+
         Args:
             audio_path: Path to reference audio file
             reference_text: Transcript of reference audio
             use_cache: Whether to use cached prompt if available
-            
+
         Returns:
             Tuple of (voice_prompt_dict, was_cached)
         """
         await self.load_model_async(None)
-        
+
         # Check cache if enabled
         if use_cache:
             cache_key = get_cache_key(audio_path, reference_text)
@@ -165,25 +170,25 @@ class MLXTTSBackend:
                         return cached_prompt, True
                     else:
                         # Cached file no longer exists, invalidate cache
-                        print(f"Cached audio file not found: {cached_audio_path}, regenerating prompt")
-        
+                        logger.warning("Cached audio file not found: %s, regenerating prompt", cached_audio_path)
+
         # MLX voice prompt format - store audio path and text
         # The model will process this during generation
         voice_prompt_items = {
             "ref_audio": str(audio_path),
             "ref_text": reference_text,
         }
-        
+
         # Cache if enabled
         if use_cache:
             cache_key = get_cache_key(audio_path, reference_text)
             cache_voice_prompt(cache_key, voice_prompt_items)
-        
+
         return voice_prompt_items, False
-    
+
     async def combine_voice_prompts(self, audio_paths, reference_texts):
         return await _combine_voice_prompts(audio_paths, reference_texts)
-    
+
     async def generate(
         self,
         text: str,
@@ -207,7 +212,7 @@ class MLXTTSBackend:
         """
         await self.load_model_async(None)
 
-        print(f"Generating audio for text: {text}")
+        logger.info("Generating audio for text: %s", text)
 
         def _generate_sync():
             """Run synchronous generation in thread pool."""
@@ -219,20 +224,21 @@ class MLXTTSBackend:
             # Set seed if provided (MLX uses numpy random)
             if seed is not None:
                 import mlx.core as mx
+
                 np.random.seed(seed)
                 mx.random.seed(seed)
-            
+
             # Extract voice prompt info
             ref_audio = voice_prompt.get("ref_audio") or voice_prompt.get("ref_audio_path")
             ref_text = voice_prompt.get("ref_text", "")
-            
+
             # Validate that the audio file exists
             if ref_audio and not Path(ref_audio).exists():
-                print(f"Warning: Audio file not found: {ref_audio}")
-                print("This may be due to a cached voice prompt referencing a deleted temp file.")
-                print("Regenerating without voice prompt.")
+                logger.warning("Audio file not found: %s", ref_audio)
+                logger.warning("This may be due to a cached voice prompt referencing a deleted temp file.")
+                logger.warning("Regenerating without voice prompt.")
                 ref_audio = None
-            
+
             # Check if model supports voice cloning via generate method
             # MLX API may support ref_audio parameter directly
             try:
@@ -240,6 +246,7 @@ class MLXTTSBackend:
                 if ref_audio:
                     # Check if generate accepts ref_audio parameter
                     import inspect
+
                     sig = inspect.signature(self.model.generate)
                     if "ref_audio" in sig.parameters:
                         # Generate with voice cloning
@@ -258,18 +265,18 @@ class MLXTTSBackend:
                         sample_rate = result.sample_rate
             except Exception as e:
                 # If voice cloning fails, try without it
-                print(f"Warning: Voice cloning failed, generating without voice prompt: {e}")
+                logger.warning("Voice cloning failed, generating without voice prompt: %s", e)
                 for result in self.model.generate(text, lang_code=lang):
                     audio_chunks.append(np.array(result.audio))
                     sample_rate = result.sample_rate
-            
+
             # Concatenate all chunks
             if audio_chunks:
                 audio = np.concatenate([np.asarray(chunk, dtype=np.float32) for chunk in audio_chunks])
             else:
                 # Fallback: empty audio
                 audio = np.array([], dtype=np.float32)
-            
+
             return audio, sample_rate
 
         # Run blocking inference in thread pool
@@ -284,55 +291,56 @@ class MLXSTTBackend:
     def __init__(self, model_size: str = "base"):
         self.model = None
         self.model_size = model_size
-    
+
     def is_loaded(self) -> bool:
         """Check if model is loaded."""
         return self.model is not None
-    
+
     def _is_model_cached(self, model_size: str) -> bool:
         hf_repo = WHISPER_HF_REPOS.get(model_size, f"openai/whisper-{model_size}")
         return is_model_cached(hf_repo, weight_extensions=(".safetensors", ".bin", ".npz"))
-    
+
     async def load_model_async(self, model_size: Optional[str] = None):
         """
         Lazy load the MLX Whisper model.
-        
+
         Args:
             model_size: Model size (tiny, base, small, medium, large)
         """
         if model_size is None:
             model_size = self.model_size
-        
+
         if self.model is not None and self.model_size == model_size:
             return
-        
+
         # Run blocking load in thread pool
         await asyncio.to_thread(self._load_model_sync, model_size)
-    
+
     # Alias for compatibility
     load_model = load_model_async
-    
+
     def _load_model_sync(self, model_size: str):
         """Synchronous model loading."""
         progress_model_name = f"whisper-{model_size}"
         is_cached = self._is_model_cached(model_size)
-        
+
         with model_load_progress(progress_model_name, is_cached):
             from mlx_audio.stt import load
+
             model_name = WHISPER_HF_REPOS.get(model_size, f"openai/whisper-{model_size}")
-            print(f"Loading MLX Whisper model {model_size}...")
+            logger.info("Loading MLX Whisper model %s...", model_size)
             self.model = load(model_name)
-        
+
         self.model_size = model_size
-        print(f"MLX Whisper model {model_size} loaded successfully")
-    
+        logger.info("MLX Whisper model %s loaded successfully", model_size)
+
     def unload_model(self):
         """Unload the model to free memory."""
         if self.model is not None:
             del self.model
             self.model = None
-            print("MLX Whisper model unloaded")
-    
+            logger.info("MLX Whisper model unloaded")
+
     async def transcribe(
         self,
         audio_path: str,

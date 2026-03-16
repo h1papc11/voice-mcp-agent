@@ -235,8 +235,11 @@ def _save_regenerate(
     audio_path = config.get_generations_dir() / f"{generation_id}_{suffix}.wav"
     save_audio(audio, str(audio_path), sample_rate)
 
-    existing = versions_mod.list_versions(generation_id, db)
-    label = f"take-{len(existing) + 1}"
+    # Count via DB query rather than list length to avoid TOCTOU race
+    from ..database import GenerationVersion as DBGenerationVersion
+
+    count = db.query(DBGenerationVersion).filter_by(generation_id=generation_id).count()
+    label = f"take-{count + 1}"
 
     versions_mod.create_version(
         generation_id=generation_id,

@@ -1,8 +1,11 @@
 """FastAPI application factory, middleware, and lifecycle events."""
 
 import asyncio
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # AMD GPU environment variables must be set before torch import
 if not os.environ.get("HSA_OVERRIDE_GFX_VERSION"):
@@ -30,11 +33,9 @@ def safe_content_disposition(disposition_type: str, filename: str) -> str:
     Uses RFC 5987 ``filename*`` parameter so browsers can decode UTF-8
     filenames while the ``filename`` fallback stays ASCII-only.
     """
-    ascii_name = (
-        "".join(c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")).strip() or "download"
-    )
+    ascii_name = "".join(c for c in filename if c.isascii() and (c.isalnum() or c in " -_.")).strip() or "download"
     utf8_name = quote(filename, safe="")
-    return f'{disposition_type}; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+    return f"{disposition_type}; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
 
 
 def create_app() -> FastAPI:
@@ -55,13 +56,13 @@ def create_app() -> FastAPI:
 def _configure_cors(application: FastAPI) -> None:
     """Set up CORS middleware with local-first defaults."""
     default_origins = [
-        "http://localhost:5173",        # Vite dev server
+        "http://localhost:5173",  # Vite dev server
         "http://127.0.0.1:5173",
         "http://localhost:17493",
         "http://127.0.0.1:17493",
-        "tauri://localhost",            # Tauri webview (macOS)
-        "https://tauri.localhost",      # Tauri webview (Windows/Linux)
-        "http://tauri.localhost",       # Tauri webview (Windows, some builds)
+        "tauri://localhost",  # Tauri webview (macOS)
+        "https://tauri.localhost",  # Tauri webview (Windows/Linux)
+        "http://tauri.localhost",  # Tauri webview (Windows, some builds)
     ]
     env_origins = os.environ.get("VOICEBOX_CORS_ORIGINS", "")
     all_origins = default_origins + [o.strip() for o in env_origins.split(",") if o.strip()]
@@ -96,9 +97,9 @@ def _register_lifecycle(application: FastAPI) -> None:
 
     @application.on_event("startup")
     async def startup_event():
-        print("voicebox API starting up...")
+        logger.info("Voicebox server starting up...")
         database.init_db()
-        print(f"Database initialized at {database._db_path}")
+        logger.info("Database initialized at %s", database._db_path)
 
         init_queue()
 
@@ -115,15 +116,15 @@ def _register_lifecycle(application: FastAPI) -> None:
                 )
             )
             if result.rowcount > 0:
-                print(f"Marked {result.rowcount} stale generation(s) as failed")
+                logger.info("Marked %d stale generation(s) as failed", result.rowcount)
             db.commit()
             db.close()
         except Exception as e:
-            print(f"Warning: Could not clean up stale generations: {e}")
+            logger.warning("Could not clean up stale generations: %s", e)
 
         backend_type = get_backend_type()
-        print(f"Backend: {backend_type.upper()}")
-        print(f"GPU available: {_get_gpu_status()}")
+        logger.info("Backend: %s", backend_type.upper())
+        logger.info("GPU available: %s", _get_gpu_status())
 
         from .services.cuda import check_and_update_cuda_binary
 
@@ -132,23 +133,23 @@ def _register_lifecycle(application: FastAPI) -> None:
         try:
             progress_manager = get_progress_manager()
             progress_manager._set_main_loop(asyncio.get_running_loop())
-            print("Progress manager initialized with event loop")
+            logger.info("Progress manager initialized with event loop")
         except Exception as e:
-            print(f"Warning: Could not initialize progress manager event loop: {e}")
+            logger.warning("Could not initialize progress manager event loop: %s", e)
 
         try:
             from huggingface_hub import constants as hf_constants
 
             cache_dir = Path(hf_constants.HF_HUB_CACHE)
             cache_dir.mkdir(parents=True, exist_ok=True)
-            print(f"HuggingFace cache directory: {cache_dir}")
+            logger.info("HuggingFace cache directory: %s", cache_dir)
         except Exception as e:
-            print(f"Warning: Could not create HuggingFace cache directory: {e}")
-            print("Model downloads may fail. Please ensure the directory exists and has write permissions.")
+            logger.warning("Could not create HuggingFace cache directory: %s", e)
+            logger.warning("Model downloads may fail. Please ensure the directory exists and has write permissions.")
 
     @application.on_event("shutdown")
     async def shutdown_event():
-        print("voicebox API shutting down...")
+        logger.info("Voicebox server shutting down...")
         tts.unload_tts_model()
         transcribe.unload_whisper_model()
 
