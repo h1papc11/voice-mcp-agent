@@ -1,10 +1,22 @@
-import { createRootRoute, createRoute, createRouter, Outlet } from '@tanstack/react-router';
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  redirect,
+} from '@tanstack/react-router';
 import { AppFrame } from '@/components/AppFrame/AppFrame';
 import { AudioTab } from '@/components/AudioTab/AudioTab';
 import { EffectsTab } from '@/components/EffectsTab/EffectsTab';
 import { MainEditor } from '@/components/MainEditor/MainEditor';
 import { ModelsTab } from '@/components/ModelsTab/ModelsTab';
-import { ServerTab } from '@/components/ServerTab/ServerTab';
+import { AboutPage } from '@/components/ServerTab/AboutPage';
+import { ChangelogPage } from '@/components/ServerTab/ChangelogPage';
+import { GeneralPage } from '@/components/ServerTab/GeneralPage';
+import { GenerationPage } from '@/components/ServerTab/GenerationPage';
+import { GpuPage } from '@/components/ServerTab/GpuPage';
+import { LogsPage } from '@/components/ServerTab/LogsPage';
+import { SettingsLayout } from '@/components/ServerTab/ServerTab';
 import { Sidebar } from '@/components/Sidebar';
 import { StoriesTab } from '@/components/StoriesTab/StoriesTab';
 import { Toaster } from '@/components/ui/toaster';
@@ -120,11 +132,57 @@ const modelsRoute = createRoute({
   component: ModelsTab,
 });
 
-// Server route
-const serverRoute = createRoute({
+// Settings layout route (parent for sub-tabs)
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/settings',
+  component: SettingsLayout,
+});
+
+// Settings sub-routes
+const settingsGeneralRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/',
+  component: GeneralPage,
+});
+
+const settingsGenerationRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/generation',
+  component: GenerationPage,
+});
+
+const settingsGpuRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/gpu',
+  component: GpuPage,
+});
+
+const settingsChangelogRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/changelog',
+  component: ChangelogPage,
+});
+
+const settingsLogsRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/logs',
+  component: LogsPage,
+});
+
+const settingsAboutRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: '/about',
+  component: AboutPage,
+});
+
+// Redirect old /server path to /settings
+const serverRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/server',
-  component: ServerTab,
+  beforeLoad: () => {
+    throw redirect({ to: '/settings' });
+  },
 });
 
 // Route tree
@@ -135,7 +193,15 @@ const routeTree = rootRoute.addChildren([
   audioRoute,
   effectsRoute,
   modelsRoute,
-  serverRoute,
+  settingsRoute.addChildren([
+    settingsGeneralRoute,
+    settingsGenerationRoute,
+    settingsGpuRoute,
+    settingsLogsRoute,
+    settingsChangelogRoute,
+    settingsAboutRoute,
+  ]),
+  serverRedirectRoute,
 ]);
 
 // Create router

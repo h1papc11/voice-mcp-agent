@@ -8,6 +8,7 @@ import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
 import { router } from '@/router';
+import { useLogStore } from '@/stores/logStore';
 import { useServerStore } from '@/stores/serverStore';
 
 const LOADING_MESSAGES = [
@@ -61,6 +62,14 @@ function App() {
     };
     // Empty dependency array - platform is stable from context, only run once
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform.lifecycle]);
+
+  // Subscribe to server logs
+  useEffect(() => {
+    const unsubscribe = platform.lifecycle.subscribeToServerLogs((entry) => {
+      useLogStore.getState().addEntry(entry);
+    });
+    return unsubscribe;
   }, [platform.lifecycle]);
 
   // Setup window close handler and auto-start server when running in Tauri (production only)

@@ -207,7 +207,7 @@ async def filesystem_health():
 
         checks.append(
             models.DirectoryCheck(
-                path=str(dir_path),
+                path=str(dir_path.resolve()),
                 exists=exists,
                 writable=writable,
                 error=error,

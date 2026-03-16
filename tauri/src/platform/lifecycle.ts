@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
-import type { PlatformLifecycle } from '@/platform/types';
+import type { PlatformLifecycle, ServerLogEntry } from '@/platform/types';
 
 class TauriLifecycle implements PlatformLifecycle {
   onServerReady?: () => void;
@@ -85,6 +85,31 @@ class TauriLifecycle implements PlatformLifecycle {
     } catch (error) {
       console.error('Failed to setup window close handler:', error);
     }
+  }
+
+  subscribeToServerLogs(callback: (entry: ServerLogEntry) => void): () => void {
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+
+    void listen<ServerLogEntry>('server-log', (event) => {
+      callback(event.payload);
+    })
+      .then((fn) => {
+        if (disposed) {
+          fn();
+          return;
+        }
+        unlisten = fn;
+      })
+      .catch((error) => {
+        console.error('Failed to subscribe to server logs:', error);
+      });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+      unlisten = null;
+    };
   }
 }
 

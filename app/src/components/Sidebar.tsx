@@ -1,5 +1,5 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
-import { AudioLines, Box, Mic, Server, Speaker, Volume2, Wand2 } from 'lucide-react';
+import { AudioLines, Box, Mic, Settings, Speaker, Volume2, Wand2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
@@ -19,7 +19,7 @@ const tabs = [
   { id: 'effects', path: '/effects', icon: Wand2, label: 'Effects' },
   { id: 'audio', path: '/audio', icon: Speaker, label: 'Audio' },
   { id: 'models', path: '/models', icon: Box, label: 'Models' },
-  { id: 'server', path: '/server', icon: Server, label: 'Server' },
+  { id: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 export function Sidebar({ isMacOS }: SidebarProps) {
@@ -54,9 +54,10 @@ export function Sidebar({ isMacOS }: SidebarProps) {
       <div className="flex flex-col gap-3">
         {tabs.map((tab, index) => {
           const Icon = tab.icon;
-          // For index route, use exact match; for others, use default matching
           const isActive =
-            tab.path === '/' ? matchRoute({ to: '/', exact: true }) : matchRoute({ to: tab.path });
+            tab.path === '/'
+              ? matchRoute({ to: '/', fuzzy: false })
+              : matchRoute({ to: tab.path, fuzzy: true });
 
           // Accent fades as buttons get further from the logo
           const accentOpacity = Math.max(0.08, 0.5 - index * 0.07);
@@ -98,7 +99,7 @@ export function Sidebar({ isMacOS }: SidebarProps) {
         <span className="text-[10px] text-muted-foreground/50">v{version}</span>
         {updateStatus.available && (
           <Link
-            to="/server"
+            to="/settings"
             className="text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
           >
             Update
