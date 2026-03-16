@@ -147,10 +147,10 @@ def _register_lifecycle(application: FastAPI) -> None:
         init_queue()
 
         # Mark stale "generating" records as failed -- leftovers from a killed process
-        try:
-            from sqlalchemy import text as sa_text
+        from sqlalchemy import text as sa_text
 
-            db = next(get_db())
+        db = next(get_db())
+        try:
             result = db.execute(
                 sa_text(
                     "UPDATE generations SET status = 'failed', "
@@ -161,7 +161,6 @@ def _register_lifecycle(application: FastAPI) -> None:
             if result.rowcount > 0:
                 logger.info("Marked %d stale generation(s) as failed", result.rowcount)
 
-            # Log database stats
             from .database import VoiceProfile as DBVoiceProfile, Generation as DBGeneration
 
             profile_count = db.query(DBVoiceProfile).count()
@@ -169,9 +168,11 @@ def _register_lifecycle(application: FastAPI) -> None:
             logger.info("Profiles: %d, Generations: %d", profile_count, generation_count)
 
             db.commit()
-            db.close()
         except Exception as e:
+            db.rollback()
             logger.warning("Could not clean up stale generations: %s", e)
+        finally:
+            db.close()
 
         backend_type = get_backend_type()
         logger.info("Backend: %s", backend_type.upper())
