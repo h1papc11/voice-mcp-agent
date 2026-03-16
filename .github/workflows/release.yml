@@ -123,6 +123,29 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        shell: bash
+        run: |
+          # Get the version from the tag (strip leading 'v')
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [X.Y.Z]" until the next "## [" heading
+          NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{/^## \[${VERSION}\]/d;/^## \[/d;p;}" CHANGELOG.md)
+
+          # Fall back to a placeholder if the version isn't in the changelog
+          if [ -z "$(echo "$NOTES" | tr -d '[:space:]')" ]; then
+            NOTES="See the assets below to download and install this version."
+          fi
+
+          # Use multiline output syntax
+          {
+            echo "notes<<CHANGELOG_EOF"
+            echo "$NOTES"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - uses: tauri-apps/tauri-action@v0.6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -139,17 +162,7 @@ jobs:
           projectPath: tauri
           tagName: v__VERSION__
           releaseName: "voicebox v__VERSION__"
-          releaseBody: |
-            ## What's Changed
-            See the assets below to download and install this version.
-
-            ### Installation
-            - **macOS (Apple Silicon)**: Download the `aarch64.dmg` file - uses MLX for fast native inference
-            - **macOS (Intel)**: Download the `x64.dmg` file - uses PyTorch
-            - **Windows**: Download the `.msi` installer
-            - **Linux**: Compile from source (see README)
-
-            The app includes automatic updates - future updates will be installed automatically.
+          releaseBody: ${{ steps.changelog.outputs.notes }}
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

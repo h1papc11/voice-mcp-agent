@@ -1,5 +1,5 @@
 {
   "title": "API Reference",
   "defaultOpen": true,
-  "pages": ["unknown"]
+  "pages": ["general", "profiles", "generation", "history", "models"]
 }

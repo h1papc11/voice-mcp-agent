@@ -119,6 +119,6 @@ Given current version `X.Y.Z`:
 
 ## Notes
 
-- This skill does not create a GitHub Release. That happens when the tag is pushed and CI runs, or the user can create it manually via `gh release create`.
+- When the tag is pushed, the release CI (`.github/workflows/release.yml`) automatically extracts the matching version section from `CHANGELOG.md` and uses it as the GitHub Release body. No manual copy-paste needed.
 - The release commit message is controlled by `.bumpversion.cfg` (`Bump version: X.Y.Z -> A.B.C`). Do not override it.
-- If the user wants to update the GitHub Release body with the changelog narrative after pushing, they can use: `gh release edit vX.Y.Z --notes-file <(sed -n '/## \[X.Y.Z\]/,/## \[/p' CHANGELOG.md | head -n -1)`
+- If you need to manually update the GitHub Release body after the fact: `gh release edit vX.Y.Z --notes-file <(sed -n '/## \[X.Y.Z\]/,/## \[/p' CHANGELOG.md | head -n -1)`
