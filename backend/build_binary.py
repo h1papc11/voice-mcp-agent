@@ -50,7 +50,7 @@ def build_server(cuda=False):
     qwen_tts_path = os.getenv("QWEN_TTS_PATH")
     if qwen_tts_path and Path(qwen_tts_path).exists():
         args.extend(["--paths", str(qwen_tts_path)])
-        print(f"Using local qwen_tts source from: {qwen_tts_path}")
+        logger.info("Using local qwen_tts source from: %s", qwen_tts_path)
 
     # Add common hidden imports
     args.extend(
@@ -185,7 +185,7 @@ def build_server(cuda=False):
 
     # Add CUDA-specific hidden imports
     if cuda:
-        print("Building with CUDA support")
+        logger.info("Building with CUDA support")
         args.extend(
             [
                 "--hidden-import",
@@ -219,7 +219,7 @@ def build_server(cuda=False):
 
     # Add MLX-specific imports if building on Apple Silicon (never for CUDA builds)
     if is_apple_silicon() and not cuda:
-        print("Building for Apple Silicon - including MLX dependencies")
+        logger.info("Building for Apple Silicon - including MLX dependencies")
         args.extend(
             [
                 "--hidden-import",
@@ -252,7 +252,7 @@ def build_server(cuda=False):
             ]
         )
     elif not cuda:
-        print("Building for non-Apple Silicon platform - PyTorch only")
+        logger.info("Building for non-Apple Silicon platform - PyTorch only")
 
     dist_dir = str(backend_dir / "dist")
     build_dir = str(backend_dir / "build")
@@ -284,7 +284,7 @@ def build_server(cuda=False):
         )
         has_cuda_torch = bool(result.stdout.strip())
         if has_cuda_torch:
-            print("CUDA torch detected — installing CPU torch for CPU build...")
+            logger.info("CUDA torch detected — installing CPU torch for CPU build...")
             subprocess.run(
                 [
                     sys.executable,
@@ -309,7 +309,7 @@ def build_server(cuda=False):
     finally:
         # Restore CUDA torch if we swapped it out (even on build failure)
         if restore_cuda:
-            print("Restoring CUDA torch...")
+            logger.info("Restoring CUDA torch...")
             import subprocess
 
             subprocess.run(
@@ -329,7 +329,7 @@ def build_server(cuda=False):
                 check=True,
             )
 
-    print(f"Binary built in {backend_dir / 'dist' / binary_name}")
+    logger.info("Binary built in %s", backend_dir / "dist" / binary_name)
 
 
 def _get_cuda_dll_excludes():
@@ -372,7 +372,7 @@ def _get_cuda_dll_excludes():
         total_mb = (
             sum((torch_lib / dll).stat().st_size for dll in exclude_dlls if (torch_lib / dll).exists()) / 1024 / 1024
         )
-        print(f"CPU build: will exclude {len(exclude_dlls)} CUDA DLLs ({total_mb:.0f} MB)")
+        logger.info("CPU build: will exclude %d CUDA DLLs (%.0f MB)", len(exclude_dlls), total_mb)
 
     return exclude_dlls
 

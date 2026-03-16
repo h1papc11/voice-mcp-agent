@@ -3,7 +3,35 @@
 import asyncio
 import logging
 import os
+import sys
 from pathlib import Path
+
+
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter to add colors matching uvicorn's style."""
+
+    COLORS = {
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+    }
+    RESET = "\033[0m"
+
+    def format(self, record):
+        log_color = self.COLORS.get(record.levelname, self.RESET)
+        record.levelname = f"{log_color}{record.levelname}{self.RESET}"
+        return super().format(record)
+
+
+# Configure logging to match uvicorn's format with colors
+handler = logging.StreamHandler(sys.stderr)
+handler.setFormatter(ColoredFormatter("%(levelname)s:     %(message)s"))
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[handler],
+)
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +46,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.parse import quote
 
-from . import __version__, database
+from . import __version__, config, database
 from .services import tts, transcribe
 from .database import get_db
 from .utils.platform_detect import get_backend_type
@@ -97,9 +125,24 @@ def _register_lifecycle(application: FastAPI) -> None:
 
     @application.on_event("startup")
     async def startup_event():
-        logger.info("Voicebox server starting up...")
+        import platform
+        import sys
+
+        logger.info("Voicebox v%s starting up", __version__)
+        logger.info(
+            "Python %s on %s %s (%s)",
+            sys.version.split()[0],
+            platform.system(),
+            platform.release(),
+            platform.machine(),
+        )
+
         database.init_db()
-        logger.info("Database initialized at %s", database._db_path)
+
+        from .database.session import _db_path
+
+        logger.info("Database: %s", _db_path)
+        logger.info("Data directory: %s", config.get_data_dir())
 
         init_queue()
 
@@ -112,11 +155,19 @@ def _register_lifecycle(application: FastAPI) -> None:
                 sa_text(
                     "UPDATE generations SET status = 'failed', "
                     "error = 'Server was shut down during generation' "
-                    "WHERE status = 'generating'"
+                    "WHERE status IN ('generating', 'loading_model')"
                 )
             )
             if result.rowcount > 0:
                 logger.info("Marked %d stale generation(s) as failed", result.rowcount)
+
+            # Log database stats
+            from .database import VoiceProfile as DBVoiceProfile, Generation as DBGeneration
+
+            profile_count = db.query(DBVoiceProfile).count()
+            generation_count = db.query(DBGeneration).count()
+            logger.info("Profiles: %d, Generations: %d", profile_count, generation_count)
+
             db.commit()
             db.close()
         except Exception as e:
@@ -124,7 +175,7 @@ def _register_lifecycle(application: FastAPI) -> None:
 
         backend_type = get_backend_type()
         logger.info("Backend: %s", backend_type.upper())
-        logger.info("GPU available: %s", _get_gpu_status())
+        logger.info("GPU: %s", _get_gpu_status())
 
         from .services.cuda import check_and_update_cuda_binary
 
@@ -133,7 +184,6 @@ def _register_lifecycle(application: FastAPI) -> None:
         try:
             progress_manager = get_progress_manager()
             progress_manager._set_main_loop(asyncio.get_running_loop())
-            logger.info("Progress manager initialized with event loop")
         except Exception as e:
             logger.warning("Could not initialize progress manager event loop: %s", e)
 
@@ -142,10 +192,11 @@ def _register_lifecycle(application: FastAPI) -> None:
 
             cache_dir = Path(hf_constants.HF_HUB_CACHE)
             cache_dir.mkdir(parents=True, exist_ok=True)
-            logger.info("HuggingFace cache directory: %s", cache_dir)
+            logger.info("Model cache: %s", cache_dir)
         except Exception as e:
             logger.warning("Could not create HuggingFace cache directory: %s", e)
-            logger.warning("Model downloads may fail. Please ensure the directory exists and has write permissions.")
+
+        logger.info("Ready")
 
     @application.on_event("shutdown")
     async def shutdown_event():
