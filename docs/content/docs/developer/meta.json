@@ -1,5 +1,6 @@
 {
   "title": "Developer",
+  "defaultOpen": true,
   "pages": [
     "setup",
     "architecture",
