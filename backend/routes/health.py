@@ -3,9 +3,11 @@
 import asyncio
 import os
 import signal
+from pathlib import Path
 
 import torch
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from .. import config, models
@@ -15,12 +17,18 @@ from ..utils.platform_detect import get_backend_type
 
 router = APIRouter()
 
+# Frontend build directory — present in Docker, absent in dev/API-only mode
+_frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+
 
 @router.get("/")
 async def root():
-    """Root endpoint."""
+    """Root endpoint — serves SPA index.html in Docker, JSON otherwise."""
     from .. import __version__
 
+    index = _frontend_dir / "index.html"
+    if index.is_file():
+        return FileResponse(index, media_type="text/html")
     return {"message": "voicebox API", "version": __version__}
 
 

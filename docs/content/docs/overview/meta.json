@@ -4,6 +4,7 @@
   "pages": [
     "introduction",
     "installation",
+    "docker",
     "quick-start",
     "voice-cloning",
     "stories-editor",

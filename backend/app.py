@@ -77,6 +77,7 @@ def create_app() -> FastAPI:
     _configure_cors(application)
     register_routers(application)
     _register_lifecycle(application)
+    _mount_frontend(application)
 
     return application
 
@@ -102,6 +103,43 @@ def _configure_cors(application: FastAPI) -> None:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+def _mount_frontend(application: FastAPI) -> None:
+    """Serve the built web frontend when present (Docker / web deployment).
+
+    The Dockerfile copies the Vite build output to ``/app/frontend/``.  When
+    that directory exists we mount static assets and add a catch-all route so
+    the React SPA handles client-side routing.  In dev or API-only mode the
+    directory is absent and this function is a no-op.
+    """
+    frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
+    if not frontend_dir.is_dir():
+        return
+
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    # Mount hashed assets (JS, CSS, images) that Vite places under /assets
+    assets_dir = frontend_dir / "assets"
+    if assets_dir.is_dir():
+        application.mount(
+            "/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="frontend-assets",
+        )
+
+    # SPA catch-all: serve files if they exist, otherwise index.html for
+    # client-side routes like /voices, /stories, /models, etc.
+    @application.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = (frontend_dir / full_path).resolve()
+        # Guard against path traversal — only serve files inside frontend_dir
+        if full_path and file_path.is_file() and str(file_path).startswith(str(frontend_dir)):
+            return FileResponse(file_path)
+        return FileResponse(frontend_dir / "index.html", media_type="text/html")
+
+    logger.info("Frontend: serving SPA from %s", frontend_dir)
 
 
 def _get_gpu_status() -> str:
