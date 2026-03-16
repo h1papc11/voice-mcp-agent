@@ -10,23 +10,23 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
 
-from .models import (
+from ..models import (
     VoiceProfileCreate,
     VoiceProfileResponse,
     ProfileSampleCreate,
     ProfileSampleResponse,
 )
-from .database import (
+from ..database import (
     VoiceProfile as DBVoiceProfile,
     ProfileSample as DBProfileSample,
     Generation as DBGeneration,
 )
-from .models import EffectConfig
-from .utils.audio import validate_reference_audio, load_audio, save_audio
-from .utils.images import validate_image, process_avatar
-from .utils.cache import _get_cache_dir, clear_profile_cache
+from ..models import EffectConfig
+from ..utils.audio import validate_reference_audio, load_audio, save_audio
+from ..utils.images import validate_image, process_avatar
+from ..utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
-from . import config
+from .. import config
 import json as _json
 
 
@@ -43,6 +43,7 @@ def _profile_to_response(
             effects_chain = [EffectConfig(**e) for e in raw]
         except Exception as e:
             import logging
+
             logging.warning(f"Failed to parse effects_chain for profile {profile.id}: {e}")
     return VoiceProfileResponse(
         id=profile.id,
@@ -56,11 +57,6 @@ def _profile_to_response(
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )
-
-
-def _get_profiles_dir() -> Path:
-    """Get profiles directory from config."""
-    return config.get_profiles_dir()
 
 
 async def create_profile(
@@ -80,12 +76,10 @@ async def create_profile(
     Raises:
         ValueError: If a profile with the same name already exists
     """
-    # Check if profile name already exists
     existing_profile = db.query(DBVoiceProfile).filter_by(name=data.name).first()
     if existing_profile:
         raise ValueError(f"A profile with the name '{data.name}' already exists. Please choose a different name.")
 
-    # Create profile in database
     db_profile = DBVoiceProfile(
         id=str(uuid.uuid4()),
         name=data.name,
@@ -99,8 +93,7 @@ async def create_profile(
     db.commit()
     db.refresh(db_profile)
 
-    # Create profile directory
-    profile_dir = _get_profiles_dir() / db_profile.id
+    profile_dir = config.get_profiles_dir() / db_profile.id
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     return _profile_to_response(db_profile)
@@ -114,56 +107,50 @@ async def add_profile_sample(
 ) -> ProfileSampleResponse:
     """
     Add a sample to a voice profile.
-    
+
     Args:
         profile_id: Profile ID
         audio_path: Path to temporary audio file
         reference_text: Transcript of audio
         db: Database session
-        
+
     Returns:
         Created sample
     """
-    # Validate profile exists
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         raise ValueError(f"Profile {profile_id} not found")
-    
-    # Validate audio
+
     is_valid, error_msg = validate_reference_audio(audio_path)
     if not is_valid:
         raise ValueError(f"Invalid reference audio: {error_msg}")
-    
-    # Create sample ID and directory
+
     sample_id = str(uuid.uuid4())
-    profile_dir = _get_profiles_dir() / profile_id
+    profile_dir = config.get_profiles_dir() / profile_id
     profile_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Copy audio file to profile directory
+
     dest_path = profile_dir / f"{sample_id}.wav"
     audio, sr = load_audio(audio_path)
     save_audio(audio, str(dest_path), sr)
-    
-    # Create database entry
+
     db_sample = DBProfileSample(
         id=sample_id,
         profile_id=profile_id,
         audio_path=str(dest_path),
         reference_text=reference_text,
     )
-    
+
     db.add(db_sample)
-    
-    # Update profile timestamp
+
     profile.updated_at = datetime.utcnow()
-    
+
     db.commit()
     db.refresh(db_sample)
-    
+
     # Invalidate combined audio cache for this profile
     # Since a new sample was added, any cached combined audio is now stale
     clear_profile_cache(profile_id)
-    
+
     return ProfileSampleResponse.model_validate(db_sample)
 
 
@@ -173,18 +160,18 @@ async def get_profile(
 ) -> Optional[VoiceProfileResponse]:
     """
     Get a voice profile by ID.
-    
+
     Args:
         profile_id: Profile ID
         db: Database session
-        
+
     Returns:
         Profile or None if not found
     """
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         return None
-    
+
     return _profile_to_response(profile)
 
 
@@ -194,11 +181,11 @@ async def get_profile_samples(
 ) -> List[ProfileSampleResponse]:
     """
     Get all samples for a profile.
-    
+
     Args:
         profile_id: Profile ID
         db: Database session
-        
+
     Returns:
         List of samples
     """
@@ -209,33 +196,27 @@ async def get_profile_samples(
 async def list_profiles(db: Session) -> List[VoiceProfileResponse]:
     """
     List all voice profiles with generation and sample counts.
-    
+
     Args:
         db: Database session
-        
+
     Returns:
         List of profiles
     """
-    profiles = db.query(DBVoiceProfile).order_by(
-        DBVoiceProfile.created_at.desc()
-    ).all()
+    profiles = db.query(DBVoiceProfile).order_by(DBVoiceProfile.created_at.desc()).all()
 
     if not profiles:
         return []
 
     # Batch-fetch generation counts
     gen_counts_rows = (
-        db.query(DBGeneration.profile_id, func.count(DBGeneration.id))
-        .group_by(DBGeneration.profile_id)
-        .all()
+        db.query(DBGeneration.profile_id, func.count(DBGeneration.id)).group_by(DBGeneration.profile_id).all()
     )
     gen_counts = {row[0]: row[1] for row in gen_counts_rows}
 
     # Batch-fetch sample counts
     sample_counts_rows = (
-        db.query(DBProfileSample.profile_id, func.count(DBProfileSample.id))
-        .group_by(DBProfileSample.profile_id)
-        .all()
+        db.query(DBProfileSample.profile_id, func.count(DBProfileSample.id)).group_by(DBProfileSample.profile_id).all()
     )
     sample_counts = {row[0]: row[1] for row in sample_counts_rows}
 
@@ -272,13 +253,11 @@ async def update_profile(
     if not profile:
         return None
 
-    # Check if the new name conflicts with another profile
     if profile.name != data.name:
         existing_profile = db.query(DBVoiceProfile).filter_by(name=data.name).first()
         if existing_profile:
             raise ValueError(f"A profile with the name '{data.name}' already exists. Please choose a different name.")
 
-    # Update fields
     profile.name = data.name
     profile.description = data.description
     profile.language = data.language
@@ -296,33 +275,30 @@ async def delete_profile(
 ) -> bool:
     """
     Delete a voice profile and all associated data.
-    
+
     Args:
         profile_id: Profile ID
         db: Database session
-        
+
     Returns:
         True if deleted, False if not found
     """
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         return False
-    
-    # Delete samples from database
+
     db.query(DBProfileSample).filter_by(profile_id=profile_id).delete()
-    
-    # Delete profile from database
+
     db.delete(profile)
     db.commit()
-    
-    # Delete profile directory
-    profile_dir = _get_profiles_dir() / profile_id
+
+    profile_dir = config.get_profiles_dir() / profile_id
     if profile_dir.exists():
         shutil.rmtree(profile_dir)
-    
+
     # Clean up combined audio cache files for this profile
     clear_profile_cache(profile_id)
-    
+
     return True
 
 
@@ -332,34 +308,32 @@ async def delete_profile_sample(
 ) -> bool:
     """
     Delete a profile sample.
-    
+
     Args:
         sample_id: Sample ID
         db: Database session
-        
+
     Returns:
         True if deleted, False if not found
     """
     sample = db.query(DBProfileSample).filter_by(id=sample_id).first()
     if not sample:
         return False
-    
+
     # Store profile_id before deleting
     profile_id = sample.profile_id
-    
-    # Delete audio file
+
     audio_path = Path(sample.audio_path)
     if audio_path.exists():
         audio_path.unlink()
-    
-    # Delete from database
+
     db.delete(sample)
     db.commit()
-    
+
     # Invalidate combined audio cache for this profile
     # Since the sample set changed, any cached combined audio is now stale
     clear_profile_cache(profile_id)
-    
+
     return True
 
 
@@ -370,30 +344,30 @@ async def update_profile_sample(
 ) -> Optional[ProfileSampleResponse]:
     """
     Update a profile sample's reference text.
-    
+
     Args:
         sample_id: Sample ID
         reference_text: Updated reference text
         db: Database session
-        
+
     Returns:
         Updated sample or None if not found
     """
     sample = db.query(DBProfileSample).filter_by(id=sample_id).first()
     if not sample:
         return None
-    
+
     # Store profile_id before updating
     profile_id = sample.profile_id
-    
+
     sample.reference_text = reference_text
     db.commit()
     db.refresh(sample)
-    
+
     # Invalidate combined audio cache for this profile
     # Since the reference text changed, cache keys and combined text are now stale
     clear_profile_cache(profile_id)
-    
+
     return ProfileSampleResponse.model_validate(sample)
 
 
@@ -415,9 +389,8 @@ async def create_voice_prompt_for_profile(
     Returns:
         Voice prompt dictionary
     """
-    from .backends import get_tts_backend_for_engine
+    from ..backends import get_tts_backend_for_engine
 
-    # Get all samples for profile
     samples = db.query(DBProfileSample).filter_by(profile_id=profile_id).all()
 
     if not samples:
@@ -426,7 +399,6 @@ async def create_voice_prompt_for_profile(
     tts_model = get_tts_backend_for_engine(engine)
 
     if len(samples) == 1:
-        # Single sample - use directly
         sample = samples[0]
         voice_prompt, _ = await tts_model.create_voice_prompt(
             sample.audio_path,
@@ -435,11 +407,9 @@ async def create_voice_prompt_for_profile(
         )
         return voice_prompt
     else:
-        # Multiple samples - combine them
         audio_paths = [s.audio_path for s in samples]
         reference_texts = [s.reference_text for s in samples]
 
-        # Combine audio
         combined_audio, combined_text = await tts_model.combine_voice_prompts(
             audio_paths,
             reference_texts,
@@ -448,18 +418,16 @@ async def create_voice_prompt_for_profile(
         # Save combined audio to cache directory (persistent)
         # Create a hash of sample IDs to identify this specific combination
         import hashlib
+
         sample_ids_str = "-".join(sorted([s.id for s in samples]))
         combination_hash = hashlib.md5(sample_ids_str.encode()).hexdigest()[:12]
-        
-        # Store in cache directory
+
         cache_dir = _get_cache_dir()
         cache_dir.mkdir(parents=True, exist_ok=True)
         combined_path = cache_dir / f"combined_{profile_id}_{combination_hash}.wav"
-        
-        # Save combined audio
+
         save_audio(combined_audio, str(combined_path), 24000)
 
-        # Create prompt from combined audio
         voice_prompt, _ = await tts_model.create_voice_prompt(
             str(combined_path),
             combined_text,
@@ -484,17 +452,14 @@ async def upload_avatar(
     Returns:
         Updated profile
     """
-    # Validate profile exists
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         raise ValueError(f"Profile {profile_id} not found")
 
-    # Validate image
     is_valid, error_msg = validate_image(image_path)
     if not is_valid:
         raise ValueError(error_msg)
 
-    # Delete existing avatar if present
     if profile.avatar_path:
         old_avatar = Path(profile.avatar_path)
         if old_avatar.exists():
@@ -502,27 +467,22 @@ async def upload_avatar(
 
     # Determine file extension from uploaded file
     from PIL import Image
+
     with Image.open(image_path) as img:
         # Normalize JPEG variants (MPO is multi-picture format from some cameras)
         img_format = img.format
-        if img_format in ('MPO', 'JPG'):
-            img_format = 'JPEG'
-        
-        ext_map = {
-            'PNG': '.png',
-            'JPEG': '.jpg',
-            'WEBP': '.webp'
-        }
-        ext = ext_map.get(img_format, '.png')
+        if img_format in ("MPO", "JPG"):
+            img_format = "JPEG"
 
-    # Save processed image to profile directory
-    profile_dir = _get_profiles_dir() / profile_id
+        ext_map = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
+        ext = ext_map.get(img_format, ".png")
+
+    profile_dir = config.get_profiles_dir() / profile_id
     profile_dir.mkdir(parents=True, exist_ok=True)
     output_path = profile_dir / f"avatar{ext}"
 
     process_avatar(image_path, str(output_path))
 
-    # Update database
     profile.avatar_path = str(output_path)
     profile.updated_at = datetime.utcnow()
 
@@ -550,12 +510,10 @@ async def delete_avatar(
     if not profile or not profile.avatar_path:
         return False
 
-    # Delete avatar file
     avatar_path = Path(profile.avatar_path)
     if avatar_path.exists():
         avatar_path.unlink()
 
-    # Update database
     profile.avatar_path = None
     profile.updated_at = datetime.utcnow()
 

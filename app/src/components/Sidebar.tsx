@@ -1,7 +1,10 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { AudioLines, Box, Mic, Server, Speaker, Volume2, Wand2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
+import { usePlatform } from '@/platform/PlatformContext';
+import type { UpdateStatus } from '@/platform/types';
 import { usePlayerStore } from '@/stores/playerStore';
 import { version } from '../../package.json';
 
@@ -22,6 +25,10 @@ const tabs = [
 export function Sidebar({ isMacOS }: SidebarProps) {
   const matchRoute = useMatchRoute();
   const isPlayerOpen = !!usePlayerStore((s) => s.audioUrl);
+  const platform = usePlatform();
+
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(platform.updater.getStatus());
+  useEffect(() => platform.updater.subscribe(setUpdateStatus), [platform.updater]);
 
   return (
     <div
@@ -85,10 +92,18 @@ export function Sidebar({ isMacOS }: SidebarProps) {
 
       {/* Version */}
       <div
-        className="mt-auto text-[10px] text-muted-foreground/50 transition-all duration-300"
+        className="mt-auto flex flex-col items-center gap-1.5 transition-all duration-300"
         style={{ paddingBottom: isPlayerOpen ? '7rem' : undefined }}
       >
-        v{version}
+        <span className="text-[10px] text-muted-foreground/50">v{version}</span>
+        {updateStatus.available && (
+          <Link
+            to="/server"
+            className="text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+          >
+            Update
+          </Link>
+        )}
       </div>
     </div>
   );

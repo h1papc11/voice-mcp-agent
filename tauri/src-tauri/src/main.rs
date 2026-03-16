@@ -12,6 +12,47 @@ use tokio::sync::mpsc;
 const LEGACY_PORT: u16 = 8000;
 const SERVER_PORT: u16 = 17493;
 
+/// Find a voicebox-server process listening on a given port (Windows only).
+///
+/// Uses PowerShell `Get-NetTCPConnection` to look up the PID owning the port,
+/// then verifies via `tasklist` that it's a voicebox process. The caller is
+/// responsible for checking port occupancy first (e.g. `TcpStream::connect_timeout`).
+/// Replaces the previous `netstat -ano` approach which failed on systems with
+/// corrupted system DLLs (see #277).
+#[cfg(windows)]
+fn find_voicebox_pid_on_port(port: u16) -> Option<u32> {
+    use std::process::Command;
+
+    // Use PowerShell's Get-NetTCPConnection to find the PID listening on the port.
+    // This is a built-in cmdlet that doesn't depend on netstat.exe.
+    let ps_script = format!(
+        "Get-NetTCPConnection -LocalPort {} -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess",
+        port
+    );
+    if let Ok(output) = Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_script])
+        .output()
+    {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        for line in output_str.lines() {
+            if let Ok(pid) = line.trim().parse::<u32>() {
+                // Verify this PID is a voicebox process
+                if let Ok(tasklist_output) = Command::new("tasklist")
+                    .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+                    .output()
+                {
+                    let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
+                    if tasklist_str.to_lowercase().contains("voicebox") {
+                        return Some(pid);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
 struct ServerState {
     child: Mutex<Option<tauri_plugin_shell::process::CommandChild>>,
     server_pid: Mutex<Option<u32>>,
@@ -68,31 +109,22 @@ async fn start_server(
     
     #[cfg(windows)]
     {
-        use std::process::Command;
-        if let Ok(output) = Command::new("netstat")
-            .args(["-ano"])
-            .output()
-        {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            for line in output_str.lines() {
-                if line.contains(&format!(":{}", SERVER_PORT)) && line.contains("LISTENING") {
-                    if let Some(pid_str) = line.split_whitespace().last() {
-                        if let Ok(pid) = pid_str.parse::<u32>() {
-                            if let Ok(tasklist_output) = Command::new("tasklist")
-                                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-                                .output()
-                            {
-                                let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
-                                if tasklist_str.to_lowercase().contains("voicebox") {
-                                    println!("Found existing voicebox-server on port {} (PID: {}), reusing it", SERVER_PORT, pid);
-                                    // Store the PID so we can kill it on exit if needed
-                                    *state.server_pid.lock().unwrap() = Some(pid);
-                                    return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
-                                }
-                            }
-                        }
-                    }
-                }
+        use std::net::TcpStream;
+        if TcpStream::connect_timeout(
+            &format!("127.0.0.1:{}", SERVER_PORT).parse().unwrap(),
+            std::time::Duration::from_secs(1),
+        ).is_ok() {
+            // Port is in use — check if it's a voicebox process
+            if let Some(pid) = find_voicebox_pid_on_port(SERVER_PORT) {
+                println!("Found existing voicebox-server on port {} (PID: {}), reusing it", SERVER_PORT, pid);
+                *state.server_pid.lock().unwrap() = Some(pid);
+                return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
+            } else {
+                return Err(format!(
+                    "Port {} is already in use by another application. \
+                     Close the other application or change the Voicebox port.",
+                    SERVER_PORT
+                ));
             }
         }
     }
@@ -102,24 +134,20 @@ async fn start_server(
     #[cfg(unix)]
     {
         use std::process::Command;
-        // Find processes listening on legacy port 8000 with their command names
         if let Ok(output) = Command::new("lsof")
             .args(["-i", &format!(":{}", LEGACY_PORT), "-sTCP:LISTEN"])
             .output()
         {
             let output_str = String::from_utf8_lossy(&output.stdout);
-            for line in output_str.lines().skip(1) { // Skip header line
-                // lsof output format: COMMAND PID USER FD TYPE DEVICE SIZE/OFF NODE NAME
+            for line in output_str.lines().skip(1) {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {
                     let command = parts[0];
                     let pid_str = parts[1];
                     
-                    // Only kill if it's a voicebox-server process
                     if command.contains("voicebox") {
                         if let Ok(pid) = pid_str.parse::<i32>() {
                             println!("Found orphaned voicebox-server on legacy port {} (PID: {}, CMD: {}), killing it...", LEGACY_PORT, pid, command);
-                            // Kill the process group
                             let _ = Command::new("kill")
                                 .args(["-9", "--", &format!("-{}", pid)])
                                 .output();
@@ -137,35 +165,16 @@ async fn start_server(
     
     #[cfg(windows)]
     {
-        use std::process::Command;
-        // On Windows, find PIDs on legacy port 8000, then check their names
-        if let Ok(output) = Command::new("netstat")
-            .args(["-ano"])
-            .output()
-        {
-            let output_str = String::from_utf8_lossy(&output.stdout);
-            for line in output_str.lines() {
-                if line.contains(&format!(":{}", LEGACY_PORT)) && line.contains("LISTENING") {
-                    if let Some(pid_str) = line.split_whitespace().last() {
-                        if let Ok(pid) = pid_str.parse::<u32>() {
-                            // Get process name for this PID
-                            if let Ok(tasklist_output) = Command::new("tasklist")
-                                .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
-                                .output()
-                            {
-                                let tasklist_str = String::from_utf8_lossy(&tasklist_output.stdout);
-                                if tasklist_str.to_lowercase().contains("voicebox") {
-                                    println!("Found orphaned voicebox-server on legacy port {} (PID: {}), killing it...", LEGACY_PORT, pid);
-                                    let _ = Command::new("taskkill")
-                                        .args(["/PID", &pid.to_string(), "/T", "/F"])
-                                        .output();
-                                } else {
-                                    println!("Legacy port {} is in use by non-voicebox process (PID: {}), not killing", LEGACY_PORT, pid);
-                                }
-                            }
-                        }
-                    }
-                }
+        use std::net::TcpStream;
+        if TcpStream::connect_timeout(
+            &format!("127.0.0.1:{}", LEGACY_PORT).parse().unwrap(),
+            std::time::Duration::from_secs(1),
+        ).is_ok() {
+            if let Some(pid) = find_voicebox_pid_on_port(LEGACY_PORT) {
+                println!("Found orphaned voicebox-server on legacy port {} (PID: {}), killing it...", LEGACY_PORT, pid);
+                let _ = std::process::Command::new("taskkill")
+                    .args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .output();
             }
         }
     }

@@ -49,6 +49,7 @@ logs/
 # Generated files
 app/openapi.json
 tauri/src-tauri/binaries/*
+tauri/src-tauri/gen/Assets.car
 
 # Temporary
 tmp/

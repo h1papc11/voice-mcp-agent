@@ -50,9 +50,10 @@
 
 | Layer | File | Purpose |
 |-------|------|---------|
-| Backend entry | `backend/main.py` | FastAPI app, all API routes (~2100 lines) |
-| TTS protocol | `backend/backends/__init__.py:14-81` | `TTSBackend` Protocol definition |
-| TTS factory | `backend/backends/__init__.py:138-178` | Thread-safe engine registry (double-checked locking) |
+| Backend entry | `backend/main.py` | FastAPI app, all API routes (~2850 lines) |
+| TTS protocol | `backend/backends/__init__.py:32-101` | `TTSBackend` Protocol definition |
+| Model registry | `backend/backends/__init__.py:17-29,153-366` | `ModelConfig` dataclass + registry helpers |
+| TTS factory | `backend/backends/__init__.py:382-426` | Thread-safe engine registry (double-checked locking) |
 | PyTorch TTS | `backend/backends/pytorch_backend.py` | Qwen3-TTS via `qwen_tts` package |
 | MLX TTS | `backend/backends/mlx_backend.py` | Qwen3-TTS via `mlx_audio.tts` |
 | LuxTTS | `backend/backends/luxtts_backend.py` | LuxTTS — fast, CPU-friendly |
@@ -64,6 +65,7 @@
 | Audio utils | `backend/utils/audio.py` | `trim_tts_output()`, normalize, load/save audio |
 | Frontend API | `app/src/lib/api/client.ts` | Hand-written fetch wrapper |
 | Frontend types | `app/src/lib/api/types.ts` | TypeScript API types |
+| Engine selector | `app/src/components/Generation/EngineModelSelector.tsx` | Shared engine/model dropdown |
 | Generation form | `app/src/components/Generation/GenerationForm.tsx` | TTS generation UI |
 | Floating gen box | `app/src/components/Generation/FloatingGenerateBox.tsx` | Compact generation UI |
 | Model manager | `app/src/components/ServerSettings/ModelManagement.tsx` | Model download/status/progress UI |
@@ -101,8 +103,10 @@ POST /generate
 - Multi-engine TTS architecture with thread-safe backend registry (PR #254)
 - LuxTTS integration — fast, CPU-friendly English TTS (PR #254)
 - Chatterbox Multilingual TTS — 23 languages including Hebrew (PR #257)
-- Delivery instructions (instruct parameter, Qwen only)
+- Instruct parameter UI exists but is non-functional across all backends (see #224, Known Limitations)
 - Single flat model dropdown (Qwen 1.7B, Qwen 0.6B, LuxTTS, Chatterbox, Chatterbox Turbo)
+- Centralized model config registry (`ModelConfig` dataclass) — no per-engine dispatch maps in `main.py`
+- Shared `EngineModelSelector` component — engine/model dropdown defined once, used in both generation forms
 
 **Infrastructure:**
 - CUDA backend swap via binary download and restart (PR #252)
@@ -125,13 +129,13 @@ POST /generate
 
 ### TTS Engine Comparison
 
-| Engine | Model Name | Languages | Size | Key Features |
-|--------|-----------|-----------|------|-------------|
-| Qwen3-TTS 1.7B | `qwen-tts-1.7B` | 10 (zh, en, ja, ko, de, fr, ru, pt, es, it) | ~3.5 GB | Instruct mode, highest quality |
-| Qwen3-TTS 0.6B | `qwen-tts-0.6B` | 10 | ~1.2 GB | Lighter, faster |
-| LuxTTS | `luxtts` | English | ~300 MB | CPU-friendly, 48 kHz, fast |
-| Chatterbox | `chatterbox-tts` | 23 (incl. Hebrew, Arabic, Hindi, etc.) | ~3.2 GB | Zero-shot cloning, multilingual |
-| Chatterbox Turbo | `chatterbox-turbo` | English | ~1.5 GB | Paralinguistic tags ([laugh], [cough]), 350M params, low latency |
+| Engine | Model Name | Languages | Size | Key Features | Instruct Support |
+|--------|-----------|-----------|------|-------------|-----------------|
+| Qwen3-TTS 1.7B | `qwen-tts-1.7B` | 10 (zh, en, ja, ko, de, fr, ru, pt, es, it) | ~3.5 GB | Highest quality, voice cloning | None (Base model has no instruct path) |
+| Qwen3-TTS 0.6B | `qwen-tts-0.6B` | 10 | ~1.2 GB | Lighter, faster | None |
+| LuxTTS | `luxtts` | English | ~300 MB | CPU-friendly, 48 kHz, fast | None |
+| Chatterbox | `chatterbox-tts` | 23 (incl. Hebrew, Arabic, Hindi, etc.) | ~3.2 GB | Zero-shot cloning, multilingual | Partial — `exaggeration` float (0-1) for expressiveness |
+| Chatterbox Turbo | `chatterbox-turbo` | English | ~1.5 GB | Paralinguistic tags ([laugh], [cough]), 350M params, low latency | Partial — inline tags only, no separate instruct param |
 
 ### Multi-Engine Architecture (Shipped)
 
@@ -149,6 +153,7 @@ The singleton TTS backend blocker described in the previous version of this doc 
 - **HF XET progress**: Large files downloaded via `hf-xet` (HuggingFace's new transfer backend) report `n=0` in tqdm updates. Progress bars may appear stuck for large `.safetensors` files even though the download is proceeding. This is a known upstream limitation.
 - **Chatterbox Turbo upstream token bug**: `from_pretrained()` passes `token=os.getenv("HF_TOKEN") or True` which fails without a stored HF token. Our backend works around this by calling `snapshot_download(token=None)` + `from_local()`.
 - **chatterbox-tts must install with `--no-deps`**: It pins `numpy<1.26`, `torch==2.6.0`, `transformers==4.46.3` — all incompatible with our stack (Python 3.12, torch 2.10, transformers 4.57.3). Sub-deps listed explicitly in `requirements.txt`.
+- **Instruct parameter is non-functional** (#224): The UI exposes an instruct text field, but it's silently dropped by every backend. The Qwen3-TTS Base model we ship only supports voice cloning — instruct requires the separate CustomVoice model variant (`Qwen3-TTS-12Hz-1.7B-CustomVoice`), which uses predefined speakers instead of ref audio. The instruct UI should be hidden until a backend with real support is integrated.
 - **Streaming generation** only works for Qwen on MLX. Other engines use the non-streaming `/generate` endpoint.
 - **dicta-onnx** (Hebrew diacritization) not included — upstream Chatterbox bug requires `model_path` arg but calls `Dicta()` with none. Hebrew works fine without it.
 
@@ -323,41 +328,43 @@ Notable requests:
 
 ### Models Worth Supporting (2026 SOTA — updated March 13)
 
-| Model | Cloning | Speed | Sample Rate | Languages | VRAM | Integration Ease | Status |
-|-------|---------|-------|-------------|-----------|------|-----------------|--------|
-| **Qwen3-TTS** | 10s zero-shot | Medium | 24 kHz | 10 | Medium | **Shipped** | v0.1.13 |
-| **LuxTTS** | 3s zero-shot | 150x RT, CPU ok | 48 kHz | English | <1 GB | **Shipped** | PR #254 |
-| **Chatterbox MTL** | 5s zero-shot | Medium | 24 kHz | 23 | Medium | **Shipped** | PR #257 |
-| **Chatterbox Turbo** | 5s zero-shot | Fast | 24 kHz | English | Low | **PR #258** | In review |
-| **HumeAI TADA 1B/3B** | Zero-shot | 5× faster than LLM-TTS | — | EN (1B), Multilingual (3B) | Medium | Needs vetting | MIT, 700s+ coherent, synced transcript output |
-| **MOSS-TTS Family** | Zero-shot | — | — | Multilingual | Medium | Needs vetting | Apache 2.0, multi-speaker dialogue, text-to-voice design (no ref audio) |
-| **VoxCPM 1.5** | Zero-shot (seconds) | ~0.15 RTF streaming | — | Bilingual (EN/ZH) | Medium | Needs vetting | Apache 2.0, tokenizer-free continuous diffusion, LoRA-friendly |
-| **Pocket TTS** | Zero-shot + streaming | >1× RT on CPU | — | English | ~100M params, CPU-first | Needs vetting | MIT, Kyutai Labs, no GPU required |
-| **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny (82M) | Ready | Apache 2.0, multi-engine arch in place |
-| **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Ready | Multi-engine arch in place |
-| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | Ready | Multi-engine arch in place |
-| **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | Ready | Multi-engine arch in place |
+| Model | Cloning | Speed | Sample Rate | Languages | VRAM | Instruct Support | Integration Ease | Status |
+|-------|---------|-------|-------------|-----------|------|-----------------|-----------------|--------|
+| **Qwen3-TTS** | 10s zero-shot | Medium | 24 kHz | 10 | Medium | None (Base); Yes (CustomVoice variant, predefined speakers only) | **Shipped** | v0.1.13 |
+| **LuxTTS** | 3s zero-shot | 150x RT, CPU ok | 48 kHz | English | <1 GB | None | **Shipped** | PR #254 |
+| **Chatterbox MTL** | 5s zero-shot | Medium | 24 kHz | 23 | Medium | Partial — `exaggeration` float | **Shipped** | PR #257 |
+| **Chatterbox Turbo** | 5s zero-shot | Fast | 24 kHz | English | Low | Partial — inline tags only | **PR #258** | In review |
+| **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | **Yes** — `inference_instruct2()`, works with cloning | Ready | Best instruct candidate |
+| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | **Yes** — inline text descriptions, word-level control | Ready | Multi-engine arch in place |
+| **MOSS-TTS Family** | Zero-shot | — | — | Multilingual | Medium | **Yes** — text prompts for style + timbre design | Needs vetting | Apache 2.0, multi-speaker dialogue |
+| **HumeAI TADA 1B/3B** | Zero-shot | 5× faster than LLM-TTS | — | EN (1B), Multilingual (3B) | Medium | Partial — automatic prosody from text context | Needs vetting | MIT, 700s+ coherent, synced transcript output |
+| **VoxCPM 1.5** | Zero-shot (seconds) | ~0.15 RTF streaming | — | Bilingual (EN/ZH) | Medium | Partial — automatic context-aware prosody | Needs vetting | Apache 2.0, tokenizer-free continuous diffusion |
+| **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny (82M) | Partial — automatic style inference | Ready | Apache 2.0, multi-engine arch in place |
+| **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Partial — style transfer from ref audio only | Ready | Multi-engine arch in place |
+| **Pocket TTS** | Zero-shot + streaming | >1× RT on CPU | — | English | ~100M params, CPU-first | None | Needs vetting | MIT, Kyutai Labs, no GPU required |
 
 #### Notes on New Candidates (March 2026)
 
-- **HumeAI TADA** — Text-Audio Dual Alignment arch. Near-zero hallucinations/drift, free synced transcript. 700+ seconds coherent audio. Best candidate for Stories long-form reliability. [HF: HumeAI/tada-1b](https://huggingface.co/HumeAI/tada-1b) | [GitHub: HumeAI/tada](https://github.com/HumeAI/tada)
-- **MOSS-TTS** — Modular suite: flagship cloning, MOSS-TTSD (multi-speaker dialogue), MOSS-VoiceGenerator (create voices from text descriptions, no ref audio). Unique UX for Stories voice design. [GitHub: OpenMOSS/MOSS-TTS](https://github.com/OpenMOSS/MOSS-TTS)
-- **VoxCPM 1.5** — Tokenizer-free continuous diffusion + autoregressive. No discrete token artifacts. Context-aware prosody/emotion, real-time streaming, LoRA fine-tuning. Trained on 1.8M+ hours. [GitHub: OpenBMB/VoxCPM](https://github.com/OpenBMB/VoxCPM)
-- **Pocket TTS** — 100M param CPU-first model from Kyutai Labs (Moshi team). Runs >1× realtime without GPU. Broadens hardware support significantly. [GitHub: kyutai-labs/pocket-tts](https://github.com/kyutai-labs/pocket-tts)
+- **CosyVoice2-0.5B** — Best candidate for instruct support. `inference_instruct2()` accepts a text instruct parameter for emotions, speed, volume, dialects — and it works alongside voice cloning. This is the closest match to what users expect from our instruct UI. [HF: FunAudioLLM/CosyVoice2-0.5B](https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B)
+- **HumeAI TADA** — Text-Audio Dual Alignment arch. Near-zero hallucinations/drift, free synced transcript. 700+ seconds coherent audio. Best candidate for Stories long-form reliability. Prosody/emotion is automatic from text context, not user-controllable. [HF: HumeAI/tada-1b](https://huggingface.co/HumeAI/tada-1b) | [GitHub: HumeAI/tada](https://github.com/HumeAI/tada)
+- **MOSS-TTS** — Modular suite: flagship cloning, MOSS-TTSD (multi-speaker dialogue), MOSS-VoiceGenerator (create voices from text descriptions). VoiceGenerator unifies timbre design and style control via text prompts, usable as a layer for downstream TTS including cloning. [HF: OpenMOSS-Team/MOSS-VoiceGenerator](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator) | [GitHub: OpenMOSS/MOSS-TTS](https://github.com/OpenMOSS/MOSS-TTS)
+- **Fish Speech** — Word-level fine-grained control using plain language descriptions inline in the script. Works with cloning. Note: Fish Audio S2 has a restrictive research license (commercial use requires approval), but the open-source Fish Speech model may differ. Needs license clarification. [fish.audio blog](https://fish.audio/blog/fish-audio-s2-fine-grained-ai-voice-control-at-the-word-level)
+- **VoxCPM 1.5** — Tokenizer-free continuous diffusion + autoregressive. No discrete token artifacts. Prosody/emotion is context-aware but automatic, not explicitly controllable via text prompt. Real-time streaming, LoRA fine-tuning. Trained on 1.8M+ hours. [GitHub: OpenBMB/VoxCPM](https://github.com/OpenBMB/VoxCPM)
+- **Pocket TTS** — 100M param CPU-first model from Kyutai Labs (Moshi team). Runs >1× realtime without GPU. No style control. Broadens hardware support significantly. [GitHub: kyutai-labs/pocket-tts](https://github.com/kyutai-labs/pocket-tts)
 - **Watch list:** MioTTS-2.6B (fast LLM-based EN/JP, vLLM compatible), Oolel-Voices (Soynade Research, expressive modular control)
-- **Skipped:** Fish Audio S2 — restrictive research license (commercial use requires approval), despite strong features
 
 ### Adding a New Engine (Now Straightforward)
 
-With the multi-engine architecture shipped, adding a new TTS engine requires:
+With the model config registry and shared `EngineModelSelector` component, adding a new TTS engine requires:
 
 1. **Create `backend/backends/<engine>_backend.py`** — implement `TTSBackend` protocol (~200-300 lines)
-2. **Register in `backend/backends/__init__.py`** — add to `TTS_ENGINES` dict + factory function
+2. **Register in `backend/backends/__init__.py`** — add `ModelConfig` entry + `TTS_ENGINES` entry + factory elif
 3. **Update `backend/models.py`** — add engine name to regex
-4. **Update `backend/main.py`** — add engine cases in generate, stream, model-status, download, delete (5 dispatch points)
-5. **Update frontend** — add to engine union type, form schema, model dropdown, language map (5-6 files)
+4. **Update frontend** — add to engine union type, `EngineModelSelector` options, form schema, language map (4 files)
 
-Total effort: **~1 day** for a well-documented model with a PyPI package.
+`main.py` requires **zero changes** — the registry handles all dispatch automatically.
+
+Total effort: **~1 day** for a well-documented model with a PyPI package. See `docs/plans/ADDING_TTS_ENGINES.md` for the full guide.
 
 ---
 
@@ -367,13 +374,13 @@ Total effort: **~1 day** for a well-documented model with a PyPI package.
 
 The singleton TTS backend was replaced with a thread-safe per-engine registry in PR #254. Multiple engines can now be loaded simultaneously.
 
-### 2. `main.py` is 2100+ Lines
+### ~~2. `main.py` Dispatch Point Duplication~~ — RESOLVED
 
-All API routes, all model configs, all business logic in one file. Five separate dispatch points for each engine. Any new engine touches this file in 5 places. A model config registry pattern would reduce duplication.
+Previously, each engine required updates to 6+ hardcoded dispatch maps across `main.py` (~320 lines of if/elif chains). A model config registry in `backend/backends/__init__.py` now centralizes all model metadata (`ModelConfig` dataclass) with helper functions (`load_engine_model()`, `check_model_loaded()`, `engine_needs_trim()`, etc.). Adding a new engine requires zero changes to `main.py`.
 
-### 3. Model Config is Scattered (Improved)
+### ~~3. Model Config is Scattered~~ — RESOLVED
 
-Model identifiers are still duplicated across `main.py` (3 dicts), backend files, frontend components, and the languages constant. However, the pattern is now consistent and well-understood. A centralized model registry would help but isn't blocking.
+Model identifiers, HF repo IDs, display names, and engine metadata are now consolidated in the `ModelConfig` registry. Backend-aware branching (e.g. MLX vs PyTorch Qwen repo IDs) happens inside the registry. Frontend model options are centralized in `EngineModelSelector.tsx`.
 
 ### 4. Voice Prompt Cache Assumes PyTorch Tensors
 
@@ -410,7 +417,7 @@ The generation form now uses a flat model dropdown with engine-based routing. Pe
 | 1 | **#253** — 48kHz speech tokenizer | Quality improvement | Medium |
 | 2 | **#161** — Docker deployment | Server/headless users | Medium |
 | 3 | **#154** — Audiobook tab | Long-form users | Medium |
-| 4 | **Model config registry** | Reduce 5-dispatch-point duplication in main.py | Medium |
+| 4 | ~~**Model config registry**~~ | ~~Reduce dispatch duplication in main.py~~ | **Done** |
 | 5 | **#225** — Custom HuggingFace models | User-supplied models | High (needs rework for multi-engine) |
 
 ### Tier 3 — Future (v0.3.0+)
@@ -421,7 +428,7 @@ The generation form now uses a flat model dropdown with engine-based routing. Pe
 | 2 | **Pocket TTS** (Kyutai) | CPU-first 100M model, broadens hardware support. Kyutai ships clean code. Needs API vetting. |
 | 3 | **MOSS-TTS** | Text-to-voice design (no ref audio) is unique. Multi-speaker dialogue for Stories. Needs thorough API vetting. |
 | 4 | **Kokoro-82M** | 82M params, CPU realtime, Apache 2.0. Easy win. |
-| 5 | **Model config registry refactor** | Reduce 5-dispatch-point duplication in main.py — do before adding 3+ more engines |
+| 5 | ~~**Model config registry refactor**~~ | **Done** — consolidated in `backend/backends/__init__.py` + `EngineModelSelector.tsx` |
 | 6 | XTTS-v2 / Fish Speech / CosyVoice | Multi-engine arch is ready; just needs backend implementation |
 | 7 | **VoxCPM 1.5** | Tokenizer-free streaming, interesting but uncertain integration surface |
 | 8 | OpenAI-compatible API (plan doc exists) | Low effort once API is stable |

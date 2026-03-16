@@ -14,9 +14,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from .config import get_data_dir
-from .utils.progress import get_progress_manager
-from . import __version__
+from ..config import get_data_dir
+from ..utils.progress import get_progress_manager
+from .. import __version__
 
 logger = logging.getLogger(__name__)
 

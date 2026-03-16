@@ -23,6 +23,7 @@ import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
+import { EngineModelSelector, getEngineDescription } from './EngineModelSelector';
 import { ParalinguisticInput } from './ParalinguisticInput';
 
 export function GenerationForm() {
@@ -117,53 +118,9 @@ export function GenerationForm() {
             <div className="grid gap-4 md:grid-cols-3">
               <FormItem>
                 <FormLabel>Model</FormLabel>
-                <Select
-                  value={
-                    form.watch('engine') === 'luxtts'
-                      ? 'luxtts'
-                      : form.watch('engine') === 'chatterbox'
-                        ? 'chatterbox'
-                        : form.watch('engine') === 'chatterbox_turbo'
-                          ? 'chatterbox_turbo'
-                          : `qwen:${form.watch('modelSize') || '1.7B'}`
-                  }
-                  onValueChange={(value) => {
-                    if (value === 'luxtts') {
-                      form.setValue('engine', 'luxtts');
-                      form.setValue('language', 'en');
-                    } else if (value === 'chatterbox') {
-                      form.setValue('engine', 'chatterbox');
-                    } else if (value === 'chatterbox_turbo') {
-                      form.setValue('engine', 'chatterbox_turbo');
-                      form.setValue('language', 'en');
-                    } else {
-                      const [, modelSize] = value.split(':');
-                      form.setValue('engine', 'qwen');
-                      form.setValue('modelSize', modelSize as '1.7B' | '0.6B');
-                    }
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="qwen:1.7B">Qwen3-TTS 1.7B</SelectItem>
-                    <SelectItem value="qwen:0.6B">Qwen3-TTS 0.6B</SelectItem>
-                    <SelectItem value="luxtts">LuxTTS</SelectItem>
-                    <SelectItem value="chatterbox">Chatterbox</SelectItem>
-                    <SelectItem value="chatterbox_turbo">Chatterbox Turbo</SelectItem>
-                  </SelectContent>
-                </Select>
+                <EngineModelSelector form={form} />
                 <FormDescription>
-                  {form.watch('engine') === 'luxtts'
-                    ? 'Fast, English-focused'
-                    : form.watch('engine') === 'chatterbox'
-                      ? '23 languages, incl. Hebrew'
-                      : form.watch('engine') === 'chatterbox_turbo'
-                        ? 'English, [laugh] [cough] tags'
-                        : 'Multi-language, two sizes'}
+                  {getEngineDescription(form.watch('engine') || 'qwen')}
                 </FormDescription>
               </FormItem>
 

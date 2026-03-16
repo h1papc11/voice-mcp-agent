@@ -14,12 +14,12 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from .database import (
+from ..database import (
     GenerationVersion as DBGenerationVersion,
     Generation as DBGeneration,
 )
-from .models import GenerationVersionResponse, EffectConfig
-from . import config
+from ..models import GenerationVersionResponse, EffectConfig
+from .. import config
 
 
 def _version_response(v: DBGenerationVersion) -> GenerationVersionResponse:

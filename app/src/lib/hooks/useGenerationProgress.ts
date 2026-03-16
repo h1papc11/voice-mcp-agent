@@ -8,7 +8,7 @@ import { useServerStore } from '@/stores/serverStore';
 
 interface GenerationStatusEvent {
   id: string;
-  status: 'generating' | 'completed' | 'failed' | 'not_found';
+  status: 'loading_model' | 'generating' | 'completed' | 'failed' | 'not_found';
   duration?: number;
   error?: string;
 }

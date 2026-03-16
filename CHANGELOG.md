@@ -66,14 +66,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI client generator script now documents the local backend port and avoids an unused loop variable warning
 
 ### Added
-- **Makefile** - Comprehensive development workflow automation with commands for setup, development, building, testing, and code quality checks
-  - Includes Python version detection and compatibility warnings
-  - Self-documenting help system with `make help`
-  - Colored output for better readability
-  - Supports parallel development server execution
+- **justfile** - Comprehensive development workflow automation with commands for setup, development, building, testing, and code quality checks
+  - Cross-platform support (macOS, Linux, Windows)
+  - Python version detection and compatibility warnings
+  - Self-documenting help system with `just --list`
 
 ### Changed
-- **README** - Added Makefile reference and updated Quick Start with Makefile-based setup instructions alongside manual setup
+- **README** - Updated Quick Start with justfile-based setup instructions
+
+### Removed
+- **Makefile** - Replaced by justfile (cross-platform, simpler syntax)
 
 ---
 

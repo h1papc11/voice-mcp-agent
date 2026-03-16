@@ -12,16 +12,11 @@ from pathlib import Path
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from .models import VoiceProfileResponse
-from .database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration, GenerationVersion as DBGenerationVersion
+from ..models import VoiceProfileResponse
+from ..database import VoiceProfile as DBVoiceProfile, ProfileSample as DBProfileSample, Generation as DBGeneration, GenerationVersion as DBGenerationVersion
 from .profiles import create_profile, add_profile_sample
-from .models import VoiceProfileCreate
-from . import config
-
-
-def _get_profiles_dir() -> Path:
-    """Get profiles directory from config."""
-    return config.get_profiles_dir()
+from ..models import VoiceProfileCreate
+from .. import config
 
 
 def _get_unique_profile_name(name: str, db: Session) -> str:
@@ -99,7 +94,7 @@ def export_profile_to_zip(profile_id: str, db: Session) -> bytes:
 
         # Create samples.json mapping
         samples_data = {}
-        profile_dir = _get_profiles_dir() / profile_id
+        profile_dir = config.get_profiles_dir() / profile_id
 
         for sample in samples:
             # Get filename from audio_path (should be {sample_id}.wav)
@@ -181,7 +176,7 @@ async def import_profile_from_zip(file_bytes: bytes, db: Session) -> VoiceProfil
             profile = await create_profile(profile_create, db)
 
             # Extract and add samples
-            profile_dir = _get_profiles_dir() / profile.id
+            profile_dir = config.get_profiles_dir() / profile.id
             profile_dir.mkdir(parents=True, exist_ok=True)
 
             # Handle avatar if present
@@ -351,7 +346,7 @@ async def import_generation_from_zip(file_bytes: bytes, db: Session) -> dict:
     import tempfile
     import shutil
     from datetime import datetime
-    from . import config
+    from .. import config
     
     zip_buffer = io.BytesIO(file_bytes)
     
