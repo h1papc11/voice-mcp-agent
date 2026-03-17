@@ -171,9 +171,9 @@ def build_server(cuda=False):
             "tqdm",
             "--hidden-import",
             "requests",
-            "--collect-submodules",
-            "qwen_tts",
-            "--collect-data",
+            # qwen_tts uses inspect.getsource() at runtime to locate
+            # modeling_qwen3_tts.py — needs physical .py source files bundled
+            "--collect-all",
             "qwen_tts",
             # Fix for pkg_resources and jaraco namespace packages
             "--hidden-import",
