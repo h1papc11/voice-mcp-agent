@@ -276,6 +276,12 @@ just build          # Build CPU server binary + Tauri app
 just build-local    # (Windows) Build CPU + CUDA server binaries + Tauri app
 ```
 
+### Adding New Voice Models
+
+The multi-engine architecture makes adding new TTS engines straightforward. A [step-by-step guide](docs/content/docs/developer/tts-engines.mdx) covers the full process: dependency research, backend protocol implementation, frontend wiring, and PyInstaller bundling.
+
+The guide is optimized for AI coding agents. An [agent skill](.agents/skills/add-tts-engine/SKILL.md) can pick up a model name and handle the entire integration autonomously — you just test the build locally.
+
 ### Project Structure
 
 ```
