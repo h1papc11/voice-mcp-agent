@@ -34,9 +34,15 @@ def build_server(cuda=False):
     binary_name = "voicebox-server-cuda" if cuda else "voicebox-server"
 
     # PyInstaller arguments
+    # CUDA builds use --onedir so we can split the output into two archives:
+    #   1. Server core (~200-400MB) — versioned with the app
+    #   2. CUDA libs (~2GB) — versioned independently (only redownloaded on
+    #      CUDA toolkit / torch major version changes)
+    # CPU builds remain --onefile for simplicity.
+    pack_mode = "--onedir" if cuda else "--onefile"
     args = [
         "server.py",  # Use server.py as entry point instead of main.py
-        "--onefile",
+        pack_mode,
         "--name",
         binary_name,
     ]

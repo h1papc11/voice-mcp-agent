@@ -1,6 +1,12 @@
 """
 Split a large binary into chunks for GitHub Releases (<2 GB each).
 
+DEPRECATED: For CUDA builds, use scripts/package_cuda.py instead.
+This script was used when the CUDA binary was built with --onefile and
+needed to be split into parts for the 2GB GitHub Release asset limit.
+With the switch to --onedir + dual archives (server core + CUDA libs),
+package_cuda.py handles the packaging.
+
 Usage:
     python scripts/split_binary.py backend/dist/voicebox-server-cuda.exe
     python scripts/split_binary.py backend/dist/voicebox-server-cuda.exe --chunk-size 1900000000
@@ -34,7 +40,7 @@ def split(input_path: Path, chunk_size: int, output_dir: Path):
         part_index = len(parts)
         part_name = f"{input_path.stem}.part{part_index:02d}{input_path.suffix}"
         part_path = output_dir / part_name
-        part_path.write_bytes(data[i:i + chunk_size])
+        part_path.write_bytes(data[i : i + chunk_size])
         parts.append(part_name)
 
     # Write manifest (ordered list of part filenames)

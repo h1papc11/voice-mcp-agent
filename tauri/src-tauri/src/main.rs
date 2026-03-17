@@ -197,22 +197,24 @@ async fn start_server(
     println!("Data directory: {:?}", data_dir);
     println!("Remote mode: {}", remote.unwrap_or(false));
 
-    // Check for CUDA backend binary in data directory
+    // Check for CUDA backend in data directory (onedir layout: backends/cuda/)
     let cuda_binary = {
-        let backends_dir = data_dir.join("backends");
+        let cuda_dir = data_dir.join("backends").join("cuda");
         let cuda_name = if cfg!(windows) {
             "voicebox-server-cuda.exe"
         } else {
             "voicebox-server-cuda"
         };
-        let path = backends_dir.join(cuda_name);
-        if path.exists() {
-            println!("Found CUDA backend binary at {:?}", path);
+        let exe_path = cuda_dir.join(cuda_name);
+        if exe_path.exists() {
+            println!("Found CUDA backend at {:?}", cuda_dir);
 
-            // Version check: run --version and compare to app version
+            // Version check: run --version from the onedir directory so
+            // PyInstaller can find its support files for the fast --version path
             let app_version = app.config().version.clone().unwrap_or_default();
-            let version_ok = match std::process::Command::new(&path)
+            let version_ok = match std::process::Command::new(&exe_path)
                 .arg("--version")
+                .current_dir(&cuda_dir)
                 .output()
             {
                 Ok(output) => {
@@ -237,7 +239,7 @@ async fn start_server(
             };
 
             if version_ok {
-                Some(path)
+                Some(exe_path)
             } else {
                 None
             }
@@ -300,10 +302,14 @@ async fn start_server(
         println!("Custom models directory: {}", dir);
     }
 
-    // If CUDA binary exists, launch it directly instead of the bundled sidecar
+    // If CUDA binary exists, launch it from the onedir directory.
+    // .current_dir() is critical: PyInstaller onedir expects all DLLs and
+    // support files (nvidia/, _internal/, etc.) relative to the exe.
     let spawn_result = if let Some(ref cuda_path) = cuda_binary {
-        println!("Launching CUDA backend: {:?}", cuda_path);
+        let cuda_dir = cuda_path.parent().unwrap();
+        println!("Launching CUDA backend: {:?} (cwd: {:?})", cuda_path, cuda_dir);
         let mut cmd = app.shell().command(cuda_path.to_str().unwrap());
+        cmd = cmd.current_dir(cuda_dir);
         cmd = cmd.args(["--data-dir", &data_dir_str, "--port", &port_str, "--parent-pid", &parent_pid_str]);
         if is_remote {
             cmd = cmd.args(["--host", "0.0.0.0"]);
