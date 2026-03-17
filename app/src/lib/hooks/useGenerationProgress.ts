@@ -75,8 +75,8 @@ export function useGenerationProgress() {
             currentSources.delete(id);
             removePendingGeneration(id);
 
-            // Refresh history to pick up the completed generation
-            queryClient.invalidateQueries({ queryKey: ['history'] });
+            // Refetch history to pick up the completed generation
+            queryClient.refetchQueries({ queryKey: ['history'] });
 
             // If this generation was queued for a story, add it now
             const storyId = removePendingStoryAdd(id);
@@ -120,7 +120,7 @@ export function useGenerationProgress() {
             removePendingGeneration(id);
             removePendingStoryAdd(id);
 
-            queryClient.invalidateQueries({ queryKey: ['history'] });
+            queryClient.refetchQueries({ queryKey: ['history'] });
 
             toast({
               title: data.status === 'not_found' ? 'Generation not found' : 'Generation failed',
@@ -134,11 +134,12 @@ export function useGenerationProgress() {
       };
 
       source.onerror = () => {
-        // EventSource auto-reconnects, but if we get repeated errors
-        // just clean up
+        // SSE connection dropped — clean up and refresh history so any
+        // completed/failed generation still appears in the list
         source.close();
         currentSources.delete(id);
         removePendingGeneration(id);
+        queryClient.refetchQueries({ queryKey: ['history'] });
       };
 
       currentSources.set(id, source);

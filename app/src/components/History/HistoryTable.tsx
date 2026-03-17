@@ -153,13 +153,28 @@ export function HistoryTable() {
     }
   }, [historyData, page]);
 
-  // Reset to page 0 when deletions or imports occur
+  // Reset to page 0 when deletions, imports, or generation completions occur
+  const pendingCount = useGenerationStore((state) => state.pendingGenerationIds.size);
+  const prevPendingCountRef = useRef(pendingCount);
   useEffect(() => {
     if (deleteGeneration.isSuccess || importGeneration.isSuccess) {
       setPage(0);
       setAllHistory([]);
     }
   }, [deleteGeneration.isSuccess, importGeneration.isSuccess]);
+
+  useEffect(() => {
+    // A generation finished (pending count decreased) — scroll back to show it
+    if (
+      prevPendingCountRef.current > 0 &&
+      pendingCount < prevPendingCountRef.current &&
+      page !== 0
+    ) {
+      setPage(0);
+      setAllHistory([]);
+    }
+    prevPendingCountRef.current = pendingCount;
+  }, [pendingCount, page]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
