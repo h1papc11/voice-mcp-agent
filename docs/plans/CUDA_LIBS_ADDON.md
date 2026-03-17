@@ -170,4 +170,4 @@ PyInstaller onedir creates a parent bootloader + child Python process on Windows
 5. Update `main.rs`: change launch path to `backends/cuda/` dir + add `.current_dir()`
 6. Add `ensure_cuda_structure()` helper in Rust to verify exe + nvidia/ subdirs exist before spawning
 7. Update CI pipeline: `build-cuda-windows` produces two archives instead of split parts
-8. Update `split_binary.py` or replace with archive-based distribution
+8. ~~Update `split_binary.py` or replace with archive-based distribution~~ Done: replaced with `package_cuda.py`

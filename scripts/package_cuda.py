@@ -19,41 +19,67 @@ import sys
 import tarfile
 from pathlib import Path
 
-# Directories / prefixes that belong in the CUDA libs archive.
-# PyInstaller --onedir puts NVIDIA packages in nvidia/ subdirectories
-# (e.g. nvidia/cublas/lib/, nvidia/cudnn/lib/, etc.)
-NVIDIA_PREFIXES = (
-    "nvidia/",
-    "nvidia\\",
-)
-
-# Individual DLL patterns that may end up at the top level on Windows
+# DLL name prefixes that identify NVIDIA CUDA runtime libraries.
+# These DLLs may appear in different locations depending on the torch
+# and PyInstaller version:
+#   - nvidia/ subdirectories (older torch with separate nvidia-* packages)
+#   - _internal/torch/lib/ (torch 2.10+ bundles NVIDIA DLLs directly)
+#   - Top-level directory (some PyInstaller versions)
 NVIDIA_DLL_PREFIXES = (
     "cublas",
+    "cublaslt",
     "cudart",
     "cudnn",
     "cufft",
+    "cufftw",
     "curand",
     "cusolver",
+    "cusolvermg",
     "cusparse",
     "nvjitlink",
     "nvrtc",
+    "nccl",
+    "caffe2_nvrtc",
 )
+
+# Files to keep in the server core even if they match NVIDIA prefixes.
+# These are small Python modules or stubs, not the large runtime DLLs.
+NVIDIA_KEEP_IN_CORE = {
+    "torch/cuda/nccl.py",
+    "torch/_inductor/codegen/cuda/cutlass_lib_extensions/cutlass_mock_imports/cuda/cudart.py",
+}
 
 
 def is_nvidia_file(rel_path: str) -> bool:
-    """Check if a relative path belongs to the NVIDIA CUDA libs."""
+    """Check if a relative path belongs to the NVIDIA CUDA libs.
+
+    Identifies large NVIDIA runtime DLLs (.dll/.so) regardless of where
+    PyInstaller placed them. Excludes small Python stubs that happen to
+    share NVIDIA-related names.
+    """
     rel_lower = rel_path.lower().replace("\\", "/")
 
-    # Files under nvidia/ subdirectory tree
-    if rel_lower.startswith("nvidia/"):
-        return True
+    # Never split out Python source files or small stubs
+    if rel_lower in NVIDIA_KEEP_IN_CORE:
+        return False
 
-    # Top-level NVIDIA DLLs (Windows) — e.g. cublas64_12.dll
-    name = rel_lower.rsplit("/", 1)[-1]
-    for prefix in NVIDIA_DLL_PREFIXES:
-        if name.startswith(prefix) and (name.endswith(".dll") or name.endswith(".so")):
+    # Files under nvidia/ subdirectory tree (older torch layout)
+    if rel_lower.startswith("nvidia/") or "nvidia/" in rel_lower.split("/", 1)[-1:]:
+        # Only DLLs/shared objects — not .py, .dist-info, etc.
+        if rel_lower.endswith((".dll", ".so")):
             return True
+        # Include entire nvidia/ namespace package tree
+        for part in rel_lower.split("/"):
+            if part == "nvidia":
+                return True
+
+    # NVIDIA DLLs anywhere in the tree (e.g. _internal/torch/lib/cublas64_12.dll)
+    name = rel_lower.rsplit("/", 1)[-1]
+    if name.endswith(".dll") or name.endswith(".so"):
+        name_no_ext = name.rsplit(".", 1)[0]
+        for prefix in NVIDIA_DLL_PREFIXES:
+            if name_no_ext.startswith(prefix):
+                return True
 
     return False
 
@@ -186,8 +212,8 @@ def main():
     parser.add_argument(
         "--torch-compat",
         type=str,
-        default=">=2.6.0,<2.8.0",
-        help="Torch version compatibility range (default: >=2.6.0,<2.8.0)",
+        default=">=2.6.0,<2.11.0",
+        help="Torch version compatibility range (default: >=2.6.0,<2.11.0)",
     )
     args = parser.parse_args()
 
