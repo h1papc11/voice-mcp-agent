@@ -149,12 +149,12 @@ fn main() {
         }
     }
 
-    // On non-macOS, create empty stub files for the macOS-only resources
-    // so Tauri's resource bundler doesn't fail on missing paths
-    #[cfg(not(target_os = "macos"))]
+    // Ensure all resource files exist so Tauri's bundler doesn't fail.
+    // On non-macOS these are always stubs. On macOS, actool may not produce
+    // Assets.car if the Xcode version doesn't support the .icon format.
     {
-        let stubs = ["Assets.car", "voicebox.icns", "partial.plist"];
-        for name in stubs {
+        let required = ["Assets.car", "voicebox.icns", "partial.plist"];
+        for name in required {
             let path = format!("{}/{}", gen_dir, name);
             if !std::path::Path::new(&path).exists() {
                 std::fs::write(&path, b"").ok();
