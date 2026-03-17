@@ -33,6 +33,11 @@ s3tokenizer
 spacy-pkuseg
 pyloudnorm
 
+# HumeAI TADA sub-dependencies (hume-tada itself is installed
+# --no-deps in the setup script because it pins torch>=2.7,<2.8)
+descript-audio-codec>=1.0.0
+torchaudio
+
 # Audio processing
 librosa>=0.10.0
 soundfile>=0.12.0

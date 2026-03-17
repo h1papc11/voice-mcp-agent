@@ -62,6 +62,7 @@ jobs:
           pip install pyinstaller
           pip install -r backend/requirements.txt
           pip install --no-deps chatterbox-tts
+          pip install --no-deps hume-tada
 
       - name: Install MLX dependencies (Apple Silicon only)
         if: matrix.backend == 'mlx'
@@ -188,6 +189,7 @@ jobs:
           pip install pyinstaller
           pip install -r backend/requirements.txt
           pip install --no-deps chatterbox-tts
+          pip install --no-deps hume-tada
 
       - name: Install PyTorch with CUDA 12.6
         run: |

@@ -166,6 +166,7 @@ TTS_ENGINES = {
     "luxtts": "LuxTTS",
     "chatterbox": "Chatterbox TTS",
     "chatterbox_turbo": "Chatterbox Turbo",
+    "tada": "TADA",
 }
 
 
@@ -259,6 +260,24 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             needs_trim=True,
             languages=["en"],
         ),
+        ModelConfig(
+            model_name="tada-1b",
+            display_name="TADA 1B (English)",
+            engine="tada",
+            hf_repo_id="HumeAI/tada-1b",
+            model_size="1B",
+            size_mb=4000,
+            languages=["en"],
+        ),
+        ModelConfig(
+            model_name="tada-3b-ml",
+            display_name="TADA 3B Multilingual",
+            engine="tada",
+            hf_repo_id="HumeAI/tada-3b-ml",
+            model_size="3B",
+            size_mb=8000,
+            languages=["en", "ar", "zh", "de", "es", "fr", "it", "ja", "pl", "pt"],
+        ),
     ]
 
 
@@ -339,10 +358,12 @@ def engine_has_model_sizes(engine: str) -> bool:
 
 
 async def load_engine_model(engine: str, model_size: str = "default") -> None:
-    """Load a model for the given engine, handling the Qwen model_size special case."""
+    """Load a model for the given engine, handling engines with multiple model sizes."""
     backend = get_tts_backend_for_engine(engine)
     if engine == "qwen":
         await backend.load_model_async(model_size)
+    elif engine == "tada":
+        await backend.load_model(model_size)
     else:
         await backend.load_model()
 
@@ -358,7 +379,7 @@ async def ensure_model_cached_or_raise(engine: str, model_size: str = "default")
             cfg = c
             break
 
-    if engine == "qwen":
+    if engine in ("qwen", "tada"):
         if not backend._is_model_cached(model_size):
             raise HTTPException(
                 status_code=400,
@@ -490,6 +511,10 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
             from .chatterbox_turbo_backend import ChatterboxTurboTTSBackend
 
             backend = ChatterboxTurboTTSBackend()
+        elif engine == "tada":
+            from .hume_backend import HumeTadaBackend
+
+            backend = HumeTadaBackend()
         else:
             raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
 

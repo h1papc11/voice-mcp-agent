@@ -15,9 +15,9 @@ const generationSchema = z.object({
   text: z.string().min(1, '').max(50000),
   language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
   seed: z.number().int().optional(),
-  modelSize: z.enum(['1.7B', '0.6B']).optional(),
+  modelSize: z.enum(['1.7B', '0.6B', '1B', '3B']).optional(),
   instruct: z.string().max(500).optional(),
-  engine: z.enum(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo']).optional(),
+  engine: z.enum(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo', 'tada']).optional(),
 });
 
 export type GenerationFormValues = z.infer<typeof generationSchema>;
@@ -79,7 +79,9 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
             ? 'chatterbox-tts'
             : engine === 'chatterbox_turbo'
               ? 'chatterbox-turbo'
-              : `qwen-tts-${data.modelSize}`;
+              : engine === 'tada'
+                ? `tada-${(data.modelSize || '1B').toLowerCase()}`
+                : `qwen-tts-${data.modelSize}`;
       const displayName =
         engine === 'luxtts'
           ? 'LuxTTS'
@@ -87,9 +89,13 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
             ? 'Chatterbox TTS'
             : engine === 'chatterbox_turbo'
               ? 'Chatterbox Turbo'
-              : data.modelSize === '1.7B'
-                ? 'Qwen TTS 1.7B'
-                : 'Qwen TTS 0.6B';
+              : engine === 'tada'
+                ? data.modelSize === '3B'
+                  ? 'TADA 3B Multilingual'
+                  : 'TADA 1B'
+                : data.modelSize === '1.7B'
+                  ? 'Qwen TTS 1.7B'
+                  : 'Qwen TTS 0.6B';
 
       // Check if model needs downloading
       try {
@@ -104,7 +110,7 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         console.error('Failed to check model status:', error);
       }
 
-      const isQwen = engine === 'qwen';
+      const hasModelSizes = engine === 'qwen' || engine === 'tada';
       const effectsChain = options.getEffectsChain?.();
       // This now returns immediately with status="generating"
       const result = await generation.mutateAsync({
@@ -112,9 +118,9 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
         text: data.text,
         language: data.language,
         seed: data.seed,
-        model_size: isQwen ? data.modelSize : undefined,
+        model_size: hasModelSizes ? data.modelSize : undefined,
         engine,
-        instruct: isQwen ? data.instruct || undefined : undefined,
+        instruct: engine === 'qwen' ? data.instruct || undefined : undefined,
         max_chunk_chars: maxChunkChars,
         crossfade_ms: crossfadeMs,
         normalize: normalizeAudio,
