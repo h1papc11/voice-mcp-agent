@@ -80,7 +80,9 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
             : engine === 'chatterbox_turbo'
               ? 'chatterbox-turbo'
               : engine === 'tada'
-                ? `tada-${(data.modelSize || '1B').toLowerCase()}`
+                ? data.modelSize === '3B'
+                  ? 'tada-3b-ml'
+                  : 'tada-1b'
                 : `qwen-tts-${data.modelSize}`;
       const displayName =
         engine === 'luxtts'
