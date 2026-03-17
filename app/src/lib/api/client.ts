@@ -32,6 +32,7 @@ import type {
   TranscriptionResponse,
   VoiceProfileCreate,
   VoiceProfileResponse,
+  WhisperModelSize,
 } from './types';
 
 class ApiClient {
@@ -318,11 +319,18 @@ class ApiClient {
   }
 
   // Transcription
-  async transcribeAudio(file: File, language?: LanguageCode): Promise<TranscriptionResponse> {
+  async transcribeAudio(
+    file: File,
+    language?: LanguageCode,
+    model?: WhisperModelSize,
+  ): Promise<TranscriptionResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (language) {
       formData.append('language', language);
+    }
+    if (model) {
+      formData.append('model', model);
     }
 
     const url = `${this.getBaseUrl()}/transcribe`;

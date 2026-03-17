@@ -99,8 +99,11 @@ export interface HistoryListResponse {
   total: number;
 }
 
+export type WhisperModelSize = 'base' | 'small' | 'medium' | 'large' | 'turbo';
+
 export interface TranscriptionRequest {
   language?: LanguageCode;
+  model?: WhisperModelSize;
 }
 
 export interface TranscriptionResponse {

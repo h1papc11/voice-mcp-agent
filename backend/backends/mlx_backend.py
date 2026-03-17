@@ -345,18 +345,20 @@ class MLXSTTBackend:
         self,
         audio_path: str,
         language: Optional[str] = None,
+        model_size: Optional[str] = None,
     ) -> str:
         """
         Transcribe audio to text.
 
         Args:
             audio_path: Path to audio file
-            language: Optional language hint (en or zh)
+            language: Optional language hint
+            model_size: Optional model size override
 
         Returns:
             Transcribed text
         """
-        await self.load_model_async(None)
+        await self.load_model_async(model_size)
 
         def _transcribe_sync():
             """Run synchronous transcription in thread pool."""
