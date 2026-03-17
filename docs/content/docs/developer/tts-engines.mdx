@@ -80,6 +80,15 @@ grep -r 'token=True\|token=os.getenv' .
 
 # Float64/Float32 assumptions — librosa returns float64, many models assume float32
 grep -r "torch.from_numpy\|\.double()\|float64" .
+
+# @torch.jit.script — calls inspect.getsource(), crashes in frozen builds
+grep -r "@torch.jit.script\|torch.jit.script" .
+
+# torchaudio.load — requires torchcodec in torchaudio 2.10+, use soundfile.read() instead
+grep -r "torchaudio.load\|torchaudio.save" .
+
+# Gated HuggingFace repos — models that hardcode gated repos as tokenizer/config sources
+grep -r "from_pretrained\|tokenizer_name\|AutoTokenizer" . | grep -i "llama\|meta-llama\|gated"
 ```
 
 ### 0.3 Install and Trace in a Throwaway Venv
@@ -270,6 +279,8 @@ In `app/src/lib/hooks/useGenerationForm.ts`:
 - Add engine-to-model-name mapping
 - Update payload construction for engine-specific fields
 
+**Watch out for model naming inconsistencies.** The HuggingFace repo name, the model size label, and the API model name don't always follow predictable patterns. For example, TADA's 3B model is named `tada-3b-ml` (not `tada-3b`), because it's a multilingual variant. Always check the actual repo names and build the frontend model name mapping from those, not from assumptions like `{engine}-{size}`.
+
 ### 3.5 Model Management
 
 In `app/src/components/ServerSettings/ModelManagement.tsx`:
@@ -391,6 +402,7 @@ These are actual production failures from shipping new engines. Every one of the
 | Chatterbox | `FileNotFoundError` for watermark model | `perth` ships pretrained model files (`hparams.yaml`, `.pth.tar`) that PyInstaller doesn't bundle by default | `--collect-all perth` |
 | All engines | `importlib.metadata` failures | Frozen binary doesn't include package metadata for `huggingface-hub`, `transformers`, etc. | `--copy-metadata` for each affected package |
 | All engines | Download progress bars stuck at 0% | `huggingface_hub` silently disables tqdm progress bars based on logger level in frozen builds — our progress tracker never receives byte updates | Force-enable tqdm's internal counter in `HFProgressTracker` |
+| TADA | `inspect.getsource` error in DAC's `Snake1d` | `@torch.jit.script` calls `inspect.getsource()` which fails without `.py` source files | Wrote a lightweight shim (`dac_shim.py`) reimplementing `Snake1d` without `@torch.jit.script`, registered fake `dac.*` modules in `sys.modules` |
 | All engines | `NameError: name 'obj' is not defined` on macOS | Python 3.12.0 has a [CPython bug](https://github.com/pyinstaller/pyinstaller/issues/7992) that corrupts bytecode when PyInstaller rewrites code objects | Upgrade to Python 3.12.13+ |
 | All engines | `resource_tracker` subprocess crash | `multiprocessing` in frozen binaries needs `freeze_support()` called before anything else | Added to `server.py` entry point |
 
@@ -480,6 +492,90 @@ def _get_device(self):
     return "cpu"  # Skip MPS
 ```
 
+### Gated HuggingFace repos as hardcoded config sources
+
+Some models hardcode a gated HuggingFace repo as their tokenizer or config source (e.g., TADA hardcodes `"meta-llama/Llama-3.2-1B"` in both its `AlignerConfig` and `TadaConfig`). This silently fails without HF authentication.
+
+**Fix:** Download from an ungated mirror and patch the config objects directly:
+
+```python
+# Download tokenizer from ungated mirror
+UNGATED_TOKENIZER = "unsloth/Llama-3.2-1B"
+tokenizer_path = snapshot_download(UNGATED_TOKENIZER, token=None)
+
+# Patch the model config to use the local path instead of the gated repo
+config = ModelConfig.from_pretrained(model_path)
+config.tokenizer_name = tokenizer_path
+model = ModelClass.from_pretrained(model_path, config=config)
+```
+
+**Do NOT monkey-patch `AutoTokenizer.from_pretrained`** — it's a classmethod, and replacing it corrupts the descriptor, which breaks other engines that use different tokenizers (e.g., Qwen uses a Qwen tokenizer via `AutoTokenizer`). Always patch at the config level, not the class method level.
+
+### `torchaudio.load()` requires `torchcodec` in 2.10+
+
+As of `torchaudio>=2.10`, `torchaudio.load()` requires the `torchcodec` package for audio I/O. If your engine or backend code uses `torchaudio.load()`, replace it with `soundfile`:
+
+```python
+# Before (breaks without torchcodec):
+import torchaudio
+waveform, sr = torchaudio.load("audio.wav")
+
+# After:
+import soundfile as sf
+import torch
+data, sr = sf.read("audio.wav", dtype="float32")
+waveform = torch.from_numpy(data).unsqueeze(0)
+```
+
+Note: `torchaudio.functional.resample()` and other pure-PyTorch math functions work fine without `torchcodec` — only the I/O functions are affected.
+
+### `@torch.jit.script` breaks in frozen builds
+
+`torch.jit.script` calls `inspect.getsource()` to parse the decorated function's source code. In a PyInstaller binary, `.py` source files aren't available, so this crashes at import time.
+
+**Fix:** Remove or avoid `@torch.jit.script` decorators. If the decorated function comes from an upstream dependency, write a shim that reimplements the function without the decorator (see "Toxic dependency chains" below).
+
+### Toxic dependency chains — the shim pattern
+
+Sometimes a model library depends on a package with a massive, hostile transitive dependency tree, but only uses a tiny piece of it. When the dependency chain is unbuildable or would pull in dozens of unwanted packages, the right move is to write a lightweight shim.
+
+**Example:** TADA depends on `descript-audio-codec` (DAC), which pulls in `descript-audiotools` -> `onnx`, `tensorboard`, `protobuf`, `matplotlib`, `pystoi`, etc. The `onnx` package fails to build from source on macOS. But TADA only uses `Snake1d` from DAC — a 7-line PyTorch module.
+
+**Solution:** Create a shim at `backend/utils/dac_shim.py` that registers fake modules in `sys.modules`:
+
+```python
+import sys
+import types
+import torch
+from torch import nn
+
+def snake(x, alpha):
+    """Snake activation — reimplemented without @torch.jit.script."""
+    return x + (1.0 / (alpha + 1e-9)) * torch.sin(alpha * x).pow(2)
+
+class Snake1d(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.alpha = nn.Parameter(torch.ones(1, channels, 1))
+    def forward(self, x):
+        return snake(x, self.alpha)
+
+# Register fake dac.* modules so "from dac.nn.layers import Snake1d" works
+_nn = types.ModuleType("dac.nn")
+_layers = types.ModuleType("dac.nn.layers")
+_layers.Snake1d = Snake1d
+_nn.layers = _layers
+
+for name, mod in [("dac", types.ModuleType("dac")),
+                   ("dac.nn", _nn), ("dac.nn.layers", _layers)]:
+    sys.modules[name] = mod
+```
+
+**Key rules for shims:**
+- Import the shim **before** importing the model library (so it finds the fake modules first)
+- Do NOT use `@torch.jit.script` in the shim (see above)
+- Only reimplement what the model actually uses — check the import chain carefully
+
 ## Upcoming Engines
 
 Based on the current model landscape, these are candidates for future integration:
@@ -490,7 +586,6 @@ Based on the current model landscape, these are candidates for future integratio
 | **Fish Speech** | 50+ | Medium | Word-level control via inline text | Ready |
 | **Kokoro-82M** | English | 82M | CPU realtime, Apache 2.0 | Ready |
 | **XTTS-v2** | 17+ | Medium | Zero-shot cloning | Ready |
-| **HumeAI TADA** | EN (1B), Multi (3B) | Medium | 700s+ coherent audio, synced transcripts | Shipped |
 | **MOSS-TTS** | Multilingual | Medium | Text-to-voice design, multi-speaker dialogue | Needs vetting |
 | **Pocket TTS** | English | ~100M | CPU-first, >1× realtime | Needs vetting |
 
@@ -508,6 +603,10 @@ Use this as a gate between phases. Do not proceed to the next phase until every 
 - [ ] Searched for `torch.load` calls missing `map_location`
 - [ ] Searched for `torch.from_numpy` without `.float()` cast
 - [ ] Searched for `token=True` or `token=os.getenv("HF_TOKEN")` in HuggingFace calls
+- [ ] Searched for `@torch.jit.script` / `torch.jit.script` (crashes in frozen builds)
+- [ ] Searched for `torchaudio.load` / `torchaudio.save` (requires `torchcodec` in 2.10+)
+- [ ] Searched for hardcoded gated HuggingFace repo names (e.g., `meta-llama/*`)
+- [ ] Evaluated whether any dependency is used minimally enough to shim instead of install
 - [ ] Tested model loading and generation on CPU in a throwaway venv
 - [ ] Tested with a clean HuggingFace cache (no pre-downloaded models)
 - [ ] Produced a written dependency audit documenting all findings

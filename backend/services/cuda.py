@@ -1,16 +1,22 @@
 """
-CUDA backend binary download, assembly, and verification.
+CUDA backend download, assembly, and verification.
 
-Downloads split parts of the CUDA-enabled voicebox-server binary from
-GitHub Releases, reassembles them, verifies integrity via SHA-256,
-and places the binary in the app's data directory for use on next
-backend restart.
+Downloads two archives from GitHub Releases:
+  1. Server core (voicebox-server-cuda.tar.gz) — the exe + non-NVIDIA deps,
+     versioned with the app.
+  2. CUDA libs (cuda-libs-{version}.tar.gz) — NVIDIA runtime libraries,
+     versioned independently (only redownloaded on CUDA toolkit bump).
+
+Both archives are extracted into {data_dir}/backends/cuda/ which forms the
+complete PyInstaller --onedir directory structure that torch expects.
 """
 
 import hashlib
+import json
 import logging
 import os
 import sys
+import tarfile
 from pathlib import Path
 from typing import Optional
 
@@ -24,6 +30,10 @@ GITHUB_RELEASES_URL = "https://github.com/jamiepine/voicebox/releases/download"
 
 PROGRESS_KEY = "cuda-backend"
 
+# The current expected CUDA libs version.  Bump this when we change the
+# CUDA toolkit version or torch's CUDA dependency changes (e.g. cu126 -> cu128).
+CUDA_LIBS_VERSION = "cu126-v1"
+
 
 def get_backends_dir() -> Path:
     """Directory where downloaded backend binaries are stored."""
@@ -32,19 +42,44 @@ def get_backends_dir() -> Path:
     return d
 
 
-def get_cuda_binary_name() -> str:
-    """Platform-specific CUDA binary filename."""
+def get_cuda_dir() -> Path:
+    """Directory where the CUDA backend (onedir) is extracted."""
+    d = get_backends_dir() / "cuda"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def get_cuda_exe_name() -> str:
+    """Platform-specific CUDA executable filename."""
     if sys.platform == "win32":
         return "voicebox-server-cuda.exe"
     return "voicebox-server-cuda"
 
 
 def get_cuda_binary_path() -> Optional[Path]:
-    """Return path to CUDA binary if it exists."""
-    p = get_backends_dir() / get_cuda_binary_name()
+    """Return path to the CUDA executable if it exists inside the onedir."""
+    p = get_cuda_dir() / get_cuda_exe_name()
     if p.exists():
         return p
     return None
+
+
+def get_cuda_libs_manifest_path() -> Path:
+    """Path to the cuda-libs.json manifest inside the CUDA dir."""
+    return get_cuda_dir() / "cuda-libs.json"
+
+
+def get_installed_cuda_libs_version() -> Optional[str]:
+    """Read the installed CUDA libs version from cuda-libs.json, or None."""
+    manifest_path = get_cuda_libs_manifest_path()
+    if not manifest_path.exists():
+        return None
+    try:
+        data = json.loads(manifest_path.read_text())
+        return data.get("version")
+    except Exception as e:
+        logger.warning(f"Could not read cuda-libs.json: {e}")
+        return None
 
 
 def is_cuda_active() -> bool:
@@ -60,25 +95,151 @@ def get_cuda_status() -> dict:
     progress_manager = get_progress_manager()
     cuda_path = get_cuda_binary_path()
     progress = progress_manager.get_progress(PROGRESS_KEY)
+    cuda_libs_version = get_installed_cuda_libs_version()
 
     return {
         "available": cuda_path is not None,
         "active": is_cuda_active(),
         "binary_path": str(cuda_path) if cuda_path else None,
+        "cuda_libs_version": cuda_libs_version,
         "downloading": progress is not None and progress.get("status") == "downloading",
         "download_progress": progress,
     }
 
 
-async def download_cuda_binary(version: Optional[str] = None):
-    """Download the CUDA backend binary from GitHub Releases.
+def _needs_server_download(version: Optional[str] = None) -> bool:
+    """Check if the server core archive needs to be (re)downloaded."""
+    cuda_path = get_cuda_binary_path()
+    if not cuda_path:
+        return True
+    # Check if the binary version matches the expected app version
+    installed = get_cuda_binary_version()
+    expected = version or __version__
+    if expected.startswith("v"):
+        expected = expected[1:]
+    return installed != expected
 
-    Downloads split parts listed in a manifest file, concatenates them,
-    and verifies the SHA-256 checksum for integrity. Atomic write
-    (temp file -> rename).
+
+def _needs_cuda_libs_download() -> bool:
+    """Check if the CUDA libs archive needs to be (re)downloaded."""
+    installed = get_installed_cuda_libs_version()
+    if installed is None:
+        return True
+    return installed != CUDA_LIBS_VERSION
+
+
+async def _download_and_extract_archive(
+    client,
+    url: str,
+    sha256_url: Optional[str],
+    dest_dir: Path,
+    label: str,
+    progress_offset: int,
+    total_size: int,
+):
+    """Download a .tar.gz archive and extract it into dest_dir.
 
     Args:
-        version: Version tag (e.g. "v0.2.0"). Defaults to current app version.
+        client: httpx.AsyncClient
+        url: URL of the .tar.gz archive
+        sha256_url: URL of the .sha256 checksum file (optional)
+        dest_dir: Directory to extract into
+        label: Human-readable label for progress updates
+        progress_offset: Byte offset for progress reporting (when downloading
+            multiple archives sequentially)
+        total_size: Total bytes across all downloads (for progress bar)
+    """
+    progress = get_progress_manager()
+    temp_path = dest_dir / f".download-{label.replace(' ', '-')}.tmp"
+
+    # Clean up leftover partial download
+    if temp_path.exists():
+        temp_path.unlink()
+
+    # Fetch expected checksum (fail-fast: never extract an unverified archive)
+    expected_sha = None
+    if sha256_url:
+        try:
+            sha_resp = await client.get(sha256_url)
+            sha_resp.raise_for_status()
+            expected_sha = sha_resp.text.strip().split()[0]
+            logger.info(f"{label}: expected SHA-256: {expected_sha[:16]}...")
+        except Exception as e:
+            raise RuntimeError(f"{label}: failed to fetch checksum from {sha256_url}") from e
+
+    # Stream download, verify, and extract — always clean up temp file
+    downloaded = 0
+    try:
+        async with client.stream("GET", url) as response:
+            response.raise_for_status()
+            with open(temp_path, "wb") as f:
+                async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    progress.update_progress(
+                        PROGRESS_KEY,
+                        current=progress_offset + downloaded,
+                        total=total_size,
+                        filename=f"Downloading {label}",
+                        status="downloading",
+                    )
+
+        # Verify integrity
+        if expected_sha:
+            progress.update_progress(
+                PROGRESS_KEY,
+                current=progress_offset + downloaded,
+                total=total_size,
+                filename=f"Verifying {label}...",
+                status="downloading",
+            )
+            sha256 = hashlib.sha256()
+            with open(temp_path, "rb") as f:
+                while True:
+                    data = f.read(1024 * 1024)
+                    if not data:
+                        break
+                    sha256.update(data)
+            actual = sha256.hexdigest()
+            if actual != expected_sha:
+                raise ValueError(
+                    f"{label} integrity check failed: expected {expected_sha[:16]}..., got {actual[:16]}..."
+                )
+            logger.info(f"{label}: integrity verified")
+
+        # Extract (use data filter for path traversal protection on Python 3.12+)
+        progress.update_progress(
+            PROGRESS_KEY,
+            current=progress_offset + downloaded,
+            total=total_size,
+            filename=f"Extracting {label}...",
+            status="downloading",
+        )
+        with tarfile.open(temp_path, "r:gz") as tar:
+            if sys.version_info >= (3, 12):
+                tar.extractall(path=dest_dir, filter="data")
+            else:
+                tar.extractall(path=dest_dir)
+
+        logger.info(f"{label}: extracted to {dest_dir}")
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+    return downloaded
+
+
+async def download_cuda_binary(version: Optional[str] = None):
+    """Download the CUDA backend (server core + CUDA libs if needed).
+
+    Downloads both archives from GitHub Releases, extracts them into
+    {data_dir}/backends/cuda/, and writes the cuda-libs.json manifest.
+
+    Only downloads what's needed:
+    - Server core: always redownloaded (versioned with app)
+    - CUDA libs: only if missing or version mismatch
+
+    Args:
+        version: Version tag (e.g. "v0.3.0"). Defaults to current app version.
     """
     import httpx
 
@@ -86,114 +247,91 @@ async def download_cuda_binary(version: Optional[str] = None):
         version = f"v{__version__}"
 
     progress = get_progress_manager()
-    binary_name = get_cuda_binary_name()
-    dest_dir = get_backends_dir()
-    final_path = dest_dir / binary_name
-    temp_path = dest_dir / f"{binary_name}.download"
+    cuda_dir = get_cuda_dir()
 
-    # Clean up any leftover partial download
-    if temp_path.exists():
-        temp_path.unlink()
+    need_server = _needs_server_download(version)
+    need_libs = _needs_cuda_libs_download()
 
-    logger.info(f"Starting CUDA backend download for {version}")
+    if not need_server and not need_libs:
+        logger.info("CUDA backend is up to date, nothing to download")
+        return
+
+    logger.info(
+        f"Starting CUDA backend download for {version} "
+        f"(server={'yes' if need_server else 'cached'}, "
+        f"libs={'yes' if need_libs else 'cached'})"
+    )
     progress.update_progress(
-        PROGRESS_KEY, current=0, total=0,
-        filename="Fetching manifest...", status="downloading",
+        PROGRESS_KEY,
+        current=0,
+        total=0,
+        filename="Preparing download...",
+        status="downloading",
     )
 
     base_url = f"{GITHUB_RELEASES_URL}/{version}"
-    stem = Path(binary_name).stem  # voicebox-server-cuda
+    server_archive = "voicebox-server-cuda.tar.gz"
+    libs_archive = f"cuda-libs-{CUDA_LIBS_VERSION}.tar.gz"
 
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-            # Fetch the manifest (list of split part filenames)
-            manifest_url = f"{base_url}/{stem}.manifest"
-            manifest_resp = await client.get(manifest_url)
-            manifest_resp.raise_for_status()
-            parts = [p.strip() for p in manifest_resp.text.strip().splitlines() if p.strip()]
-
-            if not parts:
-                raise ValueError("Empty manifest — no split parts found")
-
-            logger.info(f"Found {len(parts)} split parts to download")
-
-            # Fetch expected checksum (optional — for integrity verification)
-            expected_sha = None
-            try:
-                sha_url = f"{base_url}/{stem}.sha256"
-                sha_resp = await client.get(sha_url)
-                if sha_resp.status_code == 200:
-                    # Format: "sha256hex  filename\n"
-                    expected_sha = sha_resp.text.strip().split()[0]
-                    logger.info(f"Expected SHA-256: {expected_sha[:16]}...")
-            except Exception as e:
-                logger.warning(f"Could not fetch checksum file — skipping verification: {e}")
-
-            # Get total size across all parts by issuing HEAD requests
+            # Estimate total download size
             total_size = 0
-            for part_name in parts:
+            if need_server:
                 try:
-                    head_resp = await client.head(f"{base_url}/{part_name}")
-                    content_length = int(head_resp.headers.get("content-length", 0))
-                    total_size += content_length
+                    head = await client.head(f"{base_url}/{server_archive}")
+                    total_size += int(head.headers.get("content-length", 0))
                 except Exception:
                     pass
+            if need_libs:
+                try:
+                    head = await client.head(f"{base_url}/{libs_archive}")
+                    total_size += int(head.headers.get("content-length", 0))
+                except Exception:
+                    pass
+
             logger.info(f"Total download size: {total_size / 1024 / 1024:.1f} MB")
 
-            # Download and concatenate parts
-            total_downloaded = 0
-            with open(temp_path, "wb") as f:
-                for i, part_name in enumerate(parts):
-                    part_url = f"{base_url}/{part_name}"
-                    logger.info(f"Downloading part {i + 1}/{len(parts)}: {part_name}")
+            offset = 0
 
-                    async with client.stream("GET", part_url) as response:
-                        response.raise_for_status()
-                        async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
-                            f.write(chunk)
-                            total_downloaded += len(chunk)
-                            progress.update_progress(
-                                PROGRESS_KEY, current=total_downloaded, total=total_size,
-                                filename=f"Downloading CUDA backend ({i + 1}/{len(parts)})",
-                                status="downloading",
-                            )
-
-        # Verify integrity if checksum was available
-        if expected_sha:
-            progress.update_progress(
-                PROGRESS_KEY, current=total_downloaded, total=total_downloaded,
-                filename="Verifying integrity...", status="downloading",
-            )
-            sha256 = hashlib.sha256()
-            with open(temp_path, "rb") as f:
-                while True:
-                    chunk = f.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    sha256.update(chunk)
-
-            actual = sha256.hexdigest()
-            if actual != expected_sha:
-                raise ValueError(
-                    f"Integrity check failed: expected {expected_sha[:16]}..., "
-                    f"got {actual[:16]}..."
+            # Download server core
+            if need_server:
+                server_downloaded = await _download_and_extract_archive(
+                    client,
+                    url=f"{base_url}/{server_archive}",
+                    sha256_url=f"{base_url}/{server_archive}.sha256",
+                    dest_dir=cuda_dir,
+                    label="CUDA server",
+                    progress_offset=offset,
+                    total_size=total_size,
                 )
-            logger.info(f"Integrity verified: {actual[:16]}...")
+                offset += server_downloaded
 
-        # Atomic move into place (replace handles existing target on all platforms)
-        temp_path.replace(final_path)
+                # Make executable on Unix
+                exe_path = cuda_dir / get_cuda_exe_name()
+                if sys.platform != "win32" and exe_path.exists():
+                    exe_path.chmod(0o755)
 
-        # Make executable on Unix
-        if sys.platform != "win32":
-            final_path.chmod(0o755)
+            # Download CUDA libs
+            if need_libs:
+                await _download_and_extract_archive(
+                    client,
+                    url=f"{base_url}/{libs_archive}",
+                    sha256_url=f"{base_url}/{libs_archive}.sha256",
+                    dest_dir=cuda_dir,
+                    label="CUDA libraries",
+                    progress_offset=offset,
+                    total_size=total_size,
+                )
 
-        logger.info(f"CUDA backend downloaded to {final_path}")
+                # Write local cuda-libs.json manifest
+                manifest = {"version": CUDA_LIBS_VERSION}
+                get_cuda_libs_manifest_path().write_text(json.dumps(manifest, indent=2) + "\n")
+
+        logger.info(f"CUDA backend ready at {cuda_dir}")
         progress.mark_complete(PROGRESS_KEY)
 
     except Exception as e:
-        # Clean up on failure
-        if temp_path.exists():
-            temp_path.unlink()
         logger.error(f"CUDA backend download failed: {e}")
         progress.mark_error(PROGRESS_KEY, str(e))
         raise
@@ -202,15 +340,19 @@ async def download_cuda_binary(version: Optional[str] = None):
 def get_cuda_binary_version() -> Optional[str]:
     """Get the version of the installed CUDA binary, or None if not installed."""
     import subprocess
+
     cuda_path = get_cuda_binary_path()
     if not cuda_path:
         return None
     try:
         result = subprocess.run(
             [str(cuda_path), "--version"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(cuda_path.parent),  # Run from the onedir directory
         )
-        # Output format: "voicebox-server 0.2.0"
+        # Output format: "voicebox-server 0.3.0"
         for line in result.stdout.strip().splitlines():
             if "voicebox-server" in line:
                 return line.split()[-1]
@@ -222,26 +364,29 @@ def get_cuda_binary_version() -> Optional[str]:
 async def check_and_update_cuda_binary():
     """Check if the CUDA binary is outdated and auto-download if so.
 
-    Called on server startup. If a CUDA binary exists but its version
-    doesn't match the current app version, triggers a background download
-    of the updated CUDA binary. The download progress is visible to the
-    frontend via the existing SSE progress endpoint.
+    Called on server startup. Checks both server version and CUDA libs
+    version. Downloads only what's needed.
     """
     cuda_path = get_cuda_binary_path()
     if not cuda_path:
         return  # No CUDA binary installed, nothing to update
 
-    cuda_version = get_cuda_binary_version()
-    current_version = __version__
+    need_server = _needs_server_download()
+    need_libs = _needs_cuda_libs_download()
 
-    if cuda_version == current_version:
-        logger.info(f"CUDA binary is up to date (v{current_version})")
+    if not need_server and not need_libs:
+        logger.info(f"CUDA binary is up to date (server=v{__version__}, libs={get_installed_cuda_libs_version()})")
         return
 
-    logger.info(
-        f"CUDA binary version mismatch: binary=v{cuda_version}, app=v{current_version}. "
-        f"Auto-downloading updated CUDA backend..."
-    )
+    reasons = []
+    if need_server:
+        cuda_version = get_cuda_binary_version()
+        reasons.append(f"server v{cuda_version} != v{__version__}")
+    if need_libs:
+        installed_libs = get_installed_cuda_libs_version()
+        reasons.append(f"libs {installed_libs} != {CUDA_LIBS_VERSION}")
+
+    logger.info(f"CUDA backend needs update ({', '.join(reasons)}). Auto-downloading...")
 
     try:
         await download_cuda_binary()
@@ -250,10 +395,12 @@ async def check_and_update_cuda_binary():
 
 
 async def delete_cuda_binary() -> bool:
-    """Delete the downloaded CUDA binary. Returns True if deleted."""
-    path = get_cuda_binary_path()
-    if path and path.exists():
-        path.unlink()
-        logger.info(f"Deleted CUDA binary: {path}")
+    """Delete the downloaded CUDA backend directory. Returns True if deleted."""
+    import shutil
+
+    cuda_dir = get_cuda_dir()
+    if cuda_dir.exists() and any(cuda_dir.iterdir()):
+        shutil.rmtree(cuda_dir)
+        logger.info(f"Deleted CUDA backend directory: {cuda_dir}")
         return True
     return False

@@ -53,6 +53,12 @@ tauri/src-tauri/gen/Assets.car
 tauri/src-tauri/gen/voicebox.icns
 tauri/src-tauri/gen/partial.plist
 
+# PyInstaller
+*.spec
+
+# Windows artifacts
+nul
+
 # Temporary
 tmp/
 temp/

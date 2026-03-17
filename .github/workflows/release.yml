@@ -200,33 +200,37 @@ jobs:
         run: |
           python -c "import torch; print(f'CUDA available in build: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}')"
 
-      - name: Build CUDA server binary
+      - name: Build CUDA server binary (onedir)
         shell: bash
         working-directory: backend
         run: python build_binary.py --cuda
 
-      - name: Split binary for GitHub Releases
+      - name: Package into server core + CUDA libs archives
         shell: bash
         run: |
-          python scripts/split_binary.py \
-            backend/dist/voicebox-server-cuda.exe \
-            --output release-assets/
+          python scripts/package_cuda.py \
+            backend/dist/voicebox-server-cuda/ \
+            --output release-assets/ \
+            --cuda-libs-version cu126-v1 \
+            --torch-compat ">=2.6.0,<2.11.0"
 
-      - name: Upload split parts to GitHub Release
+      - name: Upload archives to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-assets/voicebox-server-cuda.part*.exe
-            release-assets/voicebox-server-cuda.sha256
-            release-assets/voicebox-server-cuda.manifest
+            release-assets/voicebox-server-cuda.tar.gz
+            release-assets/voicebox-server-cuda.tar.gz.sha256
+            release-assets/cuda-libs-cu126-v1.tar.gz
+            release-assets/cuda-libs-cu126-v1.tar.gz.sha256
+            release-assets/cuda-libs.json
           draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload binary as workflow artifact
+      - name: Upload onedir as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: voicebox-server-cuda-windows
-          path: backend/dist/voicebox-server-cuda.exe
+          path: backend/dist/voicebox-server-cuda/
           retention-days: 7
