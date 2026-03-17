@@ -213,19 +213,11 @@ def build_server(cuda=False):
             "tada.utils.gray_code",
             "--hidden-import",
             "tada.utils.text",
-            # descript-audio-codec (DAC) — used by TADA for Snake1d layers
+            # DAC shim — provides dac.nn.layers.Snake1d without the real
+            # descript-audio-codec package (which pulls onnx/tensorboard via
+            # descript-audiotools). The shim is in backend/utils/dac_shim.py.
             "--hidden-import",
-            "dac",
-            "--hidden-import",
-            "dac.nn",
-            "--hidden-import",
-            "dac.nn.layers",
-            "--hidden-import",
-            "dac.model",
-            "--hidden-import",
-            "dac.model.dac",
-            "--collect-all",
-            "dac",
+            "backend.utils.dac_shim",
             "--hidden-import",
             "torchaudio",
             "--collect-submodules",

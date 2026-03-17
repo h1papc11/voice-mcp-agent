@@ -100,6 +100,13 @@ class HumeTadaBackend:
         repo = TADA_MODEL_REPOS.get(model_size, TADA_1B_REPO)
 
         with model_load_progress(model_name, is_cached):
+            # Install DAC shim before importing tada — tada's encoder/decoder
+            # import dac.nn.layers.Snake1d which requires the descript-audio-codec
+            # package.  The real package pulls in onnx/tensorboard/matplotlib via
+            # descript-audiotools, so we use a lightweight shim instead.
+            from ..utils.dac_shim import install_dac_shim
+            install_dac_shim()
+
             import torch
             from huggingface_hub import snapshot_download
 
