@@ -36,6 +36,10 @@
 │  │  │  │ Qwen3-TTS│ │LuxTTS │ │Chatterbox │  │  │  │
 │  │  │  │(Py/MLX)  │ │       │ │(MTL+Turbo)│  │  │  │
 │  │  │  └──────────┘ └───────┘ └───────────┘  │  │  │
+│  │  │  ┌──────────┐                           │  │  │
+│  │  │  │ TADA     │                           │  │  │
+│  │  │  │(1B / 3B) │                           │  │  │
+│  │  │  └──────────┘                           │  │  │
 │  │  └─────────────────────────────────────────┘  │  │
 │  │  ┌───────────┐  ┌─────────┐                   │  │
 │  │  │ STTBackend│  │ Profiles│                   │  │
@@ -59,6 +63,7 @@
 | LuxTTS | `backend/backends/luxtts_backend.py` | LuxTTS — fast, CPU-friendly |
 | Chatterbox MTL | `backend/backends/chatterbox_backend.py` | Chatterbox Multilingual — 23 languages |
 | Chatterbox Turbo | `backend/backends/chatterbox_turbo_backend.py` | Chatterbox Turbo — English, paralinguistic tags |
+| TADA | `backend/backends/hume_backend.py` | HumeAI TADA — 1B English + 3B Multilingual |
 | Platform detect | `backend/platform_detect.py` | Apple Silicon → MLX, else → PyTorch |
 | API types | `backend/models.py` | Pydantic request/response models |
 | HF progress | `backend/utils/hf_progress.py` | HFProgressTracker (tqdm patching for download progress) |
@@ -78,7 +83,7 @@
 ```
 POST /generate
   1. Look up voice profile from DB
-  2. Resolve engine from request (qwen | luxtts | chatterbox | chatterbox_turbo)
+  2. Resolve engine from request (qwen | luxtts | chatterbox | chatterbox_turbo | tada)
   3. Get backend: get_tts_backend_for_engine(engine)  # thread-safe singleton per engine
   4. Check model cache → if missing, trigger background download, return HTTP 202
   5. Load model (lazy): tts_backend.load_model(model_size)
@@ -104,7 +109,8 @@ POST /generate
 - LuxTTS integration — fast, CPU-friendly English TTS (PR #254)
 - Chatterbox Multilingual TTS — 23 languages including Hebrew (PR #257)
 - Instruct parameter UI exists but is non-functional across all backends (see #224, Known Limitations)
-- Single flat model dropdown (Qwen 1.7B, Qwen 0.6B, LuxTTS, Chatterbox, Chatterbox Turbo)
+- HumeAI TADA integration — 1B English + 3B Multilingual speech-language model (PR #296)
+- Single flat model dropdown (Qwen 1.7B, Qwen 0.6B, LuxTTS, Chatterbox, Chatterbox Turbo, TADA 1B, TADA 3B)
 - Centralized model config registry (`ModelConfig` dataclass) — no per-engine dispatch maps in `main.py`
 - Shared `EngineModelSelector` component — engine/model dropdown defined once, used in both generation forms
 
@@ -136,6 +142,8 @@ POST /generate
 | LuxTTS | `luxtts` | English | ~300 MB | CPU-friendly, 48 kHz, fast | None |
 | Chatterbox | `chatterbox-tts` | 23 (incl. Hebrew, Arabic, Hindi, etc.) | ~3.2 GB | Zero-shot cloning, multilingual | Partial — `exaggeration` float (0-1) for expressiveness |
 | Chatterbox Turbo | `chatterbox-turbo` | English | ~1.5 GB | Paralinguistic tags ([laugh], [cough]), 350M params, low latency | Partial — inline tags only, no separate instruct param |
+| TADA 1B | `tada-1b` | English | ~4 GB | HumeAI speech-language model, 700s+ coherent audio | None |
+| TADA 3B Multilingual | `tada-3b-ml` | 10 (en, ar, zh, de, es, fr, it, ja, pl, pt) | ~8 GB | Multilingual, text-acoustic dual alignment | None |
 
 ### Multi-Engine Architecture (Shipped)
 
@@ -143,7 +151,7 @@ The singleton TTS backend blocker described in the previous version of this doc 
 
 - **Thread-safe backend registry** (`_tts_backends` dict + `_tts_backends_lock`) with double-checked locking
 - **Per-engine backend instances** — each engine gets its own singleton, loaded lazily
-- **Engine field on GenerationRequest** — frontend sends `engine: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo'`
+- **Engine field on GenerationRequest** — frontend sends `engine: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo' | 'tada'`
 - **Per-engine language filtering** — `ENGINE_LANGUAGES` map in frontend, backend regex accepts all languages
 - **Per-engine voice prompts** — `create_voice_prompt_for_profile()` dispatches to the correct backend
 - **Trim post-processing** — `trim_tts_output()` for Chatterbox engines (cuts trailing silence/hallucination)
@@ -337,7 +345,7 @@ Notable requests:
 | **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | **Yes** — `inference_instruct2()`, works with cloning | Ready | Best instruct candidate |
 | **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | **Yes** — inline text descriptions, word-level control | Ready | Multi-engine arch in place |
 | **MOSS-TTS Family** | Zero-shot | — | — | Multilingual | Medium | **Yes** — text prompts for style + timbre design | Needs vetting | Apache 2.0, multi-speaker dialogue |
-| **HumeAI TADA 1B/3B** | Zero-shot | 5× faster than LLM-TTS | — | EN (1B), Multilingual (3B) | Medium | Partial — automatic prosody from text context | Needs vetting | MIT, 700s+ coherent, synced transcript output |
+| **HumeAI TADA 1B/3B** | Zero-shot | 5× faster than LLM-TTS | 24 kHz | EN (1B), Multilingual (3B) | Medium | Partial — automatic prosody from text context | **Shipped** | PR #296, MIT, 700s+ coherent |
 | **VoxCPM 1.5** | Zero-shot (seconds) | ~0.15 RTF streaming | — | Bilingual (EN/ZH) | Medium | Partial — automatic context-aware prosody | Needs vetting | Apache 2.0, tokenizer-free continuous diffusion |
 | **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny (82M) | Partial — automatic style inference | Ready | Apache 2.0, multi-engine arch in place |
 | **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Partial — style transfer from ref audio only | Ready | Multi-engine arch in place |
@@ -475,7 +483,7 @@ The generation form now uses a flat model dropdown with engine-based routing. Pe
 | `/history/{id}/export` | GET | Export generation ZIP |
 | `/history/{id}/export-audio` | GET | Export audio only |
 | `/transcribe` | POST | Transcribe audio (Whisper) |
-| `/models/status` | GET | All model statuses (Qwen, LuxTTS, Chatterbox, Chatterbox Turbo, Whisper) |
+| `/models/status` | GET | All model statuses (Qwen, LuxTTS, Chatterbox, Chatterbox Turbo, TADA, Whisper) |
 | `/models/download` | POST | Trigger model download |
 | `/models/download/cancel` | POST | Cancel/dismiss download |
 | `/models/{name}` | DELETE | Delete downloaded model |

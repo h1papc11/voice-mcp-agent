@@ -24,7 +24,9 @@ import torch.nn as nn
 
 # ── Snake activation (from dac/nn/layers.py) ────────────────────────
 
-@torch.jit.script
+# NOTE: The original DAC code uses @torch.jit.script here for a 1.4x
+# speedup.  We omit it because TorchScript calls inspect.getsource()
+# which fails inside a PyInstaller frozen binary (no .py source files).
 def snake(x: torch.Tensor, alpha: torch.Tensor) -> torch.Tensor:
     shape = x.shape
     x = x.reshape(shape[0], shape[1], -1)
