@@ -20,6 +20,8 @@ const ENGINE_OPTIONS = [
   { value: 'luxtts', label: 'LuxTTS' },
   { value: 'chatterbox', label: 'Chatterbox' },
   { value: 'chatterbox_turbo', label: 'Chatterbox Turbo' },
+  { value: 'tada:1B', label: 'TADA 1B' },
+  { value: 'tada:3B', label: 'TADA 3B Multilingual' },
 ] as const;
 
 const ENGINE_DESCRIPTIONS: Record<string, string> = {
@@ -27,6 +29,7 @@ const ENGINE_DESCRIPTIONS: Record<string, string> = {
   luxtts: 'Fast, English-focused',
   chatterbox: '23 languages, incl. Hebrew',
   chatterbox_turbo: 'English, [laugh] [cough] tags',
+  tada: 'HumeAI, 700s+ coherent audio',
 };
 
 /** Engines that only support English and should force language to 'en' on select. */
@@ -34,6 +37,7 @@ const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo']);
 
 function getSelectValue(engine: string, modelSize?: string): string {
   if (engine === 'qwen') return `qwen:${modelSize || '1.7B'}`;
+  if (engine === 'tada') return `tada:${modelSize || '1B'}`;
   return engine;
 }
 
@@ -47,6 +51,20 @@ function handleEngineChange(form: UseFormReturn<GenerationFormValues>, value: st
     const available = getLanguageOptionsForEngine('qwen');
     if (!available.some((l) => l.value === currentLang)) {
       form.setValue('language', available[0]?.value ?? 'en');
+    }
+  } else if (value.startsWith('tada:')) {
+    const [, modelSize] = value.split(':');
+    form.setValue('engine', 'tada');
+    form.setValue('modelSize', modelSize as '1B' | '3B');
+    // TADA 1B is English-only; 3B is multilingual
+    if (modelSize === '1B') {
+      form.setValue('language', 'en');
+    } else {
+      const currentLang = form.getValues('language');
+      const available = getLanguageOptionsForEngine('tada');
+      if (!available.some((l) => l.value === currentLang)) {
+        form.setValue('language', available[0]?.value ?? 'en');
+      }
     }
   } else {
     form.setValue('engine', value as GenerationFormValues['engine']);

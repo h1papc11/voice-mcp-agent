@@ -59,10 +59,10 @@
 
 ## What is Voicebox?
 
-Voicebox is a **local-first voice cloning studio** — a free and open-source alternative to ElevenLabs. Clone voices from a few seconds of audio, generate speech in 23 languages across 4 TTS engines, apply post-processing effects, and compose multi-voice projects with a timeline editor.
+Voicebox is a **local-first voice cloning studio** — a free and open-source alternative to ElevenLabs. Clone voices from a few seconds of audio, generate speech in 23 languages across 5 TTS engines, apply post-processing effects, and compose multi-voice projects with a timeline editor.
 
 - **Complete privacy** — models and voice data stay on your machine
-- **4 TTS engines** — Qwen3-TTS, LuxTTS, Chatterbox Multilingual, and Chatterbox Turbo
+- **5 TTS engines** — Qwen3-TTS, LuxTTS, Chatterbox Multilingual, Chatterbox Turbo, and HumeAI TADA
 - **23 languages** — from English to Arabic, Japanese, Hindi, Swahili, and more
 - **Post-processing effects** — pitch shift, reverb, delay, chorus, compression, and filters
 - **Expressive speech** — paralinguistic tags like `[laugh]`, `[sigh]`, `[gasp]` via Chatterbox Turbo
@@ -93,7 +93,7 @@ Voicebox is a **local-first voice cloning studio** — a free and open-source al
 
 ### Multi-Engine Voice Cloning
 
-Four TTS engines with different strengths, switchable per-generation:
+Five TTS engines with different strengths, switchable per-generation:
 
 | Engine                      | Languages | Strengths                                                                                                                                |
 | --------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -101,6 +101,7 @@ Four TTS engines with different strengths, switchable per-generation:
 | **LuxTTS**                  | English   | Lightweight (~1GB VRAM), 48kHz output, 150x realtime on CPU                                                                              |
 | **Chatterbox Multilingual** | 23        | Broadest language coverage — Arabic, Danish, Finnish, Greek, Hebrew, Hindi, Malay, Norwegian, Polish, Swahili, Swedish, Turkish and more |
 | **Chatterbox Turbo**        | English   | Fast 350M model with paralinguistic emotion/sound tags                                                                                   |
+| **TADA** (1B / 3B)          | 10        | HumeAI speech-language model — 700s+ coherent audio, text-acoustic dual alignment                                                        |
 
 ### Emotions & Paralinguistic Tags
 
@@ -230,7 +231,7 @@ Full API documentation available at `http://localhost:17493/docs`.
 | Frontend      | React, TypeScript, Tailwind CSS                   |
 | State         | Zustand, React Query                              |
 | Backend       | FastAPI (Python)                                  |
-| TTS Engines   | Qwen3-TTS, LuxTTS, Chatterbox, Chatterbox Turbo   |
+| TTS Engines   | Qwen3-TTS, LuxTTS, Chatterbox, Chatterbox Turbo, TADA |
 | Effects       | Pedalboard (Spotify)                              |
 | Transcription | Whisper / Whisper Turbo (PyTorch or MLX)          |
 | Inference     | MLX (Apple Silicon) / PyTorch (CUDA/ROCm/XPU/CPU) |
@@ -245,7 +246,7 @@ Full API documentation available at `http://localhost:17493/docs`.
 | ----------------------- | ---------------------------------------------- |
 | **Real-time Streaming** | Stream audio as it generates, word by word     |
 | **Voice Design**        | Create new voices from text descriptions       |
-| **More Models**         | XTTS, Bark, and other open-source voice models |
+| **More Models**         | XTTS, Bark, and other open-source voice models  |
 | **Plugin Architecture** | Extend with custom models and effects          |
 | **Mobile Companion**    | Control Voicebox from your phone               |
 
