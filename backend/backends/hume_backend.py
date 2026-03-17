@@ -130,11 +130,13 @@ class HumeTadaBackend:
                 allow_patterns=["*.safetensors", "*.json", "*.txt", "*.bin", "*.model"],
             )
 
-            # Pre-download the Llama tokenizer from an ungated mirror.
-            # TADA hardcodes "meta-llama/Llama-3.2-1B" which is gated;
-            # we redirect to unsloth's ungated copy at load time.
+            # TADA hardcodes "meta-llama/Llama-3.2-1B" as the tokenizer
+            # source in its Aligner and TadaForCausalLM.from_pretrained().
+            # That repo is gated (requires Meta license acceptance).
+            # Download the tokenizer from an ungated mirror and get its
+            # local cache path so we can point TADA at it directly.
             logger.info("Downloading Llama tokenizer (ungated mirror)...")
-            snapshot_download(
+            tokenizer_path = snapshot_download(
                 repo_id="unsloth/Llama-3.2-1B",
                 token=None,
                 allow_patterns=["tokenizer*", "special_tokens*"],
@@ -146,43 +148,34 @@ class HumeTadaBackend:
             else:
                 model_dtype = torch.float32
 
-            # TADA hardcodes "meta-llama/Llama-3.2-1B" as the tokenizer
-            # source in its Aligner and TadaForCausalLM.from_pretrained().
-            # That repo is gated (requires Meta license acceptance on HF).
-            # Monkey-patch AutoTokenizer.from_pretrained to redirect to an
-            # ungated mirror that ships the identical tokenizer files.
-            from transformers import AutoTokenizer
-            _orig_from_pretrained = AutoTokenizer.from_pretrained.__func__
+            # Patch the Aligner config class to use the local tokenizer
+            # path instead of the gated "meta-llama/Llama-3.2-1B" default.
+            # This avoids monkey-patching AutoTokenizer.from_pretrained
+            # which corrupts the classmethod descriptor for other engines.
+            from tada.modules.aligner import AlignerConfig
+            AlignerConfig.tokenizer_name = tokenizer_path
 
-            @classmethod  # type: ignore[misc]
-            def _patched_from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
-                if "meta-llama/Llama-3.2" in str(pretrained_model_name_or_path):
-                    pretrained_model_name_or_path = "unsloth/Llama-3.2-1B"
-                    kwargs.setdefault("token", None)
-                    logger.info("Redirecting Llama tokenizer to ungated mirror: unsloth/Llama-3.2-1B")
-                return _orig_from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs)
+            # Load encoder (only needed for voice prompt encoding)
+            from tada.modules.encoder import Encoder
+            logger.info("Loading TADA encoder...")
+            self.encoder = Encoder.from_pretrained(
+                TADA_CODEC_REPO, subfolder="encoder"
+            ).to(device)
+            self.encoder.eval()
 
-            AutoTokenizer.from_pretrained = _patched_from_pretrained
-
-            try:
-                # Load encoder (only needed for voice prompt encoding)
-                from tada.modules.encoder import Encoder
-                logger.info("Loading TADA encoder...")
-                self.encoder = Encoder.from_pretrained(
-                    TADA_CODEC_REPO, subfolder="encoder"
-                ).to(device)
-                self.encoder.eval()
-
-                # Load the causal LM (includes decoder for wav generation)
-                from tada.modules.tada import TadaForCausalLM
-                logger.info(f"Loading TADA {model_size} model...")
-                self.model = TadaForCausalLM.from_pretrained(
-                    repo, torch_dtype=model_dtype
-                ).to(device)
-                self.model.eval()
-            finally:
-                # Restore original to avoid affecting other code
-                AutoTokenizer.from_pretrained = _orig_from_pretrained
+            # Load the causal LM (includes decoder for wav generation).
+            # TadaForCausalLM.from_pretrained() calls
+            #   getattr(config, "tokenizer_name", "meta-llama/Llama-3.2-1B")
+            # which hits the gated repo. Pre-load the config from HF,
+            # inject the local tokenizer path, then pass it in.
+            from tada.modules.tada import TadaForCausalLM, TadaConfig
+            logger.info(f"Loading TADA {model_size} model...")
+            config = TadaConfig.from_pretrained(repo)
+            config.tokenizer_name = tokenizer_path
+            self.model = TadaForCausalLM.from_pretrained(
+                repo, config=config, torch_dtype=model_dtype
+            ).to(device)
+            self.model.eval()
 
         logger.info(f"HumeAI TADA {model_size} loaded successfully on {device}")
 
