@@ -64,7 +64,7 @@ def is_nvidia_file(rel_path: str) -> bool:
         return False
 
     # Files under nvidia/ subdirectory tree (older torch layout)
-    if rel_lower.startswith("nvidia/") or "nvidia/" in rel_lower.split("/", 1)[-1:]:
+    if rel_lower.startswith("nvidia/") or "/nvidia/" in rel_lower:
         # Only DLLs/shared objects — not .py, .dist-info, etc.
         if rel_lower.endswith((".dll", ".so")):
             return True
@@ -127,13 +127,15 @@ def package(
 
     if not nvidia_files:
         print(
-            "WARNING: No NVIDIA files found! The CUDA libs archive will be empty.",
+            f"ERROR: No NVIDIA files found in {onedir_path}. "
+            "Refusing to create an empty CUDA libs archive.",
             file=sys.stderr,
         )
         print(
             "Make sure you built with --cuda and the NVIDIA packages are present.",
             file=sys.stderr,
         )
+        sys.exit(1)
 
     # Create server core archive
     # Files are stored relative to the archive root (no parent directory prefix)

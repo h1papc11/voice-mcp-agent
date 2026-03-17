@@ -156,16 +156,16 @@ async def _download_and_extract_archive(
     if temp_path.exists():
         temp_path.unlink()
 
-    # Fetch expected checksum
+    # Fetch expected checksum (fail-fast: never extract an unverified archive)
     expected_sha = None
     if sha256_url:
         try:
             sha_resp = await client.get(sha256_url)
-            if sha_resp.status_code == 200:
-                expected_sha = sha_resp.text.strip().split()[0]
-                logger.info(f"{label}: expected SHA-256: {expected_sha[:16]}...")
+            sha_resp.raise_for_status()
+            expected_sha = sha_resp.text.strip().split()[0]
+            logger.info(f"{label}: expected SHA-256: {expected_sha[:16]}...")
         except Exception as e:
-            logger.warning(f"{label}: could not fetch checksum — skipping verification: {e}")
+            raise RuntimeError(f"{label}: failed to fetch checksum from {sha256_url}") from e
 
     # Stream download
     downloaded = 0
