@@ -231,12 +231,17 @@ class HumeTadaBackend:
 
         def _encode_sync():
             import torch
-            import torchaudio
+            import soundfile as sf
 
             device = self._device
 
-            # Load and prepare audio
-            audio, sr = torchaudio.load(str(audio_path))
+            # Load audio with soundfile (torchaudio 2.10+ requires torchcodec)
+            audio_np, sr = sf.read(str(audio_path), dtype="float32")
+            audio = torch.from_numpy(audio_np).float()
+            if audio.ndim == 1:
+                audio = audio.unsqueeze(0)  # (samples,) -> (1, samples)
+            else:
+                audio = audio.T  # (samples, channels) -> (channels, samples)
             audio = audio.to(device)
 
             # Encode with forced alignment
