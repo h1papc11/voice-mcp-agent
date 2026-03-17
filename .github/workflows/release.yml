@@ -192,7 +192,7 @@ jobs:
       - name: Install PyTorch with CUDA 12.6
         run: |
           pip install torch --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps
-          pip install torchaudio --index-url https://download.pytorch.org/whl/cu126
+          pip install torchaudio --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps
 
       - name: Verify CUDA support in torch
         run: |
