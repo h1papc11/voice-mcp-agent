@@ -208,10 +208,10 @@ build-server-cuda: _ensure-venv
     $env:PATH = "{{ venv_bin }};$env:PATH"; \
     & "{{ python }}" backend/build_binary.py --cuda; \
     if ($LASTEXITCODE -ne 0) { throw "build_binary.py --cuda failed with exit code $LASTEXITCODE" }; \
-    $dest = "$env:APPDATA/com.voicebox.app/backends"; \
-    New-Item -ItemType Directory -Path $dest -Force | Out-Null; \
-    Copy-Item "backend/dist/voicebox-server-cuda.exe" "$dest/voicebox-server-cuda.exe" -Force; \
-    Write-Host "Copied CUDA binary to $dest"
+    $dest = "$env:APPDATA/com.voicebox.app/backends/cuda"; \
+    if (Test-Path $dest) { Remove-Item -Recurse -Force $dest }; \
+    Copy-Item "backend/dist/voicebox-server-cuda" $dest -Recurse -Force; \
+    Write-Host "Copied CUDA backend to $dest"
 
 # Build everything locally: CPU server + CUDA server + installable Tauri app
 [windows]
