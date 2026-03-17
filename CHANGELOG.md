@@ -7,9 +7,25 @@
 
 ## [Unreleased]
 
-This release rewrites the backend into a modular architecture, migrates the documentation site to Fumadocs, and ships a batch of bug fixes and UI polish across the stack.
+## [0.3.0] - 2026-03-17
 
-The backend's 3,000-line monolith `main.py` has been decomposed into domain routers, a services layer, and a proper database package. A style guide and ruff configuration now enforce consistency. On the frontend, model loading status is now visible in the UI, effects presets get a dropdown, and several race conditions and accessibility gaps are closed.
+This release rewrites the backend into a modular architecture, overhauls the settings UI into routed sub-pages, fixes audio player freezing, migrates documentation to Fumadocs, and ships a batch of bug fixes targeting the most-reported issues from the tracker.
+
+The backend's 3,000-line monolith `main.py` has been decomposed into domain routers, a services layer, and a proper database package. A style guide and ruff configuration now enforce consistency. On the frontend, settings have been split into dedicated routed pages with server logs, a changelog viewer, and an about page. The audio player no longer freezes mid-playback, and model loading status is now visible in the UI. Seven user-reported bugs have been fixed, including server crashes during sample uploads, generation list staleness, cryptic error messages, and CUDA support for RTX 50-series GPUs.
+
+### Settings Overhaul ([#294](https://github.com/jamiepine/voicebox/pull/294))
+- Split settings into routed sub-tabs: General, Generation, GPU, Logs, Changelog, About
+- Added live server log viewer with auto-scroll
+- Added in-app changelog page that parses `CHANGELOG.md` at build time
+- Added About page with version info, license, and generation folder quick-open
+- Extracted reusable `SettingRow` component for consistent setting layouts
+
+### Audio Player Fix ([#293](https://github.com/jamiepine/voicebox/pull/293))
+- Fixed audio player freezing during playback
+- Improved playback UX with better state management and listener cleanup
+- Fixed restart race condition during regeneration
+- Added stable keys for audio element re-rendering
+- Improved accessibility across player controls
 
 ### Backend Refactor ([#285](https://github.com/jamiepine/voicebox/pull/285))
 - Extracted all routes from `main.py` into 13 domain routers under `backend/routes/` — `main.py` dropped from ~3,100 lines to ~10
@@ -39,6 +55,17 @@ The backend's 3,000-line monolith `main.py` has been decomposed into domain rout
 - Added accessible focus styling to select component
 - Softened select focus indicator opacity
 - Addressed 4 critical and 12 major issues from CodeRabbit review
+
+### Bug Fixes ([#295](https://github.com/jamiepine/voicebox/pull/295))
+- Fixed sample uploads crashing the server — audio decoding now runs in a thread pool instead of blocking the async event loop ([#278](https://github.com/jamiepine/voicebox/issues/278))
+- Fixed generation list not updating when a generation completes — switched to `refetchQueries` for reliable cache busting, added SSE error fallback, and page reset on completion ([#231](https://github.com/jamiepine/voicebox/issues/231))
+- Fixed error toasts showing `[object Object]` instead of the actual error message ([#290](https://github.com/jamiepine/voicebox/issues/290))
+- Added Whisper model selection (`base`, `small`, `medium`, `large`, `turbo`) and expanded language support to the `/transcribe` endpoint ([#233](https://github.com/jamiepine/voicebox/issues/233))
+- Upgraded CUDA backend build from cu121 to cu126 for RTX 50-series (Blackwell) GPU support ([#289](https://github.com/jamiepine/voicebox/issues/289))
+- Handled client disconnects in SSE and streaming endpoints to suppress `[Errno 32] Broken Pipe` errors ([#248](https://github.com/jamiepine/voicebox/issues/248))
+- Fixed Docker build failure from pip hash mismatch on Qwen3-TTS dependencies ([#286](https://github.com/jamiepine/voicebox/issues/286))
+- Added 50 MB upload size limit with chunked reads to prevent unbounded memory allocation on sample uploads
+- Eliminated redundant double audio decode in sample processing pipeline
 
 ### Platform Fixes
 - Replaced `netstat` with `TcpStream` + PowerShell for Windows port detection ([#277](https://github.com/jamiepine/voicebox/pull/277))
