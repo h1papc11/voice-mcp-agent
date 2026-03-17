@@ -217,22 +217,40 @@ def validate_reference_audio(
     Returns:
         Tuple of (is_valid, error_message)
     """
+    result = validate_and_load_reference_audio(
+        audio_path, min_duration, max_duration, min_rms
+    )
+    return (result[0], result[1])
+
+
+def validate_and_load_reference_audio(
+    audio_path: str,
+    min_duration: float = 2.0,
+    max_duration: float = 30.0,
+    min_rms: float = 0.01,
+) -> Tuple[bool, Optional[str], Optional[np.ndarray], Optional[int]]:
+    """
+    Validate and load reference audio in a single pass.
+    
+    Returns:
+        Tuple of (is_valid, error_message, audio_array, sample_rate)
+    """
     try:
         audio, sr = load_audio(audio_path)
         duration = len(audio) / sr
         
         if duration < min_duration:
-            return False, f"Audio too short (minimum {min_duration} seconds)"
+            return False, f"Audio too short (minimum {min_duration} seconds)", None, None
         if duration > max_duration:
-            return False, f"Audio too long (maximum {max_duration} seconds)"
+            return False, f"Audio too long (maximum {max_duration} seconds)", None, None
         
         rms = np.sqrt(np.mean(audio**2))
         if rms < min_rms:
-            return False, "Audio is too quiet or silent"
+            return False, "Audio is too quiet or silent", None, None
         
         if np.abs(audio).max() > 0.99:
-            return False, "Audio is clipping (reduce input gain)"
+            return False, "Audio is clipping (reduce input gain)", None, None
         
-        return True, None
+        return True, None, audio, sr
     except Exception as e:
-        return False, f"Error validating audio: {str(e)}"
+        return False, f"Error validating audio: {str(e)}", None, None

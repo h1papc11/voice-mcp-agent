@@ -149,7 +149,8 @@ class HistoryListResponse(BaseModel):
 class TranscriptionRequest(BaseModel):
     """Request model for audio transcription."""
 
-    language: Optional[str] = Field(None, pattern="^(en|zh)$")
+    language: Optional[str] = Field(None, pattern="^(en|zh|ja|ko|de|fr|ru|pt|es|it)$")
+    model: Optional[str] = Field(None, pattern="^(base|small|medium|large|turbo)$")
 
 
 class TranscriptionResponse(BaseModel):

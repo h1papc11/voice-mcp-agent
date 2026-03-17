@@ -1,11 +1,14 @@
 """TTS generation endpoints."""
 
 import asyncio
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from .. import models
 from ..services import history, profiles, tts
@@ -181,25 +184,28 @@ async def get_generation_status(generation_id: str, db: Session = Depends(get_db
     import json
 
     async def event_stream():
-        while True:
-            db.expire_all()
-            gen = db.query(DBGeneration).filter_by(id=generation_id).first()
-            if not gen:
-                yield f"data: {json.dumps({'status': 'not_found', 'id': generation_id})}\n\n"
-                return
+        try:
+            while True:
+                db.expire_all()
+                gen = db.query(DBGeneration).filter_by(id=generation_id).first()
+                if not gen:
+                    yield f"data: {json.dumps({'status': 'not_found', 'id': generation_id})}\n\n"
+                    return
 
-            payload = {
-                "id": gen.id,
-                "status": gen.status or "completed",
-                "duration": gen.duration,
-                "error": gen.error,
-            }
-            yield f"data: {json.dumps(payload)}\n\n"
+                payload = {
+                    "id": gen.id,
+                    "status": gen.status or "completed",
+                    "duration": gen.duration,
+                    "error": gen.error,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
 
-            if (gen.status or "completed") in ("completed", "failed"):
-                return
+                if (gen.status or "completed") in ("completed", "failed"):
+                    return
 
-            await asyncio.sleep(1)
+                await asyncio.sleep(1)
+        except (BrokenPipeError, ConnectionResetError, asyncio.CancelledError):
+            logger.debug("SSE client disconnected for generation %s", generation_id)
 
     return StreamingResponse(
         event_stream(),
@@ -265,9 +271,12 @@ async def stream_speech(
     wav_bytes = tts.audio_to_wav_bytes(audio, sample_rate)
 
     async def _wav_stream():
-        chunk_size = 64 * 1024
-        for i in range(0, len(wav_bytes), chunk_size):
-            yield wav_bytes[i : i + chunk_size]
+        try:
+            chunk_size = 64 * 1024
+            for i in range(0, len(wav_bytes), chunk_size):
+                yield wav_bytes[i : i + chunk_size]
+        except (BrokenPipeError, ConnectionResetError, asyncio.CancelledError):
+            logger.debug("Client disconnected during audio stream")
 
     return StreamingResponse(
         _wav_stream(),

@@ -22,7 +22,7 @@ from ..database import (
     Generation as DBGeneration,
 )
 from ..models import EffectConfig
-from ..utils.audio import validate_reference_audio, load_audio, save_audio
+from ..utils.audio import validate_reference_audio, validate_and_load_reference_audio, load_audio, save_audio
 from ..utils.images import validate_image, process_avatar
 from ..utils.cache import _get_cache_dir, clear_profile_cache
 from .tts import get_tts_model
@@ -117,11 +117,16 @@ async def add_profile_sample(
     Returns:
         Created sample
     """
+    import asyncio
+
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         raise ValueError(f"Profile {profile_id} not found")
 
-    is_valid, error_msg = validate_reference_audio(audio_path)
+    # Validate and load audio in a single pass, off the event loop
+    is_valid, error_msg, audio, sr = await asyncio.to_thread(
+        validate_and_load_reference_audio, audio_path
+    )
     if not is_valid:
         raise ValueError(f"Invalid reference audio: {error_msg}")
 
@@ -130,8 +135,7 @@ async def add_profile_sample(
     profile_dir.mkdir(parents=True, exist_ok=True)
 
     dest_path = profile_dir / f"{sample_id}.wav"
-    audio, sr = load_audio(audio_path)
-    save_audio(audio, str(dest_path), sr)
+    await asyncio.to_thread(save_audio, audio, str(dest_path), sr)
 
     db_sample = DBProfileSample(
         id=sample_id,

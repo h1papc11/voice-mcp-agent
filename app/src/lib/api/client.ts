@@ -32,7 +32,23 @@ import type {
   TranscriptionResponse,
   VoiceProfileCreate,
   VoiceProfileResponse,
+  WhisperModelSize,
 } from './types';
+
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e: Record<string, unknown>) => e.msg || e.message || JSON.stringify(e))
+      .join('; ');
+  }
+  if (detail && typeof detail === 'object') {
+    const obj = detail as Record<string, unknown>;
+    if (typeof obj.message === 'string') return obj.message;
+    return JSON.stringify(detail);
+  }
+  return fallback;
+}
 
 class ApiClient {
   private getBaseUrl(): string {
@@ -54,7 +70,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -113,7 +129,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -147,7 +163,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.blob();
@@ -167,7 +183,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -187,7 +203,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -257,7 +273,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.blob();
@@ -271,7 +287,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.blob();
@@ -297,7 +313,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -318,11 +334,18 @@ class ApiClient {
   }
 
   // Transcription
-  async transcribeAudio(file: File, language?: LanguageCode): Promise<TranscriptionResponse> {
+  async transcribeAudio(
+    file: File,
+    language?: LanguageCode,
+    model?: WhisperModelSize,
+  ): Promise<TranscriptionResponse> {
     const formData = new FormData();
     formData.append('file', file);
     if (language) {
       formData.append('language', language);
+    }
+    if (model) {
+      formData.append('model', model);
     }
 
     const url = `${this.getBaseUrl()}/transcribe`;
@@ -335,7 +358,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.json();
@@ -608,7 +631,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.blob();
@@ -705,7 +728,7 @@ class ApiClient {
       const error = await response.json().catch(() => ({
         detail: response.statusText,
       }));
-      throw new Error(error.detail || `HTTP error! status: ${response.status}`);
+      throw new Error(formatErrorDetail(error.detail, `HTTP error! status: ${response.status}`));
     }
 
     return response.blob();

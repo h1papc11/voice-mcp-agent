@@ -102,6 +102,10 @@ async def delete_profile(
     return {"message": "Profile deleted successfully"}
 
 
+SAMPLE_MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+SAMPLE_UPLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MB
+
+
 @router.post("/profiles/{profile_id}/samples", response_model=models.ProfileSampleResponse)
 async def add_profile_sample(
     profile_id: str,
@@ -115,8 +119,16 @@ async def add_profile_sample(
     file_suffix = _uploaded_ext if _uploaded_ext in _allowed_audio_exts else ".wav"
 
     with tempfile.NamedTemporaryFile(suffix=file_suffix, delete=False) as tmp:
-        content = await file.read()
-        tmp.write(content)
+        total_size = 0
+        while chunk := await file.read(SAMPLE_UPLOAD_CHUNK_SIZE):
+            total_size += len(chunk)
+            if total_size > SAMPLE_MAX_FILE_SIZE:
+                Path(tmp.name).unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File too large (max {SAMPLE_MAX_FILE_SIZE // (1024 * 1024)} MB)",
+                )
+            tmp.write(chunk)
         tmp_path = tmp.name
 
     try:
