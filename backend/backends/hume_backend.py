@@ -130,27 +130,59 @@ class HumeTadaBackend:
                 allow_patterns=["*.safetensors", "*.json", "*.txt", "*.bin", "*.model"],
             )
 
+            # Pre-download the Llama tokenizer from an ungated mirror.
+            # TADA hardcodes "meta-llama/Llama-3.2-1B" which is gated;
+            # we redirect to unsloth's ungated copy at load time.
+            logger.info("Downloading Llama tokenizer (ungated mirror)...")
+            snapshot_download(
+                repo_id="unsloth/Llama-3.2-1B",
+                token=None,
+                allow_patterns=["tokenizer*", "special_tokens*"],
+            )
+
             # Determine dtype — use bf16 on CUDA for ~50% memory savings
             if device == "cuda" and torch.cuda.is_bf16_supported():
                 model_dtype = torch.bfloat16
             else:
                 model_dtype = torch.float32
 
-            # Load encoder (only needed for voice prompt encoding)
-            from tada.modules.encoder import Encoder
-            logger.info("Loading TADA encoder...")
-            self.encoder = Encoder.from_pretrained(
-                TADA_CODEC_REPO, subfolder="encoder"
-            ).to(device)
-            self.encoder.eval()
+            # TADA hardcodes "meta-llama/Llama-3.2-1B" as the tokenizer
+            # source in its Aligner and TadaForCausalLM.from_pretrained().
+            # That repo is gated (requires Meta license acceptance on HF).
+            # Monkey-patch AutoTokenizer.from_pretrained to redirect to an
+            # ungated mirror that ships the identical tokenizer files.
+            from transformers import AutoTokenizer
+            _orig_from_pretrained = AutoTokenizer.from_pretrained.__func__
 
-            # Load the causal LM (includes decoder for wav generation)
-            from tada.modules.tada import TadaForCausalLM
-            logger.info(f"Loading TADA {model_size} model...")
-            self.model = TadaForCausalLM.from_pretrained(
-                repo, torch_dtype=model_dtype
-            ).to(device)
-            self.model.eval()
+            @classmethod  # type: ignore[misc]
+            def _patched_from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
+                if "meta-llama/Llama-3.2" in str(pretrained_model_name_or_path):
+                    pretrained_model_name_or_path = "unsloth/Llama-3.2-1B"
+                    kwargs.setdefault("token", None)
+                    logger.info("Redirecting Llama tokenizer to ungated mirror: unsloth/Llama-3.2-1B")
+                return _orig_from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs)
+
+            AutoTokenizer.from_pretrained = _patched_from_pretrained
+
+            try:
+                # Load encoder (only needed for voice prompt encoding)
+                from tada.modules.encoder import Encoder
+                logger.info("Loading TADA encoder...")
+                self.encoder = Encoder.from_pretrained(
+                    TADA_CODEC_REPO, subfolder="encoder"
+                ).to(device)
+                self.encoder.eval()
+
+                # Load the causal LM (includes decoder for wav generation)
+                from tada.modules.tada import TadaForCausalLM
+                logger.info(f"Loading TADA {model_size} model...")
+                self.model = TadaForCausalLM.from_pretrained(
+                    repo, torch_dtype=model_dtype
+                ).to(device)
+                self.model.eval()
+            finally:
+                # Restore original to avoid affecting other code
+                AutoTokenizer.from_pretrained = _orig_from_pretrained
 
         logger.info(f"HumeAI TADA {model_size} loaded successfully on {device}")
 
