@@ -51,6 +51,7 @@ app/openapi.json
 tauri/src-tauri/binaries/*
 tauri/src-tauri/gen/Assets.car
 tauri/src-tauri/gen/voicebox.icns
+tauri/src-tauri/gen/partial.plist
 
 # Temporary
 tmp/

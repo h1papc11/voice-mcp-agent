@@ -23,15 +23,15 @@ fn main() {
         }
     }
 
+    let project_root = env!("CARGO_MANIFEST_DIR");
+    let gen_dir = format!("{}/gen", project_root);
+    std::fs::create_dir_all(&gen_dir).expect("Failed to create gen directory");
+
     // Compile macOS Liquid Glass icon
     #[cfg(target_os = "macos")]
     {
-        let project_root = env!("CARGO_MANIFEST_DIR");
         // voicebox.icon is in tauri/assets/voicebox.icon (one level up from src-tauri)
         let icon_source = format!("{}/../assets/voicebox.icon", project_root);
-        let gen_dir = format!("{}/gen", project_root);
-
-        std::fs::create_dir_all(&gen_dir).expect("Failed to create gen directory");
 
         if std::path::Path::new(&icon_source).exists() {
             println!("cargo:rerun-if-changed={}", icon_source);
@@ -76,11 +76,89 @@ fn main() {
                     panic!("Icon compilation failed");
                 }
             }
+
+            // Generate voicebox.icns from the source PNG via sips + iconutil
+            let icns_path = format!("{}/voicebox.icns", gen_dir);
+            if !std::path::Path::new(&icns_path).exists() {
+                let source_png = format!("{}/Assets/Voicebox.png", icon_source);
+                if std::path::Path::new(&source_png).exists() {
+                    let iconset_dir = format!("{}/voicebox.iconset", gen_dir);
+                    std::fs::create_dir_all(&iconset_dir).ok();
+
+                    let sizes: &[(u32, &str)] = &[
+                        (16, "icon_16x16.png"),
+                        (32, "icon_16x16@2x.png"),
+                        (32, "icon_32x32.png"),
+                        (64, "icon_32x32@2x.png"),
+                        (128, "icon_128x128.png"),
+                        (256, "icon_128x128@2x.png"),
+                        (256, "icon_256x256.png"),
+                        (512, "icon_256x256@2x.png"),
+                        (512, "icon_512x512.png"),
+                        (1024, "icon_512x512@2x.png"),
+                    ];
+
+                    for (size, name) in sizes {
+                        let dest = format!("{}/{}", iconset_dir, name);
+                        let status = Command::new("sips")
+                            .args([
+                                "-z",
+                                &size.to_string(),
+                                &size.to_string(),
+                                &source_png,
+                                "--out",
+                                &dest,
+                            ])
+                            .output();
+                        if let Ok(out) = status {
+                            if !out.status.success() {
+                                eprintln!(
+                                    "sips failed for {}: {}",
+                                    name,
+                                    String::from_utf8_lossy(&out.stderr)
+                                );
+                            }
+                        }
+                    }
+
+                    let iconutil_output = Command::new("iconutil")
+                        .args(["-c", "icns", "-o", &icns_path, &iconset_dir])
+                        .output();
+
+                    match iconutil_output {
+                        Ok(out) if out.status.success() => {
+                            println!("Generated voicebox.icns");
+                        }
+                        Ok(out) => {
+                            eprintln!("iconutil failed: {}", String::from_utf8_lossy(&out.stderr));
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to run iconutil: {}", e);
+                        }
+                    }
+
+                    // Clean up iconset directory
+                    std::fs::remove_dir_all(&iconset_dir).ok();
+                }
+            }
         } else {
             println!(
                 "cargo:warning=Icon source not found at {}, skipping icon compilation",
                 icon_source
             );
+        }
+    }
+
+    // On non-macOS, create empty stub files for the macOS-only resources
+    // so Tauri's resource bundler doesn't fail on missing paths
+    #[cfg(not(target_os = "macos"))]
+    {
+        let stubs = ["Assets.car", "voicebox.icns", "partial.plist"];
+        for name in stubs {
+            let path = format!("{}/{}", gen_dir, name);
+            if !std::path::Path::new(&path).exists() {
+                std::fs::write(&path, b"").ok();
+            }
         }
     }
 
