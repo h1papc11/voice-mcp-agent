@@ -159,11 +159,11 @@ Tauri looks for `voicebox-server-${PLATFORM}` in `src-tauri/binaries/` and bundl
 
 The `build-cuda-windows` job runs separately:
 
-1. Install PyTorch with CUDA 12.6
+1. Install PyTorch with CUDA 12.8
 2. Build with `build_binary.py --cuda` (produces `--onedir` output)
 3. Package with `scripts/package_cuda.py` into two archives:
    - `voicebox-server-cuda.tar.gz` — server core (~945 MB)
-   - `cuda-libs-cu126-v1.tar.gz` — NVIDIA runtime libraries (~1.7 GB, cached independently)
+   - `cuda-libs-cu128-v1.tar.gz` — NVIDIA runtime libraries (~1.7 GB, cached independently)
 4. Upload archives as release artifacts
 
 This binary is downloaded on-demand by users who enable CUDA in settings. The CUDA libs archive is only re-downloaded when the CUDA toolkit version changes, not on every app update.

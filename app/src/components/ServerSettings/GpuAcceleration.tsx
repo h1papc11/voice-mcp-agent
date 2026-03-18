@@ -243,7 +243,40 @@ export function GpuAcceleration() {
 
         {/* Native GPU detected - no CUDA download needed */}
 
-        {/* CUDA download section - only show when no GPU is active (native or CUDA) */}
+        {/* Currently running CUDA - show switch back to CPU */}
+        {isCurrentlyCuda && platform.metadata.isTauri && (
+          <>
+            {restartPhase !== 'idle' ? (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">
+                  {restartPhase === 'stopping' && 'Stopping server...'}
+                  {restartPhase === 'waiting' && 'Restarting server...'}
+                  {restartPhase === 'ready' && 'Server restarted successfully!'}
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Running with CUDA GPU acceleration. Switch back to CPU if needed (you can
+                  re-download later).
+                </p>
+                <Button onClick={handleSwitchToCpu} variant="outline" className="w-full" size="sm">
+                  <RotateCw className="h-4 w-4 mr-2" />
+                  Switch to CPU Backend
+                </Button>
+              </div>
+            )}
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* CUDA download/manage section - show when no native GPU and not currently running CUDA */}
         {!hasNativeGpu && !isCurrentlyCuda && (
           <>
             {/* Download progress (manual download or auto-update) */}
@@ -315,7 +348,7 @@ export function GpuAcceleration() {
                 )}
 
                 {/* Downloaded but not active - show switch button */}
-                {cudaAvailable && !isCurrentlyCuda && platform.metadata.isTauri && (
+                {cudaAvailable && platform.metadata.isTauri && (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
                       CUDA backend is downloaded and ready. Restart the server to enable GPU
@@ -328,27 +361,8 @@ export function GpuAcceleration() {
                   </div>
                 )}
 
-                {/* Currently active - show switch back to CPU */}
-                {isCurrentlyCuda && platform.metadata.isTauri && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Running with CUDA GPU acceleration. Switch back to CPU if needed (you can
-                      re-download later).
-                    </p>
-                    <Button
-                      onClick={handleSwitchToCpu}
-                      variant="outline"
-                      className="w-full"
-                      size="sm"
-                    >
-                      <RotateCw className="h-4 w-4 mr-2" />
-                      Switch to CPU Backend
-                    </Button>
-                  </div>
-                )}
-
                 {/* Delete option when downloaded (and not active) */}
-                {cudaAvailable && !isCurrentlyCuda && (
+                {cudaAvailable && (
                   <Button
                     onClick={handleDelete}
                     variant="ghost"

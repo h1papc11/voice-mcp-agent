@@ -32,7 +32,7 @@ PROGRESS_KEY = "cuda-backend"
 
 # The current expected CUDA libs version.  Bump this when we change the
 # CUDA toolkit version or torch's CUDA dependency changes (e.g. cu126 -> cu128).
-CUDA_LIBS_VERSION = "cu126-v1"
+CUDA_LIBS_VERSION = "cu128-v1"
 
 
 def get_backends_dir() -> Path:
