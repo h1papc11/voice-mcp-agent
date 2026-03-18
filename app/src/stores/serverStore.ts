@@ -30,11 +30,29 @@ interface ServerStore {
   setCustomModelsDir: (dir: string | null) => void;
 }
 
+/**
+ * Invalidate all React Query caches and reset UI selection state.
+ * Called when the server URL changes so stale data from the previous
+ * server is not shown.
+ */
+function invalidateAllServerData() {
+  // Lazy import to avoid circular dependency (main.tsx -> serverStore -> main.tsx)
+  import('@/main').then(({ queryClient }) => {
+    queryClient.invalidateQueries();
+  });
+}
+
 export const useServerStore = create<ServerStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       serverUrl: 'http://127.0.0.1:17493',
-      setServerUrl: (url) => set({ serverUrl: url }),
+      setServerUrl: (url) => {
+        const prev = get().serverUrl;
+        set({ serverUrl: url });
+        if (url !== prev) {
+          invalidateAllServerData();
+        }
+      },
 
       isConnected: false,
       setIsConnected: (connected) => set({ isConnected: connected }),
