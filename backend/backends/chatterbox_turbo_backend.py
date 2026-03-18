@@ -18,6 +18,7 @@ from . import TTSBackend
 from .base import (
     is_model_cached,
     get_torch_device,
+    empty_device_cache,
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
     patch_chatterbox_f32,
@@ -48,7 +49,7 @@ class ChatterboxTurboTTSBackend:
         self._model_load_lock = asyncio.Lock()
 
     def _get_device(self) -> str:
-        return get_torch_device(force_cpu_on_mac=True)
+        return get_torch_device(force_cpu_on_mac=True, allow_xpu=True)
 
     def is_loaded(self) -> bool:
         return self.model is not None
@@ -116,10 +117,7 @@ class ChatterboxTurboTTSBackend:
             del self.model
             self.model = None
             self._device = None
-            if device == "cuda":
-                import torch
-
-                torch.cuda.empty_cache()
+            empty_device_cache(device)
             logger.info("Chatterbox Turbo unloaded")
 
     async def create_voice_prompt(
@@ -200,10 +198,7 @@ class ChatterboxTurboTTSBackend:
             else:
                 audio = np.asarray(wav, dtype=np.float32)
 
-            sample_rate = (
-                getattr(self.model, "sr", None)
-                or getattr(self.model, "sample_rate", 24000)
-            )
+            sample_rate = getattr(self.model, "sr", None) or getattr(self.model, "sample_rate", 24000)
 
             return audio, sample_rate
 

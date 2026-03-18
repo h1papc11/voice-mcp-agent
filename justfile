@@ -70,9 +70,14 @@ setup-python:
     Write-Host "Installing Python dependencies..."
     & "{{ python }}" -m pip install --upgrade pip -q
     $hasNvidia = $null -ne (Get-WmiObject Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' })
+    $hasIntelArc = $null -ne (Get-WmiObject Win32_VideoController | Where-Object { $_.Name -match 'Intel.*Arc' })
     if ($hasNvidia) { \
         Write-Host "NVIDIA GPU detected — installing PyTorch with CUDA support..."; \
         & "{{ pip }}" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128; \
+    } elseif ($hasIntelArc) { \
+        Write-Host "Intel Arc GPU detected — installing PyTorch with XPU support..."; \
+        & "{{ pip }}" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/xpu; \
+        & "{{ pip }}" install intel-extension-for-pytorch --index-url https://download.pytorch.org/whl/xpu; \
     }
     & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
     & "{{ pip }}" install --no-deps chatterbox-tts
