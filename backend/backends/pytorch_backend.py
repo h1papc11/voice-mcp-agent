@@ -19,6 +19,7 @@ from .base import (
 )
 from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_prompt
 from ..utils.audio import load_audio
+from ..utils.hf_offline_patch import force_offline_if_cached
 
 
 class PyTorchTTSBackend:
@@ -96,18 +97,19 @@ class PyTorchTTSBackend:
             model_path = self._get_model_path(model_size)
             logger.info("Loading TTS model %s on %s...", model_size, self.device)
 
-            if self.device == "cpu":
-                self.model = Qwen3TTSModel.from_pretrained(
-                    model_path,
-                    torch_dtype=torch.float32,
-                    low_cpu_mem_usage=False,
-                )
-            else:
-                self.model = Qwen3TTSModel.from_pretrained(
-                    model_path,
-                    device_map=self.device,
-                    torch_dtype=torch.bfloat16,
-                )
+            with force_offline_if_cached(is_cached, model_name):
+                if self.device == "cpu":
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_path,
+                        torch_dtype=torch.float32,
+                        low_cpu_mem_usage=False,
+                    )
+                else:
+                    self.model = Qwen3TTSModel.from_pretrained(
+                        model_path,
+                        device_map=self.device,
+                        torch_dtype=torch.bfloat16,
+                    )
 
         self._current_model_size = model_size
         self.model_size = model_size
@@ -282,8 +284,9 @@ class PyTorchSTTBackend:
             model_name = WHISPER_HF_REPOS.get(model_size, f"openai/whisper-{model_size}")
             logger.info("Loading Whisper model %s on %s...", model_size, self.device)
 
-            self.processor = WhisperProcessor.from_pretrained(model_name)
-            self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
+            with force_offline_if_cached(is_cached, progress_model_name):
+                self.processor = WhisperProcessor.from_pretrained(model_name)
+                self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
 
         self.model.to(self.device)
         self.model_size = model_size

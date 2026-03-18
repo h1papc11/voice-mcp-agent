@@ -6,7 +6,6 @@ from typing import Optional, List, Tuple
 import asyncio
 import logging
 import numpy as np
-import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -21,6 +20,7 @@ ensure_original_qwen_config_cached()
 from . import TTSBackend, STTBackend, LANGUAGE_CODE_TO_NAME, WHISPER_HF_REPOS
 from .base import is_model_cached, combine_voice_prompts as _combine_voice_prompts, model_load_progress
 from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_prompt
+from ..utils.hf_offline_patch import force_offline_if_cached
 
 
 class MLXTTSBackend:
@@ -96,32 +96,13 @@ class MLXTTSBackend:
         model_name = f"qwen-tts-{model_size}"
         is_cached = self._is_model_cached(model_size)
 
-        # Force offline mode when cached to avoid network requests
-        original_hf_hub_offline = os.environ.get("HF_HUB_OFFLINE")
-        if is_cached:
-            os.environ["HF_HUB_OFFLINE"] = "1"
-            logger.info("[PATCH] Model %s is cached, forcing HF_HUB_OFFLINE=1 to avoid network requests", model_size)
+        with model_load_progress(model_name, is_cached):
+            from mlx_audio.tts import load
 
-        try:
-            with model_load_progress(model_name, is_cached):
-                from mlx_audio.tts import load
+            logger.info("Loading MLX TTS model %s...", model_size)
 
-                logger.info("Loading MLX TTS model %s...", model_size)
-
-                try:
-                    self.model = load(model_path)
-                except Exception as load_error:
-                    if is_cached and "offline" in str(load_error).lower():
-                        logger.warning("[PATCH] Offline load failed, trying with network: %s", load_error)
-                        os.environ.pop("HF_HUB_OFFLINE", None)
-                        self.model = load(model_path)
-                    else:
-                        raise
-        finally:
-            if original_hf_hub_offline is not None:
-                os.environ["HF_HUB_OFFLINE"] = original_hf_hub_offline
-            else:
-                os.environ.pop("HF_HUB_OFFLINE", None)
+            with force_offline_if_cached(is_cached, model_name):
+                self.model = load(model_path)
 
         self._current_model_size = model_size
         self.model_size = model_size
@@ -329,7 +310,9 @@ class MLXSTTBackend:
 
             model_name = WHISPER_HF_REPOS.get(model_size, f"openai/whisper-{model_size}")
             logger.info("Loading MLX Whisper model %s...", model_size)
-            self.model = load(model_name)
+
+            with force_offline_if_cached(is_cached, progress_model_name):
+                self.model = load(model_name)
 
         self.model_size = model_size
         logger.info("MLX Whisper model %s loaded successfully", model_size)

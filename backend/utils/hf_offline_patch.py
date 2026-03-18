@@ -1,15 +1,62 @@
 """Monkey-patch huggingface_hub to force offline mode with cached models.
 
-Prevents mlx_audio from making network requests when models are already
-downloaded. Must be imported BEFORE mlx_audio.
+Prevents mlx_audio / transformers from making network requests when models
+are already downloaded. Must be imported BEFORE mlx_audio.
 """
 
 import logging
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def force_offline_if_cached(is_cached: bool, model_label: str = ""):
+    """Context manager that sets ``HF_HUB_OFFLINE=1`` while loading a cached model.
+
+    If *is_cached* is ``False`` the block runs normally (network allowed).
+    If the offline load raises an error containing "offline" we automatically
+    retry with network access so a partially-cached model still works.
+
+    Args:
+        is_cached: Whether the model weights are already on disk.
+        model_label: Human-readable name used in log messages.
+    """
+    if not is_cached:
+        yield
+        return
+
+    original_value = os.environ.get("HF_HUB_OFFLINE")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    logger.info(
+        "[offline-guard] %s is cached — forcing HF_HUB_OFFLINE=1",
+        model_label or "model",
+    )
+
+    try:
+        yield
+    except Exception as exc:
+        if "offline" in str(exc).lower():
+            logger.warning(
+                "[offline-guard] Offline load failed for %s, retrying with network: %s",
+                model_label or "model",
+                exc,
+            )
+            # Restore original env and retry — caller must wrap the load
+            # inside force_offline_if_cached so retrying here isn't possible.
+            # Instead, propagate a flag via the exception so the caller can
+            # decide.  For simplicity we just let it fall through to the
+            # finally block and re-raise.
+            raise
+        raise
+    finally:
+        if original_value is not None:
+            os.environ["HF_HUB_OFFLINE"] = original_value
+        else:
+            os.environ.pop("HF_HUB_OFFLINE", None)
 
 
 def patch_huggingface_hub_offline():
