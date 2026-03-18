@@ -191,10 +191,10 @@ jobs:
           pip install --no-deps chatterbox-tts
           pip install --no-deps hume-tada
 
-      - name: Install PyTorch with CUDA 12.6
+      - name: Install PyTorch with CUDA 12.8
         run: |
-          pip install torch --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps
-          pip install torchaudio --index-url https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps
+          pip install torch --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps
+          pip install torchaudio --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps
 
       - name: Verify CUDA support in torch
         run: |
@@ -211,8 +211,8 @@ jobs:
           python scripts/package_cuda.py \
             backend/dist/voicebox-server-cuda/ \
             --output release-assets/ \
-            --cuda-libs-version cu126-v1 \
-            --torch-compat ">=2.6.0,<2.11.0"
+            --cuda-libs-version cu128-v1 \
+            --torch-compat ">=2.7.0,<2.11.0"
 
       - name: Upload archives to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -221,8 +221,8 @@ jobs:
           files: |
             release-assets/voicebox-server-cuda.tar.gz
             release-assets/voicebox-server-cuda.tar.gz.sha256
-            release-assets/cuda-libs-cu126-v1.tar.gz
-            release-assets/cuda-libs-cu126-v1.tar.gz.sha256
+            release-assets/cuda-libs-cu128-v1.tar.gz
+            release-assets/cuda-libs-cu128-v1.tar.gz.sha256
             release-assets/cuda-libs.json
           draft: true
         env:

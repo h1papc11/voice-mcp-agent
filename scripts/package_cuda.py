@@ -3,13 +3,13 @@ Package the PyInstaller --onedir CUDA build into two archives.
 
 Takes the PyInstaller --onedir output directory and splits it into:
   1. voicebox-server-cuda.tar.gz  — server core (exe + non-NVIDIA deps)
-  2. cuda-libs-cu126.tar.gz       — NVIDIA runtime libraries only
+  2. cuda-libs-cu128.tar.gz       — NVIDIA runtime libraries only
   3. cuda-libs.json                — version manifest for the CUDA libs
 
 Usage:
     python scripts/package_cuda.py backend/dist/voicebox-server-cuda/
     python scripts/package_cuda.py backend/dist/voicebox-server-cuda/ --output release-assets/
-    python scripts/package_cuda.py backend/dist/voicebox-server-cuda/ --cuda-libs-version cu126-v1
+    python scripts/package_cuda.py backend/dist/voicebox-server-cuda/ --cuda-libs-version cu128-v1
 """
 
 import argparse
@@ -208,13 +208,13 @@ def main():
     parser.add_argument(
         "--cuda-libs-version",
         type=str,
-        default="cu126-v1",
-        help="Version string for the CUDA libs archive (default: cu126-v1)",
+        default="cu128-v1",
+        help="Version string for the CUDA libs archive (default: cu128-v1)",
     )
     parser.add_argument(
         "--torch-compat",
         type=str,
-        default=">=2.6.0,<2.11.0",
+        default=">=2.7.0,<2.11.0",
         help="Torch version compatibility range (default: >=2.6.0,<2.11.0)",
     )
     args = parser.parse_args()

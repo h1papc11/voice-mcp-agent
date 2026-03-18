@@ -370,7 +370,7 @@ def build_server(cuda=False):
                     "torchvision",
                     "torchaudio",
                     "--index-url",
-                    "https://download.pytorch.org/whl/cu126",
+                    "https://download.pytorch.org/whl/cu128",
                     "--force-reinstall",
                     "-q",
                 ],
