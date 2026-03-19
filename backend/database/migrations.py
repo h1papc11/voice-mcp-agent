@@ -189,8 +189,16 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
     These break when the production binary's CWD differs from the data directory.
     This migration converts them to absolute paths using the configured data dir.
     Idempotent: absolute paths are left untouched.
+
+    Strategy: paths like "data/generations/abc.wav" are rebased onto the
+    configured data directory.  If the path starts with "data/", strip that
+    prefix and prepend get_data_dir().  Otherwise, try resolving relative to
+    CWD as a fallback.
     """
     from pathlib import Path
+    from ..config import get_data_dir
+
+    data_dir = get_data_dir()
 
     path_columns = [
         ("generations", "audio_path"),
@@ -213,8 +221,20 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
                 p = Path(path_val)
                 if p.is_absolute():
                     continue
-                # Resolve relative to CWD (which is where they were created)
-                resolved = p.resolve()
+
+                # Try rebasing: "data/generations/abc.wav" → data_dir / "generations/abc.wav"
+                parts = p.parts
+                if parts and parts[0] == "data":
+                    rebased = data_dir / Path(*parts[1:])
+                else:
+                    rebased = data_dir / p
+
+                if rebased.exists():
+                    resolved = rebased
+                else:
+                    # Fallback: resolve relative to CWD
+                    resolved = p.resolve()
+
                 if resolved.exists():
                     conn.execute(
                         text(f"UPDATE {table} SET {column} = :path WHERE id = :id"),
