@@ -41,26 +41,11 @@ const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo']);
 /** Engines that support cloned (reference audio) profiles. */
 const CLONING_ENGINES = new Set(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo', 'tada']);
 
-/** Engines that are preset-only (no cloning). */
-const PRESET_ONLY_ENGINES = new Set(['kokoro']);
-
 /**
- * Get which engine options are available for the selected profile.
- *
- * - Preset profiles: locked to their preset engine
- * - All other profiles: all engines available
+ * All engine options are always available. The profile grid already
+ * filters by engine, so the dropdown doesn't need to restrict options.
  */
-function getAvailableOptions(selectedProfile?: VoiceProfileResponse | null) {
-  if (!selectedProfile) return ENGINE_OPTIONS;
-
-  const voiceType = selectedProfile.voice_type || 'cloned';
-
-  if (voiceType === 'preset') {
-    // Preset profiles lock to their specific engine
-    const presetEngine = selectedProfile.preset_engine;
-    return ENGINE_OPTIONS.filter((opt) => opt.engine === presetEngine);
-  }
-
+function getAvailableOptions(_selectedProfile?: VoiceProfileResponse | null) {
   return ENGINE_OPTIONS;
 }
 
@@ -169,5 +154,5 @@ export function isProfileCompatibleWithEngine(
   const voiceType = profile.voice_type || 'cloned';
   if (voiceType === 'preset') return profile.preset_engine === engine;
   if (voiceType === 'cloned') return CLONING_ENGINES.has(engine);
-  return !PRESET_ONLY_ENGINES.has(engine); // designed — future
+  return true; // designed — future
 }
