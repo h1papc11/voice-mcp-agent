@@ -569,15 +569,27 @@ export function HistoryTable() {
                       )}
 
                       {isFailed ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 text-muted-foreground/50 hover:bg-muted-foreground/20 hover:text-muted-foreground"
-                          aria-label="Retry generation"
-                          onClick={() => handleRetry(gen.id)}
-                        >
-                          <RotateCcw className="h-2 w-2" />
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground/50 hover:bg-muted-foreground/20 hover:text-muted-foreground"
+                            aria-label="Retry generation"
+                            onClick={() => handleRetry(gen.id)}
+                          >
+                            <RotateCcw className="h-2 w-2" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground/50 hover:bg-muted-foreground/20 hover:text-muted-foreground"
+                            aria-label="Delete generation"
+                            disabled={deleteGeneration.isPending}
+                            onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
+                          >
+                            <Trash2 className="h-2 w-2" />
+                          </Button>
+                        </>
                       ) : (
                         <>
                           <DropdownMenu>
