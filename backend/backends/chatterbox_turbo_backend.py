@@ -19,6 +19,7 @@ from .base import (
     is_model_cached,
     get_torch_device,
     empty_device_cache,
+    manual_seed,
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
     patch_chatterbox_f32,
@@ -179,7 +180,7 @@ class ChatterboxTurboTTSBackend:
             import torch
 
             if seed is not None:
-                torch.manual_seed(seed)
+                manual_seed(seed, self._device)
 
             logger.info("[Chatterbox Turbo] Generating (English)")
 

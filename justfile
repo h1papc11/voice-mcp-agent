@@ -69,8 +69,10 @@ setup-python:
     }
     Write-Host "Installing Python dependencies..."
     & "{{ python }}" -m pip install --upgrade pip -q
-    $hasNvidia = $null -ne (Get-WmiObject Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' })
-    $hasIntelArc = $null -ne (Get-WmiObject Win32_VideoController | Where-Object { $_.Name -match 'Intel.*Arc' })
+    $gpus = Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name
+    Write-Host "Detected GPUs: $($gpus -join ', ')"
+    $hasNvidia = ($gpus | Where-Object { $_ -match 'NVIDIA' }).Count -gt 0
+    $hasIntelArc = ($gpus | Where-Object { $_ -match 'Arc' }).Count -gt 0
     if ($hasNvidia) { \
         Write-Host "NVIDIA GPU detected — installing PyTorch with CUDA support..."; \
         & "{{ pip }}" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128; \
@@ -78,6 +80,11 @@ setup-python:
         Write-Host "Intel Arc GPU detected — installing PyTorch with XPU support..."; \
         & "{{ pip }}" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/xpu; \
         & "{{ pip }}" install intel-extension-for-pytorch --index-url https://download.pytorch.org/whl/xpu; \
+    } else { \
+        Write-Host "No NVIDIA or Intel Arc GPU detected — using CPU-only PyTorch."; \
+        Write-Host "If you have an Intel Arc GPU, install XPU support manually:"; \
+        Write-Host "  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/xpu"; \
+        Write-Host "  pip install intel-extension-for-pytorch --index-url https://download.pytorch.org/whl/xpu"; \
     }
     & "{{ pip }}" install -r {{ backend_dir }}/requirements.txt
     & "{{ pip }}" install --no-deps chatterbox-tts

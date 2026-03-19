@@ -16,6 +16,7 @@ from .base import (
     is_model_cached,
     get_torch_device,
     empty_device_cache,
+    manual_seed,
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
 )
@@ -163,12 +164,8 @@ class LuxTTSBackend:
         await self.load_model()
 
         def _generate_sync():
-            import torch
-
             if seed is not None:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
+                manual_seed(seed, self.device)
 
             wav = self.model.generate_speech(
                 text=text,
