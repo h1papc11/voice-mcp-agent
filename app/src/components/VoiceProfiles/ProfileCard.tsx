@@ -97,6 +97,16 @@ export function ProfileCard({ profile }: ProfileCardProps) {
             <Badge variant="outline" className="text-xs h-5 px-1.5 text-muted-foreground">
               {profile.language}
             </Badge>
+            {profile.voice_type === 'preset' && (
+              <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                {profile.preset_engine}
+              </Badge>
+            )}
+            {profile.voice_type === 'designed' && (
+              <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                designed
+              </Badge>
+            )}
             {profile.effects_chain && profile.effects_chain.length > 0 && (
               <Sparkles className="h-3.5 w-3.5 text-accent fill-accent" />
             )}

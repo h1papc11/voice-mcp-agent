@@ -167,6 +167,7 @@ TTS_ENGINES = {
     "chatterbox": "Chatterbox TTS",
     "chatterbox_turbo": "Chatterbox Turbo",
     "tada": "TADA",
+    "kokoro": "Kokoro",
 }
 
 
@@ -277,6 +278,14 @@ def _get_non_qwen_tts_configs() -> list[ModelConfig]:
             model_size="3B",
             size_mb=8000,
             languages=["en", "ar", "zh", "de", "es", "fr", "it", "ja", "pl", "pt"],
+        ),
+        ModelConfig(
+            model_name="kokoro",
+            display_name="Kokoro 82M",
+            engine="kokoro",
+            hf_repo_id="hexgrad/Kokoro-82M",
+            size_mb=350,
+            languages=["en", "es", "fr", "hi", "it", "pt", "ja", "zh"],
         ),
     ]
 
@@ -515,6 +524,10 @@ def get_tts_backend_for_engine(engine: str) -> TTSBackend:
             from .hume_backend import HumeTadaBackend
 
             backend = HumeTadaBackend()
+        elif engine == "kokoro":
+            from .kokoro_backend import KokoroTTSBackend
+
+            backend = KokoroTTSBackend()
         else:
             raise ValueError(f"Unknown TTS engine: {engine}. Supported: {list(TTS_ENGINES.keys())}")
 

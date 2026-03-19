@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { VoiceProfileResponse } from '@/lib/api/types';
 import { getLanguageOptionsForEngine } from '@/lib/constants/languages';
 import type { GenerationFormValues } from '@/lib/hooks/useGenerationForm';
 
@@ -15,13 +16,14 @@ import type { GenerationFormValues } from '@/lib/hooks/useGenerationForm';
  * Adding a new engine means adding one entry here.
  */
 const ENGINE_OPTIONS = [
-  { value: 'qwen:1.7B', label: 'Qwen3-TTS 1.7B' },
-  { value: 'qwen:0.6B', label: 'Qwen3-TTS 0.6B' },
-  { value: 'luxtts', label: 'LuxTTS' },
-  { value: 'chatterbox', label: 'Chatterbox' },
-  { value: 'chatterbox_turbo', label: 'Chatterbox Turbo' },
-  { value: 'tada:1B', label: 'TADA 1B' },
-  { value: 'tada:3B', label: 'TADA 3B Multilingual' },
+  { value: 'qwen:1.7B', label: 'Qwen3-TTS 1.7B', engine: 'qwen' },
+  { value: 'qwen:0.6B', label: 'Qwen3-TTS 0.6B', engine: 'qwen' },
+  { value: 'luxtts', label: 'LuxTTS', engine: 'luxtts' },
+  { value: 'chatterbox', label: 'Chatterbox', engine: 'chatterbox' },
+  { value: 'chatterbox_turbo', label: 'Chatterbox Turbo', engine: 'chatterbox_turbo' },
+  { value: 'tada:1B', label: 'TADA 1B', engine: 'tada' },
+  { value: 'tada:3B', label: 'TADA 3B Multilingual', engine: 'tada' },
+  { value: 'kokoro', label: 'Kokoro 82M', engine: 'kokoro' },
 ] as const;
 
 const ENGINE_DESCRIPTIONS: Record<string, string> = {
@@ -30,10 +32,37 @@ const ENGINE_DESCRIPTIONS: Record<string, string> = {
   chatterbox: '23 languages, incl. Hebrew',
   chatterbox_turbo: 'English, [laugh] [cough] tags',
   tada: 'HumeAI, 700s+ coherent audio',
+  kokoro: '82M params, CPU realtime, 8 langs',
 };
 
 /** Engines that only support English and should force language to 'en' on select. */
 const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo']);
+
+/** Engines that support cloned (reference audio) profiles. */
+const CLONING_ENGINES = new Set(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo', 'tada']);
+
+/** Engines that are preset-only (no cloning). */
+const PRESET_ONLY_ENGINES = new Set(['kokoro']);
+
+/**
+ * Get which engine options are available for the selected profile.
+ *
+ * - Preset profiles: locked to their preset engine
+ * - All other profiles: all engines available
+ */
+function getAvailableOptions(selectedProfile?: VoiceProfileResponse | null) {
+  if (!selectedProfile) return ENGINE_OPTIONS;
+
+  const voiceType = selectedProfile.voice_type || 'cloned';
+
+  if (voiceType === 'preset') {
+    // Preset profiles lock to their specific engine
+    const presetEngine = selectedProfile.preset_engine;
+    return ENGINE_OPTIONS.filter((opt) => opt.engine === presetEngine);
+  }
+
+  return ENGINE_OPTIONS;
+}
 
 function getSelectValue(engine: string, modelSize?: string): string {
   if (engine === 'qwen') return `qwen:${modelSize || '1.7B'}`;
@@ -85,12 +114,21 @@ function handleEngineChange(form: UseFormReturn<GenerationFormValues>, value: st
 interface EngineModelSelectorProps {
   form: UseFormReturn<GenerationFormValues>;
   compact?: boolean;
+  selectedProfile?: VoiceProfileResponse | null;
 }
 
-export function EngineModelSelector({ form, compact }: EngineModelSelectorProps) {
+export function EngineModelSelector({ form, compact, selectedProfile }: EngineModelSelectorProps) {
   const engine = form.watch('engine') || 'qwen';
   const modelSize = form.watch('modelSize');
   const selectValue = getSelectValue(engine, modelSize);
+  const availableOptions = getAvailableOptions(selectedProfile);
+
+  // If current engine isn't in available options, auto-switch to first available
+  const currentEngineAvailable = availableOptions.some((opt) => opt.value === selectValue);
+  if (!currentEngineAvailable && availableOptions.length > 0) {
+    // Defer to avoid setting state during render
+    setTimeout(() => handleEngineChange(form, availableOptions[0].value), 0);
+  }
 
   const itemClass = compact ? 'text-xs text-muted-foreground' : undefined;
   const triggerClass = compact
@@ -105,7 +143,7 @@ export function EngineModelSelector({ form, compact }: EngineModelSelectorProps)
         </SelectTrigger>
       </FormControl>
       <SelectContent>
-        {ENGINE_OPTIONS.map((opt) => (
+        {availableOptions.map((opt) => (
           <SelectItem key={opt.value} value={opt.value} className={itemClass}>
             {opt.label}
           </SelectItem>
@@ -118,4 +156,18 @@ export function EngineModelSelector({ form, compact }: EngineModelSelectorProps)
 /** Returns a human-readable description for the currently selected engine. */
 export function getEngineDescription(engine: string): string {
   return ENGINE_DESCRIPTIONS[engine] ?? '';
+}
+
+/**
+ * Check if a profile is compatible with the currently selected engine.
+ * Useful for UI hints.
+ */
+export function isProfileCompatibleWithEngine(
+  profile: VoiceProfileResponse,
+  engine: string,
+): boolean {
+  const voiceType = profile.voice_type || 'cloned';
+  if (voiceType === 'preset') return profile.preset_engine === engine;
+  if (voiceType === 'cloned') return CLONING_ENGINES.has(engine);
+  return !PRESET_ONLY_ENGINES.has(engine); // designed — future
 }

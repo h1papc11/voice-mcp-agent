@@ -17,6 +17,7 @@ import type {
   HistoryResponse,
   ModelDownloadRequest,
   ModelStatusListResponse,
+  PresetVoice,
   ProfileSampleResponse,
   StoryCreate,
   StoryDetailResponse,
@@ -95,6 +96,16 @@ class ApiClient {
 
   async getProfile(profileId: string): Promise<VoiceProfileResponse> {
     return this.request<VoiceProfileResponse>(`/profiles/${profileId}`);
+  }
+
+  async listPresetVoices(engine: string): Promise<{ engine: string; voices: PresetVoice[] }> {
+    return this.request<{ engine: string; voices: PresetVoice[] }>(`/profiles/presets/${engine}`);
+  }
+
+  async seedPresetProfiles(
+    engine: string,
+  ): Promise<{ engine: string; created: number; total_available: number }> {
+    return this.request(`/profiles/presets/${engine}/seed`, { method: 'POST' });
   }
 
   async updateProfile(profileId: string, data: VoiceProfileCreate): Promise<VoiceProfileResponse> {

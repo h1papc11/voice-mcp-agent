@@ -1,9 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit2, Mic, Monitor, Upload, X } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Edit2, Mic, Monitor, Music, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,6 +17,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -32,7 +35,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { apiClient } from '@/lib/api/client';
-import type { EffectConfig } from '@/lib/api/types';
+import type { EffectConfig, PresetVoice, VoiceType } from '@/lib/api/types';
 import { LANGUAGE_CODES, LANGUAGE_OPTIONS, type LanguageCode } from '@/lib/constants/languages';
 import { useAudioPlayer } from '@/lib/hooks/useAudioPlayer';
 import { useAudioRecording } from '@/lib/hooks/useAudioRecording';
@@ -120,16 +123,20 @@ export function ProfileForm() {
   const deleteAvatar = useDeleteAvatar();
   const transcribe = useTranscription();
   const { toast } = useToast();
+  const [voiceSource, setVoiceSource] = useState<'clone' | 'builtin'>('clone');
   const [sampleMode, setSampleMode] = useState<'upload' | 'record' | 'system'>('record');
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [isValidatingAudio, setIsValidatingAudio] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [selectedPresetEngine, setSelectedPresetEngine] = useState<string>('kokoro');
+  const [selectedPresetVoiceId, setSelectedPresetVoiceId] = useState<string>('');
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const { isPlaying, playPause, cleanup: cleanupAudio } = useAudioPlayer();
   const isCreating = !editingProfileId;
   const serverUrl = useServerStore((state) => state.serverUrl);
   const [profileEffectsChain, setProfileEffectsChain] = useState<EffectConfig[]>([]);
   const [effectsDirty, setEffectsDirty] = useState(false);
+  const [defaultEngine, setDefaultEngine] = useState<string>('');
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -239,6 +246,20 @@ export function ProfileForm() {
     },
   });
 
+  // Fetch available preset voices for the selected engine
+  const presetEngineToQuery = isCreating
+    ? selectedPresetEngine
+    : (editingProfile?.preset_engine ?? '');
+  const { data: presetVoicesData } = useQuery({
+    queryKey: ['presetVoices', presetEngineToQuery],
+    queryFn: () => apiClient.listPresetVoices(presetEngineToQuery),
+    enabled:
+      !!presetEngineToQuery &&
+      ((voiceSource === 'builtin' && isCreating) ||
+        (!isCreating && editingProfile?.voice_type === 'preset')),
+  });
+  const presetVoices = presetVoicesData?.voices ?? [];
+
   // Show recording errors
   useEffect(() => {
     if (recordingError) {
@@ -287,6 +308,7 @@ export function ProfileForm() {
       });
       setProfileEffectsChain(editingProfile.effects_chain ?? []);
       setEffectsDirty(false);
+      setDefaultEngine(editingProfile.default_engine ?? '');
     } else if (profileFormDraft && open) {
       // Restore from draft when opening in create mode
       form.reset({
@@ -415,13 +437,14 @@ export function ProfileForm() {
   async function onSubmit(data: ProfileFormValues) {
     try {
       if (editingProfileId) {
-        // Editing: just update profile
+        // Editing: update profile
         await updateProfile.mutateAsync({
           profileId: editingProfileId,
           data: {
             name: data.name,
             description: data.description,
             language: data.language,
+            default_engine: defaultEngine || undefined,
           },
         });
 
@@ -464,8 +487,50 @@ export function ProfileForm() {
           title: 'Voice updated',
           description: `"${data.name}" has been updated successfully.`,
         });
+      } else if (voiceSource === 'builtin') {
+        // Creating preset profile from built-in voice
+        if (!selectedPresetVoiceId) {
+          toast({
+            title: 'No voice selected',
+            description: 'Please select a built-in voice.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        const profile = await createProfile.mutateAsync({
+          name: data.name,
+          description: data.description,
+          language: data.language,
+          voice_type: 'preset' as VoiceType,
+          preset_engine: selectedPresetEngine,
+          preset_voice_id: selectedPresetVoiceId,
+          default_engine: selectedPresetEngine,
+        });
+
+        // Handle avatar upload if provided
+        if (data.avatarFile) {
+          try {
+            await uploadAvatar.mutateAsync({
+              profileId: profile.id,
+              file: data.avatarFile,
+            });
+          } catch (avatarError) {
+            toast({
+              title: 'Avatar upload failed',
+              description:
+                avatarError instanceof Error ? avatarError.message : 'Failed to upload avatar',
+              variant: 'destructive',
+            });
+          }
+        }
+
+        toast({
+          title: 'Profile created',
+          description: `"${data.name}" has been created with a built-in voice.`,
+        });
       } else {
-        // Creating: require sample file and reference text
+        // Creating cloned profile: require sample file and reference text
         const sampleFile = form.getValues('sampleFile');
         const referenceText = form.getValues('referenceText');
 
@@ -528,6 +593,7 @@ export function ProfileForm() {
           name: data.name,
           description: data.description,
           language: data.language,
+          default_engine: defaultEngine || undefined,
         });
 
         // Convert non-WAV uploads to WAV so the backend can always use soundfile.
@@ -642,16 +708,16 @@ export function ProfileForm() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-none w-screen h-screen left-0 top-0 translate-x-0 translate-y-0 rounded-none p-6 overflow-y-auto">
-        <div className="max-w-5xl max-h-[85vh] mx-auto my-auto w-full flex flex-col">
+      <DialogContent className="max-w-none w-screen h-screen left-0 top-0 translate-x-0 translate-y-0 rounded-none p-6 overflow-hidden">
+        <div className="max-w-5xl h-[85vh] mx-auto my-auto w-full flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              {editingProfileId ? 'Edit Voice' : 'Clone voice'}
+              {editingProfileId ? 'Edit Voice' : 'Create Voice'}
             </DialogTitle>
             <DialogDescription>
               {editingProfileId
                 ? 'Update your voice profile details and manage samples.'
-                : 'Create a new voice profile with an audio sample to clone the voice.'}
+                : 'Create a new voice profile from an audio sample or a built-in voice.'}
             </DialogDescription>
             {isCreating && profileFormDraft && (
               <div className="flex items-center gap-2 pt-2">
@@ -682,143 +748,275 @@ export function ProfileForm() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
-              <div className="grid gap-6 grid-cols-2 flex-1 overflow-y-auto min-h-0">
+              <div className="grid gap-6 grid-cols-2 flex-1 min-h-0 overflow-hidden">
                 {/* Left column: Sample management */}
-                <div className="space-y-4 border-r pr-6">
+                <div className="space-y-4 border-r pr-6 overflow-y-auto min-h-0">
                   {isCreating ? (
                     <>
-                      <Tabs
-                        className="pt-4"
-                        value={sampleMode}
-                        onValueChange={(v) => {
-                          const newMode = v as 'upload' | 'record' | 'system';
-                          // Cancel any active recordings when switching modes
-                          if (isRecording && newMode !== 'record') {
-                            cancelRecording();
-                          }
-                          if (isSystemRecording && newMode !== 'system') {
-                            cancelSystemRecording();
-                          }
-                          setSampleMode(newMode);
-                        }}
-                      >
-                        <TabsList
-                          className={`grid w-full ${platform.metadata.isTauri && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
-                        >
-                          <TabsTrigger value="upload" className="flex items-center gap-2">
-                            <Upload className="h-4 w-4 shrink-0" />
-                            Upload
-                          </TabsTrigger>
-                          <TabsTrigger value="record" className="flex items-center gap-2">
-                            <Mic className="h-4 w-4 shrink-0" />
-                            Record
-                          </TabsTrigger>
-                          {platform.metadata.isTauri && isSystemAudioSupported && (
-                            <TabsTrigger value="system" className="flex items-center gap-2">
-                              <Monitor className="h-4 w-4 shrink-0" />
-                              System Audio
-                            </TabsTrigger>
-                          )}
-                        </TabsList>
+                      {/* Voice source selector */}
+                      <div className="flex pt-4 pb-2">
+                        <div className="inline-flex rounded-lg border border-border p-0.5 bg-muted/50">
+                          <button
+                            type="button"
+                            onClick={() => setVoiceSource('clone')}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                              voiceSource === 'clone'
+                                ? 'bg-accent text-accent-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <Mic className="h-3.5 w-3.5" />
+                            Clone from audio
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setVoiceSource('builtin')}
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                              voiceSource === 'builtin'
+                                ? 'bg-accent text-accent-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <Music className="h-3.5 w-3.5" />
+                            Built-in voice
+                          </button>
+                        </div>
+                      </div>
 
-                        <TabsContent value="upload" className="space-y-4">
-                          <FormField
-                            control={form.control}
-                            name="sampleFile"
-                            render={({ field: { onChange, name } }) => (
-                              <AudioSampleUpload
-                                file={selectedFile}
-                                onFileChange={onChange}
-                                onTranscribe={handleTranscribe}
-                                onPlayPause={handlePlayPause}
-                                isPlaying={isPlaying}
-                                isValidating={isValidatingAudio}
-                                isTranscribing={transcribe.isPending}
-                                isDisabled={
-                                  audioDuration !== null &&
-                                  audioDuration > MAX_AUDIO_DURATION_SECONDS
-                                }
-                                fieldName={name}
-                              />
-                            )}
-                          />
-                        </TabsContent>
+                      {voiceSource === 'builtin' ? (
+                        <div className="space-y-4">
+                          <FormDescription>
+                            Choose a pre-built voice. These don't require an audio sample.
+                          </FormDescription>
 
-                        <TabsContent value="record" className="space-y-4">
-                          <FormField
-                            control={form.control}
-                            name="sampleFile"
-                            render={() => (
-                              <AudioSampleRecording
-                                file={selectedFile}
-                                isRecording={isRecording}
-                                duration={duration}
-                                onStart={startRecording}
-                                onStop={stopRecording}
-                                onCancel={handleCancelRecording}
-                                onTranscribe={handleTranscribe}
-                                onPlayPause={handlePlayPause}
-                                isPlaying={isPlaying}
-                                isTranscribing={transcribe.isPending}
-                              />
-                            )}
-                          />
-                        </TabsContent>
-
-                        {platform.metadata.isTauri && isSystemAudioSupported && (
-                          <TabsContent value="system" className="space-y-4">
-                            <FormField
-                              control={form.control}
-                              name="sampleFile"
-                              render={() => (
-                                <AudioSampleSystem
-                                  file={selectedFile}
-                                  isRecording={isSystemRecording}
-                                  duration={systemDuration}
-                                  onStart={startSystemRecording}
-                                  onStop={stopSystemRecording}
-                                  onCancel={handleCancelRecording}
-                                  onTranscribe={handleTranscribe}
-                                  onPlayPause={handlePlayPause}
-                                  isPlaying={isPlaying}
-                                  isTranscribing={transcribe.isPending}
-                                />
-                              )}
-                            />
-                          </TabsContent>
-                        )}
-                      </Tabs>
-
-                      <FormField
-                        control={form.control}
-                        name="referenceText"
-                        render={({ field }) => (
+                          {/* Engine selector */}
                           <FormItem>
-                            <FormLabel>Reference Text</FormLabel>
-                            <FormControl>
-                              <Textarea
-                                placeholder="Enter the exact text spoken in the audio..."
-                                className="min-h-[100px]"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
+                            <FormLabel>Engine</FormLabel>
+                            <Select
+                              value={selectedPresetEngine}
+                              onValueChange={setSelectedPresetEngine}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="kokoro">Kokoro 82M</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </FormItem>
-                        )}
-                      />
+
+                          {/* Voice picker */}
+                          <FormItem>
+                            <FormLabel>Voice</FormLabel>
+                            <div className="grid grid-cols-2 gap-1.5 max-h-[340px] overflow-y-auto pr-1">
+                              {presetVoices.map((voice: PresetVoice) => (
+                                <button
+                                  key={voice.voice_id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPresetVoiceId(voice.voice_id);
+                                    // Auto-set language from voice
+                                    if (voice.language) {
+                                      form.setValue('language', voice.language as LanguageCode);
+                                    }
+                                  }}
+                                  className={`text-left px-3 py-2 rounded-md border text-sm transition-colors ${
+                                    selectedPresetVoiceId === voice.voice_id
+                                      ? 'border-accent bg-accent/10 text-accent-foreground'
+                                      : 'border-border hover:bg-muted'
+                                  }`}
+                                >
+                                  <div className="font-medium">{voice.name}</div>
+                                  <div className="flex gap-1.5 mt-0.5">
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                      {voice.gender}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1">
+                                      {voice.language}
+                                    </Badge>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </FormItem>
+                        </div>
+                      ) : (
+                        <>
+                          <Tabs
+                            className="pt-0"
+                            value={sampleMode}
+                            onValueChange={(v) => {
+                              const newMode = v as 'upload' | 'record' | 'system';
+                              // Cancel any active recordings when switching modes
+                              if (isRecording && newMode !== 'record') {
+                                cancelRecording();
+                              }
+                              if (isSystemRecording && newMode !== 'system') {
+                                cancelSystemRecording();
+                              }
+                              setSampleMode(newMode);
+                            }}
+                          >
+                            <TabsList
+                              className={`grid w-full ${platform.metadata.isTauri && isSystemAudioSupported ? 'grid-cols-3' : 'grid-cols-2'}`}
+                            >
+                              <TabsTrigger value="upload" className="flex items-center gap-2">
+                                <Upload className="h-4 w-4 shrink-0" />
+                                Upload
+                              </TabsTrigger>
+                              <TabsTrigger value="record" className="flex items-center gap-2">
+                                <Mic className="h-4 w-4 shrink-0" />
+                                Record
+                              </TabsTrigger>
+                              {platform.metadata.isTauri && isSystemAudioSupported && (
+                                <TabsTrigger value="system" className="flex items-center gap-2">
+                                  <Monitor className="h-4 w-4 shrink-0" />
+                                  System Audio
+                                </TabsTrigger>
+                              )}
+                            </TabsList>
+
+                            <TabsContent value="upload" className="space-y-4">
+                              <FormField
+                                control={form.control}
+                                name="sampleFile"
+                                render={({ field: { onChange, name } }) => (
+                                  <AudioSampleUpload
+                                    file={selectedFile}
+                                    onFileChange={onChange}
+                                    onTranscribe={handleTranscribe}
+                                    onPlayPause={handlePlayPause}
+                                    isPlaying={isPlaying}
+                                    isValidating={isValidatingAudio}
+                                    isTranscribing={transcribe.isPending}
+                                    isDisabled={
+                                      audioDuration !== null &&
+                                      audioDuration > MAX_AUDIO_DURATION_SECONDS
+                                    }
+                                    fieldName={name}
+                                  />
+                                )}
+                              />
+                            </TabsContent>
+
+                            <TabsContent value="record" className="space-y-4">
+                              <FormField
+                                control={form.control}
+                                name="sampleFile"
+                                render={() => (
+                                  <AudioSampleRecording
+                                    file={selectedFile}
+                                    isRecording={isRecording}
+                                    duration={duration}
+                                    onStart={startRecording}
+                                    onStop={stopRecording}
+                                    onCancel={handleCancelRecording}
+                                    onTranscribe={handleTranscribe}
+                                    onPlayPause={handlePlayPause}
+                                    isPlaying={isPlaying}
+                                    isTranscribing={transcribe.isPending}
+                                  />
+                                )}
+                              />
+                            </TabsContent>
+
+                            {platform.metadata.isTauri && isSystemAudioSupported && (
+                              <TabsContent value="system" className="space-y-4">
+                                <FormField
+                                  control={form.control}
+                                  name="sampleFile"
+                                  render={() => (
+                                    <AudioSampleSystem
+                                      file={selectedFile}
+                                      isRecording={isSystemRecording}
+                                      duration={systemDuration}
+                                      onStart={startSystemRecording}
+                                      onStop={stopSystemRecording}
+                                      onCancel={handleCancelRecording}
+                                      onTranscribe={handleTranscribe}
+                                      onPlayPause={handlePlayPause}
+                                      isPlaying={isPlaying}
+                                      isTranscribing={transcribe.isPending}
+                                    />
+                                  )}
+                                />
+                              </TabsContent>
+                            )}
+                          </Tabs>
+
+                          <FormField
+                            control={form.control}
+                            name="referenceText"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Reference Text</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Enter the exact text spoken in the audio..."
+                                    className="min-h-[100px]"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </>
+                      )}
                     </>
                   ) : (
-                    // Show sample list when editing
-                    editingProfileId && (
+                    // Editing mode
+                    editingProfileId &&
+                    editingProfile &&
+                    (editingProfile.voice_type === 'preset' ? (
+                      <div className="space-y-4 pt-4">
+                        <div className="rounded-lg border border-border p-4 space-y-3">
+                          <div className="text-sm font-medium text-muted-foreground">
+                            Built-in Voice
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-lg font-semibold">
+                              {presetVoices.find(
+                                (v: PresetVoice) => v.voice_id === editingProfile.preset_voice_id,
+                              )?.name ?? editingProfile.preset_voice_id}
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {editingProfile.preset_engine}
+                            </Badge>
+                          </div>
+                          {(() => {
+                            const voice = presetVoices.find(
+                              (v: PresetVoice) => v.voice_id === editingProfile.preset_voice_id,
+                            );
+                            return voice ? (
+                              <div className="flex gap-1.5">
+                                <Badge variant="outline" className="text-xs">
+                                  {voice.gender}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {voice.language}
+                                </Badge>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          This profile uses a built-in voice. The voice cannot be changed after
+                          creation.
+                        </p>
+                      </div>
+                    ) : (
                       <div>
                         <SampleList profileId={editingProfileId} />
                       </div>
-                    )
+                    ))
                   )}
                 </div>
 
                 {/* Right column: Profile info */}
-                <div className="space-y-4">
+                <div className="space-y-4 overflow-y-auto min-h-0">
                   {/* Avatar Upload */}
                   <FormField
                     control={form.control}
@@ -923,6 +1121,37 @@ export function ProfileForm() {
                       </FormItem>
                     )}
                   />
+
+                  <FormItem>
+                    <FormLabel>Default Engine</FormLabel>
+                    <Select
+                      value={defaultEngine || '_none'}
+                      onValueChange={(v) => {
+                        setDefaultEngine(v === '_none' ? '' : v);
+                      }}
+                      disabled={
+                        voiceSource === 'builtin' || editingProfile?.voice_type === 'preset'
+                      }
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="No preference" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="_none">No preference</SelectItem>
+                        <SelectItem value="qwen">Qwen3-TTS</SelectItem>
+                        <SelectItem value="luxtts">LuxTTS</SelectItem>
+                        <SelectItem value="chatterbox">Chatterbox</SelectItem>
+                        <SelectItem value="chatterbox_turbo">Chatterbox Turbo</SelectItem>
+                        <SelectItem value="tada">TADA</SelectItem>
+                        <SelectItem value="kokoro">Kokoro 82M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Auto-selects this engine when the profile is chosen.
+                    </p>
+                  </FormItem>
 
                   {editingProfileId && (
                     <div className="space-y-2">

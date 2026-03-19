@@ -228,6 +228,44 @@ def build_server(cuda=False):
             "torchaudio",
             "--collect-submodules",
             "tada",
+            # Kokoro 82M — lightweight TTS engine using misaki G2P
+            "--hidden-import",
+            "backend.backends.kokoro_backend",
+            "--hidden-import",
+            "kokoro",
+            "--hidden-import",
+            "kokoro.pipeline",
+            "--hidden-import",
+            "kokoro.model",
+            "--hidden-import",
+            "kokoro.istftnet",
+            "--hidden-import",
+            "kokoro.modules",
+            "--hidden-import",
+            "kokoro.custom_stft",
+            # misaki ships G2P data files (dictionaries, phoneme tables)
+            # that must be bundled for espeak/en/ja/zh G2P to work
+            "--collect-all",
+            "misaki",
+            # language_tags ships JSON data files (index.json etc.) loaded at
+            # runtime via: misaki → phonemizer → segments → csvw → language_tags
+            "--collect-all",
+            "language_tags",
+            # espeakng_loader ships the entire espeak-ng-data directory (369 files)
+            # loaded at import time by misaki.espeak via get_data_path()
+            "--collect-all",
+            "espeakng_loader",
+            # spacy en_core_web_sm model — misaki.en tries to spacy.cli.download()
+            # at runtime if not found, which calls pip as a subprocess and crashes
+            # the frozen binary. Bundle the model so spacy.util.is_package() passes.
+            "--collect-all",
+            "en_core_web_sm",
+            "--copy-metadata",
+            "en_core_web_sm",
+            "--hidden-import",
+            "en_core_web_sm",
+            "--hidden-import",
+            "loguru",
         ]
     )
 

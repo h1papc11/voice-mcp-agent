@@ -66,6 +66,8 @@ const MODEL_DESCRIPTIONS: Record<string, string> = {
     'HumeAI TADA 1B — English speech-language model built on Llama 3.2 1B. Generates 700s+ of coherent audio with synchronized text-acoustic alignment.',
   'tada-3b-ml':
     'HumeAI TADA 3B Multilingual — built on Llama 3.2 3B. Supports 10 languages with high-fidelity voice cloning via text-acoustic dual alignment.',
+  kokoro:
+    'Kokoro 82M by hexgrad. Tiny 82M-parameter TTS that runs at CPU realtime. Supports 8 languages with pre-built voice styles. Apache 2.0 licensed.',
   'whisper-base':
     'Smallest Whisper model (74M parameters). Fast transcription with moderate accuracy.',
   'whisper-small':
@@ -396,7 +398,8 @@ export function ModelManagement() {
         m.model_name.startsWith('qwen-tts') ||
         m.model_name.startsWith('luxtts') ||
         m.model_name.startsWith('chatterbox') ||
-        m.model_name.startsWith('tada'),
+        m.model_name.startsWith('tada') ||
+        m.model_name.startsWith('kokoro'),
     ) ?? [];
   const whisperModels = modelStatus?.models.filter((m) => m.model_name.startsWith('whisper')) ?? [];
 

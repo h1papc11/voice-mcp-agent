@@ -285,6 +285,34 @@ In `app/src/lib/hooks/useGenerationForm.ts`:
 
 In `app/src/components/ServerSettings/ModelManagement.tsx`:
 - Add description to `MODEL_DESCRIPTIONS` record
+- Add model name to `voiceModels` filter condition
+
+### 3.6 Non-Cloning Engines (Preset Voices)
+
+If your engine uses **pre-built voices** instead of zero-shot cloning from reference audio (e.g. Kokoro), additional integration is needed:
+
+**Backend:**
+- In `kokoro_backend.py` (or your engine), define a `VOICES` list of `(voice_id, display_name, gender, language)` tuples
+- `create_voice_prompt()` should return `{"voice_type": "preset", "preset_engine": "<engine>", "preset_voice_id": "<id>"}`
+- `generate()` should read `voice_prompt.get("preset_voice_id")` to select the voice
+- Add a `seed_preset_profiles("<engine>")` call in `backend/routes/models.py` after model download completes
+- The `seed_preset_profiles()` function in `backend/services/profiles.py` creates DB profiles with `voice_type="preset"`
+
+**Frontend:**
+- The `EngineModelSelector` filters options based on `selectedProfile.voice_type`:
+  - `"cloned"` profiles → only cloning engines shown (Kokoro hidden)
+  - `"preset"` profiles → only the preset's engine shown
+- Profile cards show the engine name as a badge for preset profiles
+- When a preset profile is selected, the engine auto-switches
+
+**Profile schema fields for presets:**
+- `voice_type: "preset"` (vs `"cloned"` for traditional profiles)
+- `preset_engine: "<engine>"` — which engine owns this voice
+- `preset_voice_id: "<id>"` — the engine-specific voice identifier
+
+**For future "designed" voices** (text description instead of audio, e.g. Qwen CustomVoice):
+- Use `voice_type: "designed"` with `design_prompt` field
+- `create_voice_prompt_for_profile()` already returns the design prompt for this type
 
 ## Phase 4: Dependencies
 
