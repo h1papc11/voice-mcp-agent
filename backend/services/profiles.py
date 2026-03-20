@@ -236,7 +236,7 @@ async def add_profile_sample(
     db_sample = DBProfileSample(
         id=sample_id,
         profile_id=profile_id,
-        audio_path=str(dest_path),
+        audio_path=config.to_storage_path(dest_path),
         reference_text=reference_text,
     )
 
@@ -441,8 +441,8 @@ async def delete_profile_sample(
     # Store profile_id before deleting
     profile_id = sample.profile_id
 
-    audio_path = Path(sample.audio_path)
-    if audio_path.exists():
+    audio_path = config.resolve_storage_path(sample.audio_path)
+    if audio_path is not None and audio_path.exists():
         audio_path.unlink()
 
     db.delete(sample)
@@ -556,14 +556,22 @@ async def create_voice_prompt_for_profile(
 
     if len(samples) == 1:
         sample = samples[0]
+        sample_audio_path = config.resolve_storage_path(sample.audio_path)
+        if sample_audio_path is None:
+            raise ValueError(f"Sample audio not found for profile {profile_id}")
         voice_prompt, _ = await tts_model.create_voice_prompt(
-            sample.audio_path,
+            str(sample_audio_path),
             sample.reference_text,
             use_cache=use_cache,
         )
         return voice_prompt
 
-    audio_paths = [s.audio_path for s in samples]
+    audio_paths = []
+    for sample in samples:
+        sample_audio_path = config.resolve_storage_path(sample.audio_path)
+        if sample_audio_path is None:
+            raise ValueError(f"Sample audio not found for profile {profile_id}")
+        audio_paths.append(str(sample_audio_path))
     reference_texts = [s.reference_text for s in samples]
 
     combined_audio, combined_text = await tts_model.combine_voice_prompts(
@@ -617,8 +625,8 @@ async def upload_avatar(
         raise ValueError(error_msg)
 
     if profile.avatar_path:
-        old_avatar = Path(profile.avatar_path)
-        if old_avatar.exists():
+        old_avatar = config.resolve_storage_path(profile.avatar_path)
+        if old_avatar is not None and old_avatar.exists():
             old_avatar.unlink()
 
     # Determine file extension from uploaded file
@@ -639,7 +647,7 @@ async def upload_avatar(
 
     process_avatar(image_path, str(output_path))
 
-    profile.avatar_path = str(output_path)
+    profile.avatar_path = config.to_storage_path(output_path)
     profile.updated_at = datetime.utcnow()
 
     db.commit()
@@ -666,8 +674,8 @@ async def delete_avatar(
     if not profile or not profile.avatar_path:
         return False
 
-    avatar_path = Path(profile.avatar_path)
-    if avatar_path.exists():
+    avatar_path = config.resolve_storage_path(profile.avatar_path)
+    if avatar_path is not None and avatar_path.exists():
         avatar_path.unlink()
 
     profile.avatar_path = None

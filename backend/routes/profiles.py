@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import models
+from .. import config, models
 from ..app import safe_content_disposition
 from ..database import VoiceProfile as DBVoiceProfile, get_db
 from ..services import channels, export_import, profiles
@@ -258,8 +258,8 @@ async def get_profile_avatar(
     if not profile.avatar_path:
         raise HTTPException(status_code=404, detail="No avatar found for this profile")
 
-    avatar_path = Path(profile.avatar_path)
-    if not avatar_path.exists():
+    avatar_path = config.resolve_storage_path(profile.avatar_path)
+    if avatar_path is None or not avatar_path.exists():
         raise HTTPException(status_code=404, detail="Avatar file not found")
 
     return FileResponse(avatar_path)
