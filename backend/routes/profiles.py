@@ -7,13 +7,12 @@ import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
-from .. import config, models
+from .. import models
 from ..app import safe_content_disposition
 from ..database import VoiceProfile as DBVoiceProfile, get_db
 from ..services import channels, export_import, profiles
@@ -131,13 +130,15 @@ async def seed_preset_profiles_route(
             if existing:
                 continue
 
-            # Skip name collisions
-            if db.query(DBVoiceProfile).filter_by(name=profile_name).first():
-                continue
+            unique_name = profile_name
+            suffix = 2
+            while db.query(DBVoiceProfile).filter_by(name=unique_name).first():
+                unique_name = f"{profile_name} {suffix}"
+                suffix += 1
 
             profile = DBVoiceProfile(
                 id=str(uuid.uuid4()),
-                name=profile_name,
+                name=unique_name,
                 description=f"Kokoro preset voice — {display_name} ({gender})",
                 language=lang,
                 voice_type="preset",
@@ -394,8 +395,6 @@ async def update_profile_effects(
     db: Session = Depends(get_db),
 ):
     """Set or clear the default effects chain for a voice profile."""
-    import json as _json
-
     profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")

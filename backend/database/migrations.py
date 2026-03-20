@@ -191,11 +191,12 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
     Idempotent: absolute paths are left untouched.
 
     Strategy: paths like "data/generations/abc.wav" are rebased onto the
-    configured data directory.  If the path starts with "data/", strip that
-    prefix and prepend get_data_dir().  Otherwise, try resolving relative to
-    CWD as a fallback.
+    configured data directory. If the path starts with "data/", strip that
+    prefix and prepend get_data_dir(). Otherwise, join the relative path
+    directly under get_data_dir().
     """
     from pathlib import Path
+
     from ..config import get_data_dir
 
     data_dir = get_data_dir()
@@ -229,11 +230,7 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
                 else:
                     rebased = data_dir / p
 
-                if rebased.exists():
-                    resolved = rebased
-                else:
-                    # Fallback: resolve relative to CWD
-                    resolved = p.resolve()
+                resolved = rebased.resolve()
 
                 if resolved.exists():
                     conn.execute(

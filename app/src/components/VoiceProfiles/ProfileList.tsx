@@ -63,7 +63,7 @@ export function ProfileList() {
                 No {ENGINE_NAMES[selectedEngine] ?? selectedEngine} voices created yet.
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                The default voice will be used. Create a profile to choose a specific voice.
+                Create a profile to choose a specific voice before generating.
               </p>
               <Button onClick={() => setDialogOpen(true)}>
                 <Sparkles className="mr-2 h-4 w-4" />

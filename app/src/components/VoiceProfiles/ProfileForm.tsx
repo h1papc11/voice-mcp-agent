@@ -43,6 +43,7 @@ import {
   useAddSample,
   useCreateProfile,
   useDeleteAvatar,
+  useDeleteProfile,
   useProfile,
   useUpdateProfile,
   useUploadAvatar,
@@ -59,6 +60,15 @@ import { AudioSampleUpload } from './AudioSampleUpload';
 import { SampleList } from './SampleList';
 
 const MAX_AUDIO_DURATION_SECONDS = 30;
+const PRESET_ONLY_ENGINES = new Set(['kokoro']);
+const DEFAULT_ENGINE_OPTIONS = [
+  { value: 'qwen', label: 'Qwen3-TTS' },
+  { value: 'luxtts', label: 'LuxTTS' },
+  { value: 'chatterbox', label: 'Chatterbox' },
+  { value: 'chatterbox_turbo', label: 'Chatterbox Turbo' },
+  { value: 'tada', label: 'TADA' },
+  { value: 'kokoro', label: 'Kokoro 82M' },
+] as const;
 
 const baseProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -119,6 +129,7 @@ export function ProfileForm() {
   const createProfile = useCreateProfile();
   const updateProfile = useUpdateProfile();
   const addSample = useAddSample();
+  const deleteProfile = useDeleteProfile();
   const uploadAvatar = useUploadAvatar();
   const deleteAvatar = useDeleteAvatar();
   const transcribe = useTranscription();
@@ -259,6 +270,12 @@ export function ProfileForm() {
         (!isCreating && editingProfile?.voice_type === 'preset')),
   });
   const presetVoices = presetVoicesData?.voices ?? [];
+  const isSampleBasedProfile = isCreating
+    ? voiceSource === 'clone'
+    : editingProfile?.voice_type !== 'preset';
+  const availableDefaultEngines = DEFAULT_ENGINE_OPTIONS.filter(
+    (option) => !isSampleBasedProfile || !PRESET_ONLY_ENGINES.has(option.value),
+  );
 
   // Show recording errors
   useEffect(() => {
@@ -347,6 +364,15 @@ export function ProfileForm() {
       setAvatarPreview(null);
     }
   }, [editingProfile, profileFormDraft, open, form]);
+
+  useEffect(() => {
+    if (
+      defaultEngine &&
+      !availableDefaultEngines.some((option) => option.value === defaultEngine)
+    ) {
+      setDefaultEngine('');
+    }
+  }, [availableDefaultEngines, defaultEngine]);
 
   async function handleTranscribe() {
     const file = form.getValues('sampleFile');
@@ -638,12 +664,32 @@ export function ProfileForm() {
             description: `"${data.name}" has been created with a sample.`,
           });
         } catch (sampleError) {
-          // Profile was created but sample failed - still show error
+          let rollbackSucceeded = false;
+          try {
+            await deleteProfile.mutateAsync(profile.id);
+            rollbackSucceeded = true;
+          } catch (rollbackError) {
+            toast({
+              title: 'Rollback failed',
+              description:
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : 'Created profile could not be removed after sample upload failure.',
+              variant: 'destructive',
+            });
+          }
+
           toast({
             title: 'Failed to add sample',
-            description: `Profile "${data.name}" was created, but failed to add sample: ${sampleError instanceof Error ? sampleError.message : 'Unknown error'}`,
+            description:
+              sampleError instanceof Error
+                ? `${sampleError.message}${rollbackSucceeded ? ' The profile was rolled back.' : ''}`
+                : rollbackSucceeded
+                  ? 'Failed to add sample. The profile was rolled back.'
+                  : 'Failed to add sample.',
             variant: 'destructive',
           });
+          return;
         }
       }
 
@@ -1140,12 +1186,11 @@ export function ProfileForm() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="_none">No preference</SelectItem>
-                        <SelectItem value="qwen">Qwen3-TTS</SelectItem>
-                        <SelectItem value="luxtts">LuxTTS</SelectItem>
-                        <SelectItem value="chatterbox">Chatterbox</SelectItem>
-                        <SelectItem value="chatterbox_turbo">Chatterbox Turbo</SelectItem>
-                        <SelectItem value="tada">TADA</SelectItem>
-                        <SelectItem value="kokoro">Kokoro 82M</SelectItem>
+                        {availableDefaultEngines.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">

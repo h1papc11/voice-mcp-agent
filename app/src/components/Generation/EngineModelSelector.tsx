@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
 import { FormControl } from '@/components/ui/form';
 import {
@@ -41,12 +42,9 @@ const ENGLISH_ONLY_ENGINES = new Set(['luxtts', 'chatterbox_turbo']);
 /** Engines that support cloned (reference audio) profiles. */
 const CLONING_ENGINES = new Set(['qwen', 'luxtts', 'chatterbox', 'chatterbox_turbo', 'tada']);
 
-/**
- * All engine options are always available. The profile grid already
- * filters by engine, so the dropdown doesn't need to restrict options.
- */
-function getAvailableOptions(_selectedProfile?: VoiceProfileResponse | null) {
-  return ENGINE_OPTIONS;
+function getAvailableOptions(selectedProfile?: VoiceProfileResponse | null) {
+  if (!selectedProfile) return ENGINE_OPTIONS;
+  return ENGINE_OPTIONS.filter((opt) => isProfileCompatibleWithEngine(selectedProfile, opt.engine));
 }
 
 function getSelectValue(engine: string, modelSize?: string): string {
@@ -108,12 +106,13 @@ export function EngineModelSelector({ form, compact, selectedProfile }: EngineMo
   const selectValue = getSelectValue(engine, modelSize);
   const availableOptions = getAvailableOptions(selectedProfile);
 
-  // If current engine isn't in available options, auto-switch to first available
   const currentEngineAvailable = availableOptions.some((opt) => opt.value === selectValue);
-  if (!currentEngineAvailable && availableOptions.length > 0) {
-    // Defer to avoid setting state during render
-    setTimeout(() => handleEngineChange(form, availableOptions[0].value), 0);
-  }
+
+  useEffect(() => {
+    if (!currentEngineAvailable && availableOptions.length > 0) {
+      handleEngineChange(form, availableOptions[0].value);
+    }
+  }, [availableOptions, currentEngineAvailable, form]);
 
   const itemClass = compact ? 'text-xs text-muted-foreground' : undefined;
   const triggerClass = compact
