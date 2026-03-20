@@ -194,6 +194,8 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
     configured data directory. If the path starts with "data/", strip that
     prefix and prepend get_data_dir(). Otherwise, join the relative path
     directly under get_data_dir().
+    directly under get_data_dir(). If the rebased path still does not exist,
+    fall back to resolving relative to CWD.
     """
     from pathlib import Path
 
@@ -222,16 +224,13 @@ def _resolve_relative_paths(engine, tables: set[str]) -> None:
                 p = Path(path_val)
                 if p.is_absolute():
                     continue
-
-                # Try rebasing: "data/generations/abc.wav" → data_dir / "generations/abc.wav"
                 parts = p.parts
                 if parts and parts[0] == "data":
-                    rebased = data_dir / Path(*parts[1:])
+                    rebased = (data_dir / Path(*parts[1:])).resolve()
                 else:
-                    rebased = data_dir / p
+                    rebased = (data_dir / p).resolve()
 
-                resolved = rebased.resolve()
-
+                resolved = rebased if rebased.exists() else p.resolve()
                 if resolved.exists():
                     conn.execute(
                         text(f"UPDATE {table} SET {column} = :path WHERE id = :id"),

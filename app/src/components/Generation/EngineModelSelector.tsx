@@ -57,7 +57,7 @@ function getSelectValue(engine: string, modelSize?: string): string {
   return engine;
 }
 
-function handleEngineChange(form: UseFormReturn<GenerationFormValues>, value: string) {
+export function applyEngineSelection(form: UseFormReturn<GenerationFormValues>, value: string) {
   if (value.startsWith('qwen_custom_voice:')) {
     const [, modelSize] = value.split(':');
     form.setValue('engine', 'qwen_custom_voice');
@@ -123,7 +123,7 @@ export function EngineModelSelector({ form, compact, selectedProfile }: EngineMo
 
   useEffect(() => {
     if (!currentEngineAvailable && availableOptions.length > 0) {
-      handleEngineChange(form, availableOptions[0].value);
+      applyEngineSelection(form, availableOptions[0].value);
     }
   }, [availableOptions, currentEngineAvailable, form]);
 
@@ -133,7 +133,7 @@ export function EngineModelSelector({ form, compact, selectedProfile }: EngineMo
     : undefined;
 
   return (
-    <Select value={selectValue} onValueChange={(v) => handleEngineChange(form, v)}>
+    <Select value={selectValue} onValueChange={(v) => applyEngineSelection(form, v)}>
       <FormControl>
         <SelectTrigger className={triggerClass}>
           <SelectValue />

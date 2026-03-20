@@ -375,6 +375,15 @@ export function ProfileForm() {
     }
   }, [availableDefaultEngines, defaultEngine]);
 
+  useEffect(() => {
+    if (!selectedPresetVoiceId) {
+      return;
+    }
+
+    if (!presetVoices.some((voice: PresetVoice) => voice.voice_id === selectedPresetVoiceId)) {
+      setSelectedPresetVoiceId('');
+    }
+  }, [presetVoices, selectedPresetVoiceId]);
   async function handleTranscribe() {
     const file = form.getValues('sampleFile');
     if (!file) {
