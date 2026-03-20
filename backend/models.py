@@ -15,6 +15,11 @@ class VoiceProfileCreate(BaseModel):
     language: str = Field(
         default="en", pattern="^(zh|en|ja|ko|de|fr|ru|pt|es|it|he|ar|da|el|fi|hi|ms|nl|no|pl|sv|sw|tr)$"
     )
+    voice_type: Optional[str] = Field(default="cloned", pattern="^(cloned|preset|designed)$")
+    preset_engine: Optional[str] = Field(None, max_length=50)
+    preset_voice_id: Optional[str] = Field(None, max_length=100)
+    design_prompt: Optional[str] = Field(None, max_length=2000)
+    default_engine: Optional[str] = Field(None, max_length=50)
 
 
 class VoiceProfileResponse(BaseModel):
@@ -26,6 +31,11 @@ class VoiceProfileResponse(BaseModel):
     language: str
     avatar_path: Optional[str] = None
     effects_chain: Optional[List["EffectConfig"]] = None
+    voice_type: str = "cloned"
+    preset_engine: Optional[str] = None
+    preset_voice_id: Optional[str] = None
+    design_prompt: Optional[str] = None
+    default_engine: Optional[str] = None
     generation_count: int = 0
     sample_count: int = 0
     created_at: datetime
@@ -68,7 +78,7 @@ class GenerationRequest(BaseModel):
     seed: Optional[int] = Field(None, ge=0)
     model_size: Optional[str] = Field(default="1.7B", pattern="^(1\\.7B|0\\.6B|1B|3B)$")
     instruct: Optional[str] = Field(None, max_length=500)
-    engine: Optional[str] = Field(default="qwen", pattern="^(qwen|luxtts|chatterbox|chatterbox_turbo|tada)$")
+    engine: Optional[str] = Field(default="qwen", pattern="^(qwen|luxtts|chatterbox|chatterbox_turbo|tada|kokoro)$")
     max_chunk_chars: int = Field(
         default=800, ge=100, le=5000, description="Max characters per chunk for long text splitting"
     )

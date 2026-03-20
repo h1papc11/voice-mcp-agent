@@ -2,6 +2,7 @@
 Voice profile management module.
 """
 
+import logging
 from typing import List, Optional
 from datetime import datetime
 import uuid
@@ -9,6 +10,8 @@ import shutil
 from pathlib import Path
 from sqlalchemy.orm import Session
 from sqlalchemy import func, select
+
+logger = logging.getLogger(__name__)
 
 from ..models import (
     VoiceProfileCreate,
@@ -52,6 +55,11 @@ def _profile_to_response(
         language=profile.language,
         avatar_path=profile.avatar_path,
         effects_chain=effects_chain,
+        voice_type=getattr(profile, "voice_type", None) or "cloned",
+        preset_engine=getattr(profile, "preset_engine", None),
+        preset_voice_id=getattr(profile, "preset_voice_id", None),
+        design_prompt=getattr(profile, "design_prompt", None),
+        default_engine=getattr(profile, "default_engine", None),
         generation_count=generation_count,
         sample_count=sample_count,
         created_at=profile.created_at,
@@ -80,11 +88,22 @@ async def create_profile(
     if existing_profile:
         raise ValueError(f"A profile with the name '{data.name}' already exists. Please choose a different name.")
 
+    # Auto-set default_engine for preset profiles
+    default_engine = data.default_engine
+    voice_type = data.voice_type or "cloned"
+    if voice_type == "preset" and data.preset_engine and not default_engine:
+        default_engine = data.preset_engine
+
     db_profile = DBVoiceProfile(
         id=str(uuid.uuid4()),
         name=data.name,
         description=data.description,
         language=data.language,
+        voice_type=voice_type,
+        preset_engine=data.preset_engine,
+        preset_voice_id=data.preset_voice_id,
+        design_prompt=data.design_prompt,
+        default_engine=default_engine,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -265,6 +284,8 @@ async def update_profile(
     profile.name = data.name
     profile.description = data.description
     profile.language = data.language
+    if data.default_engine is not None:
+        profile.default_engine = data.default_engine or None  # empty string → NULL
     profile.updated_at = datetime.utcnow()
 
     db.commit()
@@ -382,19 +403,45 @@ async def create_voice_prompt_for_profile(
     engine: str = "qwen",
 ) -> dict:
     """
-    Create a combined voice prompt from all samples in a profile.
+    Create a voice prompt from a profile.
+
+    For cloned profiles: combines all audio samples into a voice prompt.
+    For preset profiles: returns the engine-specific preset voice reference.
+    For designed profiles: returns the text design prompt (future).
 
     Args:
         profile_id: Profile ID
         db: Database session
         use_cache: Whether to use cached prompts
-        engine: TTS engine to create prompt for ("qwen" or "luxtts")
+        engine: TTS engine to create prompt for
 
     Returns:
         Voice prompt dictionary
     """
     from ..backends import get_tts_backend_for_engine
 
+    profile = db.query(DBVoiceProfile).filter_by(id=profile_id).first()
+    if not profile:
+        raise ValueError(f"Profile not found: {profile_id}")
+
+    voice_type = getattr(profile, "voice_type", None) or "cloned"
+
+    # ── Preset profiles: return engine-specific voice reference ──
+    if voice_type == "preset":
+        return {
+            "voice_type": "preset",
+            "preset_engine": profile.preset_engine,
+            "preset_voice_id": profile.preset_voice_id,
+        }
+
+    # ── Designed profiles: return text description (future) ──
+    if voice_type == "designed":
+        return {
+            "voice_type": "designed",
+            "design_prompt": profile.design_prompt,
+        }
+
+    # ── Cloned profiles: create from audio samples ──
     samples = db.query(DBProfileSample).filter_by(profile_id=profile_id).all()
 
     if not samples:
@@ -524,3 +571,6 @@ async def delete_avatar(
     db.commit()
 
     return True
+
+
+

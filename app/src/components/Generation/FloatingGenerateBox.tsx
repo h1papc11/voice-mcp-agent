@@ -36,6 +36,7 @@ export function FloatingGenerateBox({
 }: FloatingGenerateBoxProps) {
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
+  const setSelectedEngine = useUIStore((state) => state.setSelectedEngine);
   const { data: selectedProfile } = useProfile(selectedProfileId || '');
   const { data: profiles } = useProfiles();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -67,7 +68,12 @@ export function FloatingGenerateBox({
       }
     },
     getEffectsChain: () => {
-      if (!selectedPresetId || !effectPresets) return undefined;
+      if (!selectedPresetId) return undefined;
+      // Profile's own effects chain (no matching preset)
+      if (selectedPresetId === '_profile') {
+        return selectedProfile?.effects_chain ?? undefined;
+      }
+      if (!effectPresets) return undefined;
       const preset = effectPresets.find((p) => p.id === selectedPresetId);
       return preset?.effects_chain;
     },
@@ -110,12 +116,56 @@ export function FloatingGenerateBox({
     }
   }, [selectedProfileId, profiles, setSelectedProfileId]);
 
-  // Sync generation form language with selected profile's language
+  // Sync engine selection to global store so ProfileList can filter
+  const watchedEngine = form.watch('engine');
+  useEffect(() => {
+    if (watchedEngine) {
+      setSelectedEngine(watchedEngine);
+    }
+  }, [watchedEngine, setSelectedEngine]);
+
+  // Sync generation form language, engine, and effects with selected profile
   useEffect(() => {
     if (selectedProfile?.language) {
       form.setValue('language', selectedProfile.language as LanguageCode);
     }
-  }, [selectedProfile, form]);
+    // Auto-switch engine if profile has a default
+    if (selectedProfile?.default_engine) {
+      form.setValue(
+        'engine',
+        selectedProfile.default_engine as
+          | 'qwen'
+          | 'luxtts'
+          | 'chatterbox'
+          | 'chatterbox_turbo'
+          | 'tada'
+          | 'kokoro',
+      );
+    }
+    // Pre-fill effects from profile defaults
+    if (
+      selectedProfile?.effects_chain &&
+      selectedProfile.effects_chain.length > 0 &&
+      effectPresets
+    ) {
+      // Try to match against a known preset
+      const profileChainJson = JSON.stringify(selectedProfile.effects_chain);
+      const matchingPreset = effectPresets.find(
+        (p) => JSON.stringify(p.effects_chain) === profileChainJson,
+      );
+      if (matchingPreset) {
+        setSelectedPresetId(matchingPreset.id);
+      } else {
+        // No matching preset — use special value to pass profile chain directly
+        setSelectedPresetId('_profile');
+      }
+    } else if (
+      selectedProfile &&
+      (!selectedProfile.effects_chain || selectedProfile.effects_chain.length === 0)
+    ) {
+      setSelectedPresetId(null);
+    }
+  }, [selectedProfile, effectPresets, form]);
 
   // Auto-resize textarea based on content (only when expanded)
   useEffect(() => {
@@ -358,7 +408,7 @@ export function FloatingGenerateBox({
                   />
 
                   <FormItem className="flex-1 space-y-0">
-                    <EngineModelSelector form={form} compact />
+                    <EngineModelSelector form={form} compact selectedProfile={selectedProfile} />
                   </FormItem>
 
                   <FormItem className="flex-1 space-y-0">
@@ -375,6 +425,12 @@ export function FloatingGenerateBox({
                         <SelectItem value="none" className="text-xs">
                           No effects
                         </SelectItem>
+                        {selectedProfile?.effects_chain &&
+                          selectedProfile.effects_chain.length > 0 && (
+                            <SelectItem value="_profile" className="text-xs">
+                              Profile default
+                            </SelectItem>
+                          )}
                         {effectPresets?.map((preset) => (
                           <SelectItem key={preset.id} value={preset.id} className="text-xs">
                             {preset.name}

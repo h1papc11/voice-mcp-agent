@@ -19,7 +19,7 @@ if _custom_models_dir:
     logger.info("Model download path set to: %s", _custom_models_dir)
 
 # Default data directory (used in development)
-_data_dir = Path("data")
+_data_dir = Path("data").resolve()
 
 
 def set_data_dir(path: str | Path):
@@ -30,9 +30,9 @@ def set_data_dir(path: str | Path):
         path: Path to the data directory
     """
     global _data_dir
-    _data_dir = Path(path)
+    _data_dir = Path(path).resolve()
     _data_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Data directory set to: %s", _data_dir.absolute())
+    logger.info("Data directory set to: %s", _data_dir)
 
 
 def get_data_dir() -> Path:

@@ -1,9 +1,13 @@
 """Voice profile endpoints."""
 
 import io
+import json as _json
+import logging
 import tempfile
+import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -14,6 +18,8 @@ from ..app import safe_content_disposition
 from ..database import VoiceProfile as DBVoiceProfile, get_db
 from ..services import channels, export_import, profiles
 from ..services.profiles import _profile_to_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -59,6 +65,97 @@ async def import_profile(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Preset Voice Endpoints ───────────────────────────────────────────
+# These MUST be declared before /profiles/{profile_id} to avoid the
+# wildcard swallowing "presets" as a profile_id.
+
+
+@router.get("/profiles/presets/{engine}")
+async def list_preset_voices(engine: str):
+    """List available preset voices for an engine."""
+    if engine == "kokoro":
+        from ..backends.kokoro_backend import KOKORO_VOICES
+
+        return {
+            "engine": engine,
+            "voices": [
+                {
+                    "voice_id": vid,
+                    "name": name,
+                    "gender": gender,
+                    "language": lang,
+                }
+                for vid, name, gender, lang in KOKORO_VOICES
+            ],
+        }
+    return {"engine": engine, "voices": []}
+
+
+@router.post("/profiles/presets/{engine}/seed")
+async def seed_preset_profiles_route(
+    engine: str,
+    db: Session = Depends(get_db),
+):
+    """Seed preset voice profiles for an engine.
+
+    Creates profiles for all available preset voices that don't already exist.
+    Returns the count of newly created profiles.
+    """
+    if engine != "kokoro":
+        raise HTTPException(status_code=400, detail=f"No presets available for engine: {engine}")
+
+    try:
+        from ..backends.kokoro_backend import KOKORO_VOICES
+
+        created = 0
+        for voice_id, display_name, gender, lang in KOKORO_VOICES:
+            profile_name = display_name
+
+            # Disambiguate duplicate display names across languages
+            # (e.g. "Alpha" exists in Hindi and Japanese, "Dora" in Spanish and Portuguese)
+            dupes = [v for v in KOKORO_VOICES if v[1] == display_name]
+            if len(dupes) > 1:
+                lang_labels = {"en": "English", "es": "Spanish", "fr": "French", "hi": "Hindi",
+                               "it": "Italian", "pt": "Portuguese", "ja": "Japanese", "zh": "Chinese"}
+                profile_name = f"{display_name} {lang_labels.get(lang, lang)}"
+
+            # Skip if preset already exists
+            existing = (
+                db.query(DBVoiceProfile)
+                .filter_by(preset_engine="kokoro", preset_voice_id=voice_id)
+                .first()
+            )
+            if existing:
+                continue
+
+            # Skip name collisions
+            if db.query(DBVoiceProfile).filter_by(name=profile_name).first():
+                continue
+
+            profile = DBVoiceProfile(
+                id=str(uuid.uuid4()),
+                name=profile_name,
+                description=f"Kokoro preset voice — {display_name} ({gender})",
+                language=lang,
+                voice_type="preset",
+                preset_engine="kokoro",
+                preset_voice_id=voice_id,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(profile)
+            created += 1
+
+        if created > 0:
+            db.commit()
+            logger.info(f"Seeded {created} Kokoro preset profiles")
+
+        return {"engine": engine, "created": created, "total_available": len(KOKORO_VOICES)}
+    except Exception as e:
+        logger.exception(f"Failed to seed Kokoro profiles: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

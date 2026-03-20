@@ -34,6 +34,7 @@ def run_migrations(engine) -> None:
     _migrate_generations(engine, inspector, tables)
     _migrate_effect_presets(engine, inspector, tables)
     _migrate_generation_versions(engine, inspector, tables)
+    _resolve_relative_paths(engine, tables)
 
 
 # -- helpers ---------------------------------------------------------------
@@ -134,6 +135,17 @@ def _migrate_profiles(engine, inspector, tables: set[str]) -> None:
         _add_column(engine, "profiles", "avatar_path VARCHAR", "avatar_path")
     if "effects_chain" not in columns:
         _add_column(engine, "profiles", "effects_chain TEXT", "effects_chain")
+    # Voice type system — v0.3.x
+    if "voice_type" not in columns:
+        _add_column(engine, "profiles", "voice_type VARCHAR DEFAULT 'cloned'", "voice_type")
+    if "preset_engine" not in columns:
+        _add_column(engine, "profiles", "preset_engine VARCHAR", "preset_engine")
+    if "preset_voice_id" not in columns:
+        _add_column(engine, "profiles", "preset_voice_id VARCHAR", "preset_voice_id")
+    if "design_prompt" not in columns:
+        _add_column(engine, "profiles", "design_prompt TEXT", "design_prompt")
+    if "default_engine" not in columns:
+        _add_column(engine, "profiles", "default_engine VARCHAR", "default_engine")
 
 
 def _migrate_generations(engine, inspector, tables: set[str]) -> None:
@@ -168,3 +180,67 @@ def _migrate_generation_versions(engine, inspector, tables: set[str]) -> None:
     columns = _get_columns(inspector, "generation_versions")
     if "source_version_id" not in columns:
         _add_column(engine, "generation_versions", "source_version_id VARCHAR", "source_version_id")
+
+
+def _resolve_relative_paths(engine, tables: set[str]) -> None:
+    """Resolve any relative file paths in the database to absolute paths.
+
+    Earlier versions stored paths relative to CWD (e.g. "data/generations/abc.wav").
+    These break when the production binary's CWD differs from the data directory.
+    This migration converts them to absolute paths using the configured data dir.
+    Idempotent: absolute paths are left untouched.
+
+    Strategy: paths like "data/generations/abc.wav" are rebased onto the
+    configured data directory.  If the path starts with "data/", strip that
+    prefix and prepend get_data_dir().  Otherwise, try resolving relative to
+    CWD as a fallback.
+    """
+    from pathlib import Path
+    from ..config import get_data_dir
+
+    data_dir = get_data_dir()
+
+    path_columns = [
+        ("generations", "audio_path"),
+        ("generation_versions", "audio_path"),
+        ("profile_samples", "audio_path"),
+        ("profiles", "avatar_path"),
+    ]
+
+    total_fixed = 0
+    with engine.connect() as conn:
+        for table, column in path_columns:
+            if table not in tables:
+                continue
+            rows = conn.execute(
+                text(f"SELECT id, {column} FROM {table} WHERE {column} IS NOT NULL")
+            ).fetchall()
+            for row_id, path_val in rows:
+                if not path_val:
+                    continue
+                p = Path(path_val)
+                if p.is_absolute():
+                    continue
+
+                # Try rebasing: "data/generations/abc.wav" → data_dir / "generations/abc.wav"
+                parts = p.parts
+                if parts and parts[0] == "data":
+                    rebased = data_dir / Path(*parts[1:])
+                else:
+                    rebased = data_dir / p
+
+                if rebased.exists():
+                    resolved = rebased
+                else:
+                    # Fallback: resolve relative to CWD
+                    resolved = p.resolve()
+
+                if resolved.exists():
+                    conn.execute(
+                        text(f"UPDATE {table} SET {column} = :path WHERE id = :id"),
+                        {"path": str(resolved), "id": row_id},
+                    )
+                    total_fixed += 1
+        if total_fixed > 0:
+            conn.commit()
+            logger.info("Resolved %d relative file paths to absolute", total_fixed)

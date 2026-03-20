@@ -118,7 +118,7 @@ export function GenerationForm() {
             <div className="grid gap-4 md:grid-cols-3">
               <FormItem>
                 <FormLabel>Model</FormLabel>
-                <EngineModelSelector form={form} />
+                <EngineModelSelector form={form} selectedProfile={selectedProfile} />
                 <FormDescription>
                   {getEngineDescription(form.watch('engine') || 'qwen')}
                 </FormDescription>

@@ -1,10 +1,17 @@
 // API Types matching backend Pydantic models
 import type { LanguageCode } from '@/lib/constants/languages';
 
+export type VoiceType = 'cloned' | 'preset' | 'designed';
+
 export interface VoiceProfileCreate {
   name: string;
   description?: string;
   language: LanguageCode;
+  voice_type?: VoiceType;
+  preset_engine?: string;
+  preset_voice_id?: string;
+  design_prompt?: string;
+  default_engine?: string;
 }
 
 export interface VoiceProfileResponse {
@@ -14,10 +21,22 @@ export interface VoiceProfileResponse {
   language: string;
   avatar_path?: string;
   effects_chain?: EffectConfig[];
+  voice_type: VoiceType;
+  preset_engine?: string;
+  preset_voice_id?: string;
+  design_prompt?: string;
+  default_engine?: string;
   generation_count: number;
   sample_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PresetVoice {
+  voice_id: string;
+  name: string;
+  gender: 'male' | 'female';
+  language: string;
 }
 
 export interface ProfileSampleCreate {
@@ -43,7 +62,7 @@ export interface GenerationRequest {
   language: LanguageCode;
   seed?: number;
   model_size?: '1.7B' | '0.6B' | '1B' | '3B';
-  engine?: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo' | 'tada';
+  engine?: 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo' | 'tada' | 'kokoro';
   instruct?: string;
   max_chunk_chars?: number;
   crossfade_ms?: number;

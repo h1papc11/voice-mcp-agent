@@ -1,6 +1,6 @@
 # Voicebox Project Status & Roadmap
 
-> Last updated: 2026-03-13 | Current version: **v0.1.13** | 13.1k stars | ~176 open issues | 25 open PRs
+> Last updated: 2026-03-18 | Current version: **v0.3.0** | 13.4k stars | ~136 open issues | 9 open PRs
 
 ---
 
@@ -100,7 +100,7 @@ POST /generate
 
 ## Current State
 
-### What's Shipped (v0.1.13 + recent merges)
+### What's Shipped (v0.3.0)
 
 **Core TTS:**
 - Qwen3-TTS voice cloning (1.7B and 0.6B models)
@@ -108,30 +108,42 @@ POST /generate
 - Multi-engine TTS architecture with thread-safe backend registry (PR #254)
 - LuxTTS integration — fast, CPU-friendly English TTS (PR #254)
 - Chatterbox Multilingual TTS — 23 languages including Hebrew (PR #257)
-- Instruct parameter UI exists but is non-functional across all backends (see #224, Known Limitations)
+- Chatterbox Turbo — paralinguistic tags, low latency English (PR #258)
 - HumeAI TADA integration — 1B English + 3B Multilingual speech-language model (PR #296)
-- Single flat model dropdown (Qwen 1.7B, Qwen 0.6B, LuxTTS, Chatterbox, Chatterbox Turbo, TADA 1B, TADA 3B)
-- Centralized model config registry (`ModelConfig` dataclass) — no per-engine dispatch maps in `main.py`
+- Chunked TTS generation for long text — engine-agnostic, removes ~500 char limit (PR #266)
+- Async generation queue (PR #269)
+- Post-processing audio effects system (PR #271)
+- Centralized model config registry (`ModelConfig` dataclass) — no per-engine dispatch maps
 - Shared `EngineModelSelector` component — engine/model dropdown defined once, used in both generation forms
 
 **Infrastructure:**
-- CUDA backend swap via binary download and restart (PR #252)
-- GPU acceleration settings UI
+- CUDA backend swap via binary download and restart (PR #252), upgraded to cu128 (PR #316)
+- CUDA backend split into independently versioned server + libs archives (PR #298)
+- Docker + web deployment (PR #161)
+- Backend refactor: modular architecture, style guide, tooling (PR #285)
+- Settings overhaul: routed sub-tabs, server logs, changelog, about page (PR #294)
+- Windows support: CUDA detection, cross-platform justfile, clean server shutdown (PR #272)
 - Voice profiles with multi-sample support
 - Stories editor (multi-track DAW timeline)
 - Whisper transcription (base, small, medium, large variants)
-- Model management UI with inline download progress bars (HFProgressTracker)
+- Model management UI with inline download progress bars + folder migration (PR #268)
 - Download cancel/clear UI with error panel (PR #238)
 - Generation history with caching
 - Streaming generation endpoint (MLX only)
-- Duplicate profile name validation (PR #175)
-- Linux NVIDIA GBM buffer + WebKitGTK microphone fix (PR #210)
+- Audio player freeze fix + UX improvements (PR #293)
+- CORS restriction to known local origins (PR #88)
+
+### Abandoned Integrations
+
+| Model | PR | Reason |
+|-------|----|--------|
+| **CosyVoice2/3** | PR #311 | Output quality too poor. Heavy deps, no PyPI, needed 5+ shims. |
 
 ### What's In-Flight
 
 | Feature | Branch/PR | Status |
 |---------|-----------|--------|
-| Chatterbox Turbo + per-engine language lists | `feat/chatterbox-turbo` / PR #258 | Open, ready for review |
+| Kokoro 82M TTS engine | WIP | In development — 82M CPU-realtime engine, 8 languages |
 
 ### TTS Engine Comparison
 
@@ -144,6 +156,7 @@ POST /generate
 | Chatterbox Turbo | `chatterbox-turbo` | English | ~1.5 GB | Paralinguistic tags ([laugh], [cough]), 350M params, low latency | Partial — inline tags only, no separate instruct param |
 | TADA 1B | `tada-1b` | English | ~4 GB | HumeAI speech-language model, 700s+ coherent audio | None |
 | TADA 3B Multilingual | `tada-3b-ml` | 10 (en, ar, zh, de, es, fr, it, ja, pl, pt) | ~8 GB | Multilingual, text-acoustic dual alignment | None |
+| Kokoro 82M | `kokoro` | 8 (en, es, fr, hi, it, pt, ja, zh) | ~350 MB | 82M params, CPU realtime, Apache 2.0, pre-built voices | None |
 
 ### Multi-Engine Architecture (Shipped)
 
@@ -173,69 +186,41 @@ The singleton TTS backend blocker described in the previous version of this doc 
 
 | PR | Title | Merged |
 |----|-------|--------|
-| **#257** | feat: Chatterbox TTS engine with multilingual voice cloning | 2026-03-13 |
-| **#254** | feat: LuxTTS integration — multi-engine TTS support | 2026-03-13 |
-| **#252** | feat: CUDA backend swap via binary download and restart | 2026-03-13 |
-| **#238** | Download cancel/clear UI, fixed model downloading | 2026-03-13 |
-| **#250** | docs: align local API port examples | 2026-03-13 |
-| **#210** | fix: Linux NVIDIA GBM buffer crash | 2026-03-13 |
-| **#175** | Fix #134: duplicate profile name validation | 2026-03-13 |
+| **#316** | Upgrade CUDA backend from cu126 to cu128, fix GPU settings UI | 2026-03-18 |
+| **#305** | fix: bundle qwen_tts source files in PyInstaller build | 2026-03-17 |
+| **#298** | feat: split CUDA backend into independently versioned server + libs archives | 2026-03-17 |
+| **#296** | Add HumeAI TADA TTS engine (1B English + 3B Multilingual) | 2026-03-17 |
+| **#295** | fix: batch of bug fixes from issue tracker | 2026-03-17 |
+| **#293** | Fix audio player freezing and improve UX | 2026-03-17 |
+| **#294** | Settings overhaul: routed sub-tabs, server logs, changelog, about page | 2026-03-16 |
+| **#288** | Better docs | 2026-03-16 |
+| **#285** | Backend refactor: modular architecture, style guide, tooling | 2026-03-16 |
+| **#274** | Landing page v0.2.0 redesign | 2026-03-15 |
+| **#272** | Windows support: CUDA detection, cross-platform justfile, clean server shutdown | 2026-03-15 |
+| **#271** | Add post-processing audio effects system | 2026-03-14 |
+| **#269** | feat: async generation queue | 2026-03-13 |
+| **#268** | feat: model management improvements and folder migration | 2026-03-13 |
+| **#266** | feat: chunked TTS generation for long text (engine-agnostic) | 2026-03-13 |
+| **#265** | feat: paralinguistic tag autocomplete for Chatterbox Turbo | 2026-03-13 |
+| **#264** | fix: Chatterbox float64 dtype mismatch + model unload button | 2026-03-13 |
+| **#258** | feat: Chatterbox Turbo engine + per-engine language lists | 2026-03-13 |
+| **#230** | docs: fix README grammar | 2026-03-13 |
+| **#161** | feat: Docker + web deployment | 2026-03-13 |
+| **#88** | security: restrict CORS to known local origins | 2026-03-13 |
 
-### In-Flight (Our Work)
+### Currently Open (9 PRs)
 
 | PR | Title | Status | Notes |
 |----|-------|--------|-------|
-| **#258** | feat: Chatterbox Turbo engine + per-engine language lists | Open | Ready for review. Adds Turbo engine + dynamic language dropdown. |
-
-### Merge-Ready / Near-Ready (Bug Fixes & Small Features)
-
-| PR | Title | Risk | Notes |
-|----|-------|------|-------|
-| **#230** | docs: fix README grammar | None | Docs-only |
-| **#243** | a11y: screen reader and keyboard improvements | Low | Accessibility, no backend changes |
-| **#178** | Fix #168 #140: generation error handling | Low | Error handling improvements |
-| **#152** | Fix: prevent crashes when HuggingFace unreachable | Medium | Monkey-patches HF hub; solves real offline bug (#150, #151) |
-| **#218** | fix: unify qwen tts cache dir on Windows | Low | Windows-specific path fix |
-| **#214** | fix: panic on launch from tokio::spawn | Low | Rust-side Tauri fix |
-| **#88** | security: restrict CORS to known local origins | Low | Security hardening |
-| **#133** | feat: network access toggle | Low | Wires up existing plumbing |
-
-### Significant Feature PRs
-
-| PR | Title | Complexity | Notes |
-|----|-------|-----------|-------|
-| **#253** | Enhance speech tokenizer with 48kHz version | Medium | Qwen tokenizer upgrade |
-| **#97** | fix: pass language parameter to TTS models | Medium | May be partially obsoleted by multi-engine work — needs review |
-| **#99** | feat: chunked TTS with quality selector | Medium | Solves 500-char limit. Addresses #191, #203, #69, #111. |
-| **#154** | feat: Audiobook tab | Medium | Full audiobook workflow. Depends on #99 concepts. |
-| **#91** | fix: CoreAudio device enumeration | Medium | macOS audio device handling |
-
-### Architectural PRs (Need Careful Review)
-
-| PR | Title | Complexity | Notes |
-|----|-------|-----------|-------|
-| **#225** | feat: custom HuggingFace model support | High | Arbitrary HF repo loading. May need rework given multi-engine arch is now shipped. |
-| **#194** | feat: Hebrew + Chatterbox TTS | High | **Superseded** by PR #257 which shipped Chatterbox multilingual (23 langs incl. Hebrew). May be closeable. |
-| **#195** | feat: per-profile LoRA fine-tuning | Very High | Training pipeline, adapter management, 15 new endpoints. Depends on #194 (now superseded). |
-| **#161** | feat: Docker + web deployment | High | 3-stage Dockerfile, SPA serving. Independent of TTS engine work. |
-| **#124** / **#123** | Docker (simpler attempts) | Low-Medium | Overlap with #161 |
-| **#227** | fix: harden input validation & file safety | Medium | Coupled to #225 (custom models) |
-
-### PRs That Need Author Action / Are Stale
-
-| PR | Title | Notes |
-|----|-------|-------|
-| **#237** | fix: bundle qwen_tts source files in PyInstaller | Build system, needs review |
-| **#215** | Update prerequisites with Tauri deps | Branch is `main` — will have conflicts |
-| **#89** | Linux Support | Branch is `main` — will have conflicts. Broad scope. |
-| **#83** | Update download links for v0.1.12 | Outdated (we're on v0.1.13) |
-
-### PRs Likely Superseded
-
-| PR | Superseded By | Notes |
-|----|--------------|-------|
-| **#194** (Hebrew + Chatterbox) | PR #257 (merged) | #257 ships Chatterbox multilingual with 23 languages including Hebrew. #194 took a different approach (route by language). Can likely be closed. |
-| **#33** (External provider binaries) | PR #252 (merged) | #252 shipped CUDA backend swap. #33's broader provider architecture may still have value but needs reassessment. |
+| **#311** | feat: add CosyVoice2/3 TTS engine | **Will close** | Model quality too poor. See Abandoned Integrations. |
+| **#253** | Enhance speech tokenizer with 48kHz version | Community PR | Qwen tokenizer upgrade. Worth reviewing. |
+| **#237** | fix: bundle qwen_tts source files in PyInstaller | Superseded | Our PR #305 shipped this. Can close. |
+| **#227** | fix: harden input validation & file safety | Community PR | Coupled to #225 (custom models). |
+| **#225** | feat: custom HuggingFace model support | Community PR | Needs rework for multi-engine arch. |
+| **#218** | fix: unify qwen tts cache dir on Windows | Community PR | Windows-specific path fix. Still relevant. |
+| **#195** | feat: per-profile LoRA fine-tuning | Draft | Complex. 15 new endpoints. |
+| **#154** | feat: Audiobook tab | Community PR | Chunked generation now shipped (#266). |
+| **#91** | fix: CoreAudio device enumeration | Draft | macOS audio device handling. |
 
 ---
 
@@ -280,7 +265,7 @@ Strong demand for: Hindi (#245), Indonesian (#247), Dutch (#236), Hebrew (#199),
 | #132 | LavaSR (transcription) |
 | #76 | (General model expansion) |
 
-Community also requests: XTTS-v2, Fish Speech, CosyVoice, Kokoro. The multi-engine architecture is now in place, making new model integration significantly easier.
+Community also requests: XTTS-v2, Fish Speech, Kokoro. CosyVoice was tried and abandoned. The multi-engine architecture is in place, making new model integration straightforward.
 
 ### Long-Form / Chunking (5 issues)
 
@@ -288,7 +273,7 @@ Users hitting the ~500 character practical limit.
 
 **Key issues:** #234 (queue system), #203 (500 char limit), #191 (auto-split), #111, #69
 
-**Fix path:** PR #99 (chunked TTS + quality selector) directly addresses this. PR #154 (Audiobook tab) builds on it.
+**Fix path:** **Mostly resolved.** PR #266 (engine-agnostic chunked TTS) and PR #269 (async generation queue) are both merged. PR #154 (Audiobook tab) is still open.
 
 ### Feature Requests (23 issues)
 
@@ -326,7 +311,7 @@ Notable requests:
 | `CUDA_BACKEND_SWAP_FINAL.md` | — | **Shipped** (PR #252) | Final implementation plan |
 | `EXTERNAL_PROVIDERS.md` | v0.2.0 | **Not started** | Remote server support |
 | `MLX_AUDIO.md` | — | **Shipped** | MLX backend is live |
-| `DOCKER_DEPLOYMENT.md` | v0.2.0 | **PR exists** (#161) | Waiting on review |
+| `DOCKER_DEPLOYMENT.md` | v0.2.0 | **Shipped** (PR #161) | Docker + web deployment |
 | `OPENAI_SUPPORT.md` | v0.2.0 | **Not started** | OpenAI-compatible API layer |
 | `PR33_CUDA_PROVIDER_REVIEW.md` | — | **Reference** | Analysis of the original provider approach |
 
@@ -334,31 +319,31 @@ Notable requests:
 
 ## New Model Integration — Landscape
 
-### Models Worth Supporting (2026 SOTA — updated March 13)
+### Models Worth Supporting (2026 SOTA — updated March 18)
 
 | Model | Cloning | Speed | Sample Rate | Languages | VRAM | Instruct Support | Integration Ease | Status |
 |-------|---------|-------|-------------|-----------|------|-----------------|-----------------|--------|
 | **Qwen3-TTS** | 10s zero-shot | Medium | 24 kHz | 10 | Medium | None (Base); Yes (CustomVoice variant, predefined speakers only) | **Shipped** | v0.1.13 |
 | **LuxTTS** | 3s zero-shot | 150x RT, CPU ok | 48 kHz | English | <1 GB | None | **Shipped** | PR #254 |
 | **Chatterbox MTL** | 5s zero-shot | Medium | 24 kHz | 23 | Medium | Partial — `exaggeration` float | **Shipped** | PR #257 |
-| **Chatterbox Turbo** | 5s zero-shot | Fast | 24 kHz | English | Low | Partial — inline tags only | **PR #258** | In review |
-| **CosyVoice2-0.5B** | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | **Yes** — `inference_instruct2()`, works with cloning | Ready | Best instruct candidate |
-| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | **Yes** — inline text descriptions, word-level control | Ready | Multi-engine arch in place |
-| **MOSS-TTS Family** | Zero-shot | — | — | Multilingual | Medium | **Yes** — text prompts for style + timbre design | Needs vetting | Apache 2.0, multi-speaker dialogue |
-| **HumeAI TADA 1B/3B** | Zero-shot | 5× faster than LLM-TTS | 24 kHz | EN (1B), Multilingual (3B) | Medium | Partial — automatic prosody from text context | **Shipped** | PR #296, MIT, 700s+ coherent |
-| **VoxCPM 1.5** | Zero-shot (seconds) | ~0.15 RTF streaming | — | Bilingual (EN/ZH) | Medium | Partial — automatic context-aware prosody | Needs vetting | Apache 2.0, tokenizer-free continuous diffusion |
-| **Kokoro-82M** | 3s instant | CPU realtime | 24 kHz | English | Tiny (82M) | Partial — automatic style inference | Ready | Apache 2.0, multi-engine arch in place |
-| **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Partial — style transfer from ref audio only | Ready | Multi-engine arch in place |
-| **Pocket TTS** | Zero-shot + streaming | >1× RT on CPU | — | English | ~100M params, CPU-first | None | Needs vetting | MIT, Kyutai Labs, no GPU required |
+| **Chatterbox Turbo** | 5s zero-shot | Fast | 24 kHz | English | Low | Partial — inline tags only | **Shipped** | PR #258 |
+| **HumeAI TADA 1B/3B** | Zero-shot | 5x faster than LLM-TTS | 24 kHz | EN (1B), Multilingual (3B) | Medium | Partial — automatic prosody | **Shipped** | PR #296 |
+| **Kokoro-82M** | Pre-built voices | CPU realtime | 24 kHz | 8 | Tiny (82M) | None | **In progress** | Apache 2.0, pip install, ~350MB |
+| ~~**CosyVoice2-0.5B**~~ | 3-10s zero-shot | Very fast | 24 kHz | Multilingual | Low | Yes — `inference_instruct2()` | **Abandoned** | PR #311 — poor output quality |
+| **Fish Speech** | 10-30s few-shot | Real-time | 24-44 kHz | 50+ | Medium | **Yes** — inline text descriptions, word-level control | Ready | Needs license clarification |
+| **XTTS-v2** | 6s zero-shot | Mid-GPU | 24 kHz | 17+ | Medium | Partial — style transfer from ref audio only | Ready | Mature pip package |
+| **Pocket TTS** | Zero-shot + streaming | >1x RT on CPU | — | English | ~100M params, CPU-first | None | Ready | MIT, Kyutai Labs |
+| **MOSS-TTS Family** | Zero-shot | — | — | Multilingual | Medium | **Yes** — text prompts for style + timbre design | Needs vetting | Apache 2.0 |
+| **VoxCPM 1.5** | Zero-shot (seconds) | ~0.15 RTF streaming | — | Bilingual (EN/ZH) | Medium | Partial — automatic context-aware prosody | Needs vetting | Apache 2.0 |
 
-#### Notes on New Candidates (March 2026)
+#### Notes on Candidates (March 2026)
 
-- **CosyVoice2-0.5B** — Best candidate for instruct support. `inference_instruct2()` accepts a text instruct parameter for emotions, speed, volume, dialects — and it works alongside voice cloning. This is the closest match to what users expect from our instruct UI. [HF: FunAudioLLM/CosyVoice2-0.5B](https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B)
-- **HumeAI TADA** — Text-Audio Dual Alignment arch. Near-zero hallucinations/drift, free synced transcript. 700+ seconds coherent audio. Best candidate for Stories long-form reliability. Prosody/emotion is automatic from text context, not user-controllable. [HF: HumeAI/tada-1b](https://huggingface.co/HumeAI/tada-1b) | [GitHub: HumeAI/tada](https://github.com/HumeAI/tada)
-- **MOSS-TTS** — Modular suite: flagship cloning, MOSS-TTSD (multi-speaker dialogue), MOSS-VoiceGenerator (create voices from text descriptions). VoiceGenerator unifies timbre design and style control via text prompts, usable as a layer for downstream TTS including cloning. [HF: OpenMOSS-Team/MOSS-VoiceGenerator](https://huggingface.co/OpenMOSS-Team/MOSS-VoiceGenerator) | [GitHub: OpenMOSS/MOSS-TTS](https://github.com/OpenMOSS/MOSS-TTS)
-- **Fish Speech** — Word-level fine-grained control using plain language descriptions inline in the script. Works with cloning. Note: Fish Audio S2 has a restrictive research license (commercial use requires approval), but the open-source Fish Speech model may differ. Needs license clarification. [fish.audio blog](https://fish.audio/blog/fish-audio-s2-fine-grained-ai-voice-control-at-the-word-level)
-- **VoxCPM 1.5** — Tokenizer-free continuous diffusion + autoregressive. No discrete token artifacts. Prosody/emotion is context-aware but automatic, not explicitly controllable via text prompt. Real-time streaming, LoRA fine-tuning. Trained on 1.8M+ hours. [GitHub: OpenBMB/VoxCPM](https://github.com/OpenBMB/VoxCPM)
-- **Pocket TTS** — 100M param CPU-first model from Kyutai Labs (Moshi team). Runs >1× realtime without GPU. No style control. Broadens hardware support significantly. [GitHub: kyutai-labs/pocket-tts](https://github.com/kyutai-labs/pocket-tts)
+- **CosyVoice2-0.5B** — **Tried and abandoned** (PR #311). Despite having the best instruct API, output quality was poor. No PyPI package, needed 5+ shims, heavy deps. Not worth it.
+- **HumeAI TADA** — **Shipped** (PR #296). 700+ seconds coherent audio. [GitHub: HumeAI/tada](https://github.com/HumeAI/tada)
+- **Kokoro-82M** — **In progress.** 82M params, CPU realtime, Apache 2.0, clean `pip install kokoro`. Uses pre-built voice styles (not zero-shot cloning from arbitrary audio). [GitHub: hexgrad/kokoro](https://github.com/hexgrad/kokoro)
+- **Fish Speech** — Word-level fine-grained control. License needs clarification. [fish.audio blog](https://fish.audio/blog/fish-audio-s2-fine-grained-ai-voice-control-at-the-word-level)
+- **XTTS-v2** — Coqui's multilingual cloning. 17+ languages, pip-installable. [GitHub: coqui-ai/TTS](https://github.com/coqui-ai/TTS)
+- **Pocket TTS** — 100M param CPU-first model from Kyutai Labs. [GitHub: kyutai-labs/pocket-tts](https://github.com/kyutai-labs/pocket-tts)
 - **Watch list:** MioTTS-2.6B (fast LLM-based EN/JP, vLLM compatible), Oolel-Voices (Soynade Research, expressive modular control)
 
 ### Adding a New Engine (Now Straightforward)
@@ -402,49 +387,44 @@ The generation form now uses a flat model dropdown with engine-based routing. Pe
 
 ## Recommended Priorities
 
-### Tier 1 — Ship Now (Low Risk)
+### Tier 1 — Ship Now
 
 | Priority | PR/Item | Impact | Effort |
 |----------|---------|--------|--------|
-| 1 | **#258** — Chatterbox Turbo + per-engine languages | Paralinguistic tags, proper language filtering | Review only |
-| 2 | **#152** — Offline mode crash fix | Fixes #150, #151 | Low |
-| 3 | **#99** — Chunked TTS + quality selector | Removes 500-char limit, addresses 5 issues | Medium |
-| 4 | **#218** — Windows HF cache dir fix | Windows-specific pain | Low |
-| 5 | **#178** — Generation error handling | Error UX | Low |
-| 6 | **#230** — Docs fixes | Zero risk | None |
-| 7 | **#133** — Network access toggle | Wires up existing code | Low |
-| 8 | **#88** — CORS restriction | Security improvement | Low |
-| 9 | **#214** — Tauri window close panic fix | Stability | Low |
-| 10 | Triage GPU issues | Many may be resolved by CUDA swap (#252) | Low |
-| 11 | Close superseded PRs | #194 (superseded by #257), #83 (outdated) | None |
+| 1 | **Kokoro 82M** — finish integration | New engine, CPU-friendly, 8 langs | Low (nearly done) |
+| 2 | Close PR #311 (CosyVoice) and #237 (superseded by #305) | Housekeeping | None |
+| 3 | **#218** — Windows HF cache dir fix | Windows-specific pain | Low |
+| 4 | **#253** — 48kHz speech tokenizer | Quality improvement for Qwen | Medium |
 
-### Tier 2 — Next Release (v0.2.0)
+### Tier 2 — Feature Work
 
 | Priority | Item | Impact | Effort |
 |----------|------|--------|--------|
-| 1 | **#253** — 48kHz speech tokenizer | Quality improvement | Medium |
-| 2 | **#161** — Docker deployment | Server/headless users | Medium |
-| 3 | **#154** — Audiobook tab | Long-form users | Medium |
-| 4 | ~~**Model config registry**~~ | ~~Reduce dispatch duplication in main.py~~ | **Done** |
-| 5 | **#225** — Custom HuggingFace models | User-supplied models | High (needs rework for multi-engine) |
+| 1 | **#154** — Audiobook tab | Long-form users. Chunking + queue now shipped. | Medium |
+| 2 | **#225** — Custom HuggingFace models | User-supplied models. Needs rework. | High |
+| 3 | OpenAI-compatible API (plan doc exists) | Low effort once API is stable | Low |
+| 4 | LoRA fine-tuning (PR #195) | Complex, needs rework for multi-engine | Very High |
+| 5 | Streaming for non-MLX engines | Currently MLX-only | Medium |
 
-### Tier 3 — Future (v0.3.0+)
+### Tier 3 — Future Engines
 
 | Priority | Item | Notes |
 |----------|------|-------|
-| 1 | **HumeAI TADA** | Long-form reliability for Stories, synced transcripts. Addresses #234, #203, #191, #111, #69. Needs API vetting. |
-| 2 | **Pocket TTS** (Kyutai) | CPU-first 100M model, broadens hardware support. Kyutai ships clean code. Needs API vetting. |
-| 3 | **MOSS-TTS** | Text-to-voice design (no ref audio) is unique. Multi-speaker dialogue for Stories. Needs thorough API vetting. |
-| 4 | **Kokoro-82M** | 82M params, CPU realtime, Apache 2.0. Easy win. |
-| 5 | ~~**Model config registry refactor**~~ | **Done** — consolidated in `backend/backends/__init__.py` + `EngineModelSelector.tsx` |
-| 6 | XTTS-v2 / Fish Speech / CosyVoice | Multi-engine arch is ready; just needs backend implementation |
-| 7 | **VoxCPM 1.5** | Tokenizer-free streaming, interesting but uncertain integration surface |
-| 8 | OpenAI-compatible API (plan doc exists) | Low effort once API is stable |
-| 9 | LoRA fine-tuning (PR #195) | Complex, needs rework for multi-engine |
-| 10 | External/remote providers | Depends on use case demand |
-| 11 | GGUF support (#226) | Depends on model ecosystem maturity |
-| 12 | Queue system (#234) | Batch generation |
-| 13 | Streaming for non-MLX engines | Currently MLX-only |
+| 1 | **Fish Speech** | 50+ langs, word-level instruct. License TBD. |
+| 2 | **XTTS-v2** | 17+ langs, mature pip package. Best multilingual cloning. |
+| 3 | **Pocket TTS** (Kyutai) | CPU-first 100M model. MIT. |
+| 4 | **MOSS-TTS** | Text-to-voice design. Multi-speaker dialogue for Stories. |
+| 5 | **VoxCPM 1.5** | Tokenizer-free streaming. Uncertain integration surface. |
+
+### ~~Previously Prioritized — Now Done~~
+
+- ~~#258 — Chatterbox Turbo~~ **Merged**
+- ~~#99 — Chunked TTS~~ **Superseded by #266, merged**
+- ~~#88 — CORS restriction~~ **Merged**
+- ~~#161 — Docker deployment~~ **Merged**
+- ~~#234 — Queue system~~ **Addressed by #269, merged**
+- ~~HumeAI TADA~~ **Shipped** (PR #296)
+- ~~Kokoro-82M~~ **In progress**
 
 ---
 
@@ -452,13 +432,10 @@ The generation form now uses a flat model dropdown with engine-based routing. Pe
 
 | Branch | PR | Status | Notes |
 |--------|-----|--------|-------|
-| `feat/chatterbox-turbo` | #258 | Open | Chatterbox Turbo + per-engine languages |
+| `feat/cosyvoice-engine` | #311 | Open — closing | CosyVoice2/3 — abandoned, poor quality |
+| `feat/chatterbox-turbo` | #258 | **Merged** | Chatterbox Turbo + per-engine languages |
 | `feat/chatterbox` | #257 | **Merged** | Chatterbox Multilingual |
 | `feat/luxtts` | #254 | **Merged** | LuxTTS + multi-engine arch |
-| `external-provider-binaries` | #33 | Superseded by #252 | Original CUDA provider approach |
-| `feat/dual-server-binaries` | — | No PR | Related to provider split |
-| `fix-multi-sample` | — | No PR | Voice profile multi-sample fix |
-| `fix-dl-notification-...` | — | No PR | Model download UX |
 
 ---
 

@@ -230,7 +230,15 @@ async def stream_speech(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    engine = data.engine or "qwen"
+    # Mirror the regular /generate endpoint behavior more closely:
+    # if the caller doesn't specify an engine, prefer the profile's default
+    # engine (or preset engine) before falling back to qwen.
+    engine = (
+        data.engine
+        or getattr(profile, "default_engine", None)
+        or getattr(profile, "preset_engine", None)
+        or "qwen"
+    )
     tts_model = get_tts_backend_for_engine(engine)
     model_size = data.model_size or "1.7B"
 
@@ -262,6 +270,22 @@ async def stream_speech(
         crossfade_ms=data.crossfade_ms,
         trim_fn=trim_fn,
     )
+
+    effects_chain_config = None
+    if data.effects_chain is not None:
+        effects_chain_config = [e.model_dump() for e in data.effects_chain]
+    elif profile.effects_chain:
+        import json as _json
+
+        try:
+            effects_chain_config = _json.loads(profile.effects_chain)
+        except Exception:
+            effects_chain_config = None
+
+    if effects_chain_config:
+        from ..utils.effects import apply_effects
+
+        audio = apply_effects(audio, sample_rate, effects_chain_config)
 
     if data.normalize:
         from ..utils.audio import normalize_audio

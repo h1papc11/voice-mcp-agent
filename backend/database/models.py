@@ -10,7 +10,13 @@ Base = declarative_base()
 
 
 class VoiceProfile(Base):
-    """Voice profile."""
+    """Voice profile.
+
+    voice_type discriminates three flavours:
+      - "cloned"   — traditional reference-audio profiles (all cloning engines)
+      - "preset"   — engine-specific pre-built voice (e.g. Kokoro voices)
+      - "designed"  — text-described voice (e.g. Qwen CustomVoice, future)
+    """
 
     __tablename__ = "profiles"
 
@@ -20,6 +26,14 @@ class VoiceProfile(Base):
     language = Column(String, default="en")
     avatar_path = Column(String, nullable=True)
     effects_chain = Column(Text, nullable=True)
+
+    # Voice type system — added v0.3.x
+    voice_type = Column(String, default="cloned")  # "cloned" | "preset" | "designed"
+    preset_engine = Column(String, nullable=True)   # e.g. "kokoro" — only for preset
+    preset_voice_id = Column(String, nullable=True)  # e.g. "am_adam" — only for preset
+    design_prompt = Column(Text, nullable=True)      # text description — only for designed
+    default_engine = Column(String, nullable=True)   # auto-selected engine, locked for preset
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
