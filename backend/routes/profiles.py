@@ -90,6 +90,21 @@ async def list_preset_voices(engine: str):
                 for vid, name, gender, lang in KOKORO_VOICES
             ],
         }
+    if engine == "qwen_custom_voice":
+        from ..backends.qwen_custom_voice_backend import QWEN_CUSTOM_VOICES
+
+        return {
+            "engine": engine,
+            "voices": [
+                {
+                    "voice_id": speaker_id,
+                    "name": display_name,
+                    "gender": gender,
+                    "language": lang,
+                }
+                for speaker_id, display_name, gender, lang, _desc in QWEN_CUSTOM_VOICES
+            ],
+        }
     return {"engine": engine, "voices": []}
 
 
@@ -103,9 +118,15 @@ async def seed_preset_profiles_route(
     Creates profiles for all available preset voices that don't already exist.
     Returns the count of newly created profiles.
     """
-    if engine != "kokoro":
-        raise HTTPException(status_code=400, detail=f"No presets available for engine: {engine}")
+    if engine == "kokoro":
+        return _seed_kokoro_presets(db)
+    if engine == "qwen_custom_voice":
+        return _seed_qwen_custom_voice_presets(db)
+    raise HTTPException(status_code=400, detail=f"No presets available for engine: {engine}")
 
+
+def _seed_kokoro_presets(db: Session):
+    """Seed Kokoro preset profiles."""
     try:
         from ..backends.kokoro_backend import KOKORO_VOICES
 
@@ -154,9 +175,54 @@ async def seed_preset_profiles_route(
             db.commit()
             logger.info(f"Seeded {created} Kokoro preset profiles")
 
-        return {"engine": engine, "created": created, "total_available": len(KOKORO_VOICES)}
+        return {"engine": "kokoro", "created": created, "total_available": len(KOKORO_VOICES)}
     except Exception as e:
         logger.exception(f"Failed to seed Kokoro profiles: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _seed_qwen_custom_voice_presets(db: Session):
+    """Seed Qwen CustomVoice preset profiles."""
+    try:
+        from ..backends.qwen_custom_voice_backend import QWEN_CUSTOM_VOICES
+
+        created = 0
+        for speaker_id, display_name, gender, lang, description in QWEN_CUSTOM_VOICES:
+            # Skip if preset already exists
+            existing = (
+                db.query(DBVoiceProfile)
+                .filter_by(preset_engine="qwen_custom_voice", preset_voice_id=speaker_id)
+                .first()
+            )
+            if existing:
+                continue
+
+            # Skip name collisions
+            if db.query(DBVoiceProfile).filter_by(name=display_name).first():
+                continue
+
+            profile = DBVoiceProfile(
+                id=str(uuid.uuid4()),
+                name=display_name,
+                description=f"Qwen CustomVoice — {description}",
+                language=lang,
+                voice_type="preset",
+                preset_engine="qwen_custom_voice",
+                preset_voice_id=speaker_id,
+                default_engine="qwen_custom_voice",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            )
+            db.add(profile)
+            created += 1
+
+        if created > 0:
+            db.commit()
+            logger.info(f"Seeded {created} Qwen CustomVoice preset profiles")
+
+        return {"engine": "qwen_custom_voice", "created": created, "total_available": len(QWEN_CUSTOM_VOICES)}
+    except Exception as e:
+        logger.exception(f"Failed to seed Qwen CustomVoice profiles: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

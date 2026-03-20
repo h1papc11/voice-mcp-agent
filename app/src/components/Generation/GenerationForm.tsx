@@ -91,7 +91,7 @@ export function GenerationForm() {
               )}
             />
 
-            {form.watch('engine') === 'qwen' && (
+            {(form.watch('engine') === 'qwen' || form.watch('engine') === 'qwen_custom_voice') && (
               <FormField
                 control={form.control}
                 name="instruct"
