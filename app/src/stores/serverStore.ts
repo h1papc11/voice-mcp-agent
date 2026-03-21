@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { queryClient } from '@/lib/queryClient';
 
 interface ServerStore {
   serverUrl: string;
@@ -31,15 +32,11 @@ interface ServerStore {
 }
 
 /**
- * Invalidate all React Query caches and reset UI selection state.
- * Called when the server URL changes so stale data from the previous
- * server is not shown.
+ * Invalidate all React Query caches so stale data from the previous
+ * server is not shown. Called when the server URL changes.
  */
 function invalidateAllServerData() {
-  // Lazy import to avoid circular dependency (main.tsx -> serverStore -> main.tsx)
-  import('@/main').then(({ queryClient }) => {
-    queryClient.invalidateQueries();
-  });
+  queryClient.invalidateQueries();
 }
 
 export const useServerStore = create<ServerStore>()(

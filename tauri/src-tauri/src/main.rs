@@ -55,9 +55,11 @@ fn find_voicebox_pid_on_port(port: u16) -> Option<u32> {
 
 /// Check if a Voicebox server is responding on the given port.
 ///
-/// Sends an HTTP GET to `/health` and returns `true` if the response
-/// contains the expected JSON field (`"status"`), confirming it's
-/// a Voicebox backend rather than an unrelated service.
+/// Sends an HTTP GET to `/health` and returns `true` only if the response
+/// is valid JSON matching the Voicebox `HealthResponse` schema — specifically
+/// `status` must be `"healthy"`, and both `model_loaded` and `gpu_available`
+/// must be present as booleans. This prevents misidentifying an unrelated
+/// service that happens to expose a `/health` endpoint.
 #[allow(dead_code)] // Used in platform-specific cfg blocks
 fn check_health(port: u16) -> bool {
     let url = format!("http://127.0.0.1:{}/health", port);
@@ -70,9 +72,13 @@ fn check_health(port: u16) -> bool {
                 if !resp.status().is_success() {
                     return false;
                 }
-                // Verify the body looks like a Voicebox health response
-                match resp.text() {
-                    Ok(body) => body.contains("status"),
+                // Parse as JSON and validate Voicebox-specific fields
+                match resp.json::<serde_json::Value>() {
+                    Ok(body) => {
+                        body.get("status").and_then(|v| v.as_str()) == Some("healthy")
+                            && body.get("model_loaded").map(|v| v.is_boolean()).unwrap_or(false)
+                            && body.get("gpu_available").map(|v| v.is_boolean()).unwrap_or(false)
+                    }
                     Err(_) => false,
                 }
             }
