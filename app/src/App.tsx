@@ -4,6 +4,7 @@ import voiceboxLogo from '@/assets/voicebox-logo.png';
 import ShinyText from '@/components/ShinyText';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
 import { useAutoUpdater } from '@/hooks/useAutoUpdater';
+import { apiClient } from '@/lib/api/client';
 import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
@@ -122,6 +123,24 @@ function App() {
         serverStartingRef.current = false;
         // @ts-expect-error - adding property to window
         window.__voiceboxServerStartedByApp = false;
+
+        // Fall back to polling: the server may already be running externally
+        // (e.g. started via python/uvicorn/Docker). Poll the health endpoint
+        // until it responds, then transition to the main UI.
+        console.log('Falling back to health-check polling...');
+        const pollInterval = setInterval(async () => {
+          try {
+            await apiClient.getHealth();
+            console.log('External server detected via health check');
+            clearInterval(pollInterval);
+            setServerReady(true);
+          } catch {
+            // Server not ready yet, keep polling
+          }
+        }, 2000);
+
+        // Stop polling after 2 minutes to avoid polling forever
+        setTimeout(() => clearInterval(pollInterval), 120_000);
       });
 
     // Cleanup: stop server on actual unmount (not StrictMode remount)
