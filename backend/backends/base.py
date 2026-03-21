@@ -126,6 +126,37 @@ def get_torch_device(
     return "cpu"
 
 
+def empty_device_cache(device: str) -> None:
+    """
+    Free cached memory on the given device (CUDA or XPU).
+
+    Backends should call this after unloading models so VRAM is returned
+    to the OS.
+    """
+    import torch
+
+    if device == "cuda" and torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    elif device == "xpu" and hasattr(torch, "xpu"):
+        torch.xpu.empty_cache()
+
+
+def manual_seed(seed: int, device: str) -> None:
+    """
+    Set the random seed on both CPU and the active accelerator.
+
+    Covers CUDA and Intel XPU so that generation is reproducible
+    regardless of which GPU backend is in use.
+    """
+    import torch
+
+    torch.manual_seed(seed)
+    if device == "cuda" and torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+    elif device == "xpu" and hasattr(torch, "xpu"):
+        torch.xpu.manual_seed(seed)
+
+
 async def combine_voice_prompts(
     audio_paths: List[str],
     reference_texts: List[str],

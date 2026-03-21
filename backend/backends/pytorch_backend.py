@@ -14,6 +14,8 @@ from . import TTSBackend, STTBackend, LANGUAGE_CODE_TO_NAME, WHISPER_HF_REPOS
 from .base import (
     is_model_cached,
     get_torch_device,
+    empty_device_cache,
+    manual_seed,
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
 )
@@ -122,8 +124,7 @@ class PyTorchTTSBackend:
             self.model = None
             self._current_model_size = None
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            empty_device_cache(self.device)
 
             logger.info("TTS model unloaded")
 
@@ -215,9 +216,7 @@ class PyTorchTTSBackend:
             """Run synchronous generation in thread pool."""
             # Set seed if provided
             if seed is not None:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
+                manual_seed(seed, self.device)
 
             # Generate audio - this is the blocking operation
             wavs, sample_rate = self.model.generate_voice_clone(
@@ -300,8 +299,7 @@ class PyTorchSTTBackend:
             self.model = None
             self.processor = None
 
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            empty_device_cache(self.device)
 
             logger.info("Whisper model unloaded")
 

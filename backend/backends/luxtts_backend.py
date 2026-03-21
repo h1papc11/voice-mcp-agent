@@ -12,7 +12,14 @@ from typing import Optional, Tuple
 import numpy as np
 
 from . import TTSBackend
-from .base import is_model_cached, get_torch_device, combine_voice_prompts as _combine_voice_prompts, model_load_progress
+from .base import (
+    is_model_cached,
+    get_torch_device,
+    empty_device_cache,
+    manual_seed,
+    combine_voice_prompts as _combine_voice_prompts,
+    model_load_progress,
+)
 from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_prompt
 
 logger = logging.getLogger(__name__)
@@ -30,7 +37,7 @@ class LuxTTSBackend:
         self._device = None
 
     def _get_device(self) -> str:
-        return get_torch_device(allow_mps=True)
+        return get_torch_device(allow_mps=True, allow_xpu=True)
 
     def is_loaded(self) -> bool:
         return self.model is not None
@@ -69,9 +76,12 @@ class LuxTTSBackend:
 
             if device == "cpu":
                 import os
+
                 threads = os.cpu_count() or 4
                 self.model = LuxTTS(
-                    model_path=LUXTTS_HF_REPO, device="cpu", threads=min(threads, 8),
+                    model_path=LUXTTS_HF_REPO,
+                    device="cpu",
+                    threads=min(threads, 8),
                 )
             else:
                 self.model = LuxTTS(model_path=LUXTTS_HF_REPO, device=device)
@@ -81,12 +91,12 @@ class LuxTTSBackend:
     def unload_model(self) -> None:
         """Unload model to free memory."""
         if self.model is not None:
+            device = self.device
             del self.model
             self.model = None
+            self._device = None
 
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            empty_device_cache(device)
 
             logger.info("LuxTTS unloaded")
 
@@ -154,12 +164,8 @@ class LuxTTSBackend:
         await self.load_model()
 
         def _generate_sync():
-            import torch
-
             if seed is not None:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
+                manual_seed(seed, self.device)
 
             wav = self.model.generate_speech(
                 text=text,

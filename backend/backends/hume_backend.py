@@ -24,6 +24,8 @@ from . import TTSBackend
 from .base import (
     is_model_cached,
     get_torch_device,
+    empty_device_cache,
+    manual_seed,
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
 )
@@ -66,7 +68,7 @@ class HumeTadaBackend:
     def _get_device(self) -> str:
         # Force CPU on macOS — MPS has issues with flow matching
         # and large vocab lm_head (>65536 output channels)
-        return get_torch_device(force_cpu_on_mac=True)
+        return get_torch_device(force_cpu_on_mac=True, allow_xpu=True)
 
     def is_loaded(self) -> bool:
         return self.model is not None
@@ -105,6 +107,7 @@ class HumeTadaBackend:
             # package.  The real package pulls in onnx/tensorboard/matplotlib via
             # descript-audiotools, so we use a lightweight shim instead.
             from ..utils.dac_shim import install_dac_shim
+
             install_dac_shim()
 
             import torch
@@ -142,8 +145,11 @@ class HumeTadaBackend:
                 allow_patterns=["tokenizer*", "special_tokens*"],
             )
 
-            # Determine dtype — use bf16 on CUDA for ~50% memory savings
+            # Determine dtype — use bf16 on CUDA/XPU for ~50% memory savings
             if device == "cuda" and torch.cuda.is_bf16_supported():
+                model_dtype = torch.bfloat16
+            elif device == "xpu":
+                # Intel Arc (Alchemist+) supports bf16 natively
                 model_dtype = torch.bfloat16
             else:
                 model_dtype = torch.float32
@@ -153,14 +159,14 @@ class HumeTadaBackend:
             # This avoids monkey-patching AutoTokenizer.from_pretrained
             # which corrupts the classmethod descriptor for other engines.
             from tada.modules.aligner import AlignerConfig
+
             AlignerConfig.tokenizer_name = tokenizer_path
 
             # Load encoder (only needed for voice prompt encoding)
             from tada.modules.encoder import Encoder
+
             logger.info("Loading TADA encoder...")
-            self.encoder = Encoder.from_pretrained(
-                TADA_CODEC_REPO, subfolder="encoder"
-            ).to(device)
+            self.encoder = Encoder.from_pretrained(TADA_CODEC_REPO, subfolder="encoder").to(device)
             self.encoder.eval()
 
             # Load the causal LM (includes decoder for wav generation).
@@ -169,12 +175,11 @@ class HumeTadaBackend:
             # which hits the gated repo. Pre-load the config from HF,
             # inject the local tokenizer path, then pass it in.
             from tada.modules.tada import TadaForCausalLM, TadaConfig
+
             logger.info(f"Loading TADA {model_size} model...")
             config = TadaConfig.from_pretrained(repo)
             config.tokenizer_name = tokenizer_path
-            self.model = TadaForCausalLM.from_pretrained(
-                repo, config=config, torch_dtype=model_dtype
-            ).to(device)
+            self.model = TadaForCausalLM.from_pretrained(repo, config=config, torch_dtype=model_dtype).to(device)
             self.model.eval()
 
         logger.info(f"HumeAI TADA {model_size} loaded successfully on {device}")
@@ -188,11 +193,11 @@ class HumeTadaBackend:
             del self.encoder
             self.encoder = None
 
+        device = self._device
         self._device = None
 
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        if device:
+            empty_device_cache(device)
 
         logger.info("HumeAI TADA unloaded")
 
@@ -213,9 +218,7 @@ class HumeTadaBackend:
         """
         await self.load_model(self.model_size)
 
-        cache_key = (
-            "tada_" + get_cache_key(audio_path, reference_text)
-        ) if use_cache else None
+        cache_key = ("tada_" + get_cache_key(audio_path, reference_text)) if use_cache else None
 
         if cache_key:
             cached = get_cached_voice_prompt(cache_key)
@@ -239,9 +242,7 @@ class HumeTadaBackend:
 
             # Encode with forced alignment
             text_arg = [reference_text] if reference_text else None
-            prompt = self.encoder(
-                audio, text=text_arg, sample_rate=sr
-            )
+            prompt = self.encoder(audio, text=text_arg, sample_rate=sr)
 
             # Serialize EncoderOutput to a dict of CPU tensors for caching
             prompt_dict = {}
@@ -299,9 +300,7 @@ class HumeTadaBackend:
             from tada.modules.encoder import EncoderOutput
 
             if seed is not None:
-                torch.manual_seed(seed)
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed(seed)
+                manual_seed(seed, self._device)
 
             device = self._device
 

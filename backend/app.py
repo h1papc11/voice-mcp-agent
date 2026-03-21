@@ -155,6 +155,20 @@ def _get_gpu_status() -> str:
         return "MPS (Apple Silicon)"
     elif backend_type == "mlx":
         return "Metal (Apple Silicon via MLX)"
+
+    # Intel XPU (Arc / Data Center) via IPEX
+    try:
+        import intel_extension_for_pytorch  # noqa: F401
+
+        if hasattr(torch, "xpu") and torch.xpu.is_available():
+            try:
+                xpu_name = torch.xpu.get_device_name(0)
+            except Exception:
+                xpu_name = "Intel GPU"
+            return f"XPU ({xpu_name})"
+    except ImportError:
+        pass
+
     return "None (CPU only)"
 
 
