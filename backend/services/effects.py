@@ -11,6 +11,8 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+from backend.utils.effects import validate_effects_chain
+
 from ..database import EffectPreset as DBEffectPreset
 from ..models import EffectPresetResponse, EffectPresetCreate, EffectPresetUpdate, EffectConfig
 
@@ -52,7 +54,6 @@ def get_preset_by_name(name: str, db: Session) -> Optional[EffectPresetResponse]
 
 def create_preset(data: EffectPresetCreate, db: Session) -> EffectPresetResponse:
     """Create a new user effect preset."""
-    from .utils.effects import validate_effects_chain
 
     chain_dicts = [e.model_dump() for e in data.effects_chain]
     error = validate_effects_chain(chain_dicts)
@@ -94,7 +95,6 @@ def update_preset(preset_id: str, data: EffectPresetUpdate, db: Session) -> Opti
     if data.description is not None:
         preset.description = data.description
     if data.effects_chain is not None:
-        from .utils.effects import validate_effects_chain
 
         chain_dicts = [e.model_dump() for e in data.effects_chain]
         error = validate_effects_chain(chain_dicts)
