@@ -41,6 +41,12 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
   const isSelected = selectedProfileId === profile.id;
 
   const handleSelect = () => {
+    // If disabled but already selected, bounce the selection to re-trigger engine auto-switch
+    if (disabled && isSelected) {
+      setSelectedProfileId(null);
+      setTimeout(() => setSelectedProfileId(profile.id), 0);
+      return;
+    }
     setSelectedProfileId(isSelected ? null : profile.id);
   };
 

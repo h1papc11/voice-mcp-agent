@@ -20,17 +20,20 @@ export function ProfileList() {
   // Scroll to the selected profile after engine/sort changes
   useEffect(() => {
     if (!selectedProfileId) return;
-    // Wait a frame for the DOM to update after re-sort
-    requestAnimationFrame(() => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const rafId = requestAnimationFrame(() => {
       const el = cardRefs.current.get(selectedProfileId);
       if (!el) return;
 
       // Temporarily apply scroll-margin so it doesn't land flush at the top
       el.style.scrollMarginTop = '180px';
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      // Clean up after scroll completes
-      setTimeout(() => { el.style.scrollMarginTop = ''; }, 500);
+      timeoutId = setTimeout(() => { el.style.scrollMarginTop = ''; }, 500);
     });
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [selectedProfileId, selectedEngine]);
 
   if (isLoading) {
