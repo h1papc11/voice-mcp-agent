@@ -125,22 +125,22 @@ export function FloatingGenerateBox({
   }, [watchedEngine, setSelectedEngine]);
 
   // Sync generation form language, engine, and effects with selected profile
+  type EngineValue = 'qwen' | 'luxtts' | 'chatterbox' | 'chatterbox_turbo' | 'tada' | 'kokoro' | 'qwen_custom_voice';
   useEffect(() => {
     if (selectedProfile?.language) {
       form.setValue('language', selectedProfile.language as LanguageCode);
     }
-    // Auto-switch engine if profile has a default
-    if (selectedProfile?.default_engine) {
-      form.setValue(
-        'engine',
-        selectedProfile.default_engine as
-          | 'qwen'
-          | 'luxtts'
-          | 'chatterbox'
-          | 'chatterbox_turbo'
-          | 'tada'
-          | 'kokoro',
-      );
+    // Auto-switch engine to match the profile
+    const engine = selectedProfile?.default_engine ?? selectedProfile?.preset_engine;
+    if (engine) {
+      form.setValue('engine', engine as EngineValue);
+    } else if (selectedProfile && selectedProfile.voice_type !== 'preset') {
+      // Cloned/designed profile with no default — ensure a compatible (non-preset) engine
+      const currentEngine = form.getValues('engine');
+      const presetEngines = new Set(['kokoro', 'qwen_custom_voice']);
+      if (presetEngines.has(currentEngine)) {
+        form.setValue('engine', 'qwen');
+      }
     }
     // Pre-fill effects from profile defaults
     if (

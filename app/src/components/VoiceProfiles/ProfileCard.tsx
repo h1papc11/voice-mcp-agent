@@ -25,9 +25,10 @@ const ENGINE_DISPLAY_NAMES: Record<string, string> = {
 
 interface ProfileCardProps {
   profile: VoiceProfileResponse;
+  disabled?: boolean;
 }
 
-export function ProfileCard({ profile }: ProfileCardProps) {
+export function ProfileCard({ profile, disabled }: ProfileCardProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const deleteProfile = useDeleteProfile();
@@ -80,8 +81,9 @@ export function ProfileCard({ profile }: ProfileCardProps) {
     <>
       <Card
         className={cn(
-          'cursor-pointer hover:shadow-md transition-all flex flex-col h-[162px]',
-          isSelected && 'ring-2 ring-accent shadow-md',
+          'cursor-pointer transition-all flex flex-col h-[162px]',
+          disabled ? 'opacity-40 hover:opacity-60' : 'hover:shadow-md',
+          isSelected && !disabled && 'ring-2 ring-accent shadow-md',
         )}
         onClick={handleSelect}
         tabIndex={0}
