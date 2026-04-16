@@ -7,6 +7,117 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-16
+
+The biggest Voicebox release yet. Three new TTS engines bring the lineup to **seven** — HumeAI TADA, Kokoro 82M, and Qwen CustomVoice join Qwen3-TTS, LuxTTS, Chatterbox Multilingual, and Chatterbox Turbo. GPU support broadens to Intel Arc (XPU) and NVIDIA Blackwell (RTX 50-series), with runtime diagnostics that warn when your PyTorch build doesn't match your GPU. The CUDA backend is now split into independently versioned server and library archives, so upgrading no longer redownloads 4 GB of PyTorch/CUDA DLLs.
+
+This release also marks a big community moment: **13 new contributors** shipped fixes and features in 0.4.0. Thirty-plus bug fixes target the most-reported issues in the tracker — numpy 2.x TTS crashes, Windows background-server reliability, macOS 11 launch failures, audio playback silence, Stories clip-splitting races, history status staleness, and more.
+
+### New TTS Engines
+
+#### HumeAI TADA — Expressive English & Multilingual ([#296](https://github.com/jamiepine/voicebox/pull/296))
+- Added `tada-1b` (English) and `tada-3b-ml` (multilingual) backends
+- Replaced `descript-audio-codec` with a lightweight DAC shim to cut dependencies
+- Switched audio decoding to `soundfile` to sidestep `torchcodec` bundling issues
+- Redirected gated Llama tokenizer lookups to an ungated mirror so model loading works out of the box
+- Fixed tokenizer patch that was corrupting `AutoTokenizer` for other engines
+- Fixed TorchScript error in frozen builds
+
+#### Kokoro 82M — Fast Lightweight TTS ([#325](https://github.com/jamiepine/voicebox/pull/325))
+- Added Kokoro 82M engine with a new voice profile type system that distinguishes preset voices from cloned profiles
+- Profile grid now handles engine compatibility directly — removed redundant dropdown filtering
+- Tightened Kokoro profile handling so preset voices can't be edited like cloned profiles
+
+#### Qwen CustomVoice ([#328](https://github.com/jamiepine/voicebox/pull/328))
+- Added `qwen-custom-voice` preset engine backed by Qwen3-TTS
+- Enforced preset/profile engine compatibility across the generation flow
+- Floating generator now shows all engines instead of silently filtering
+
+### Voice Profile UX
+
+Until 0.4, every engine in Voicebox was a cloning model, so every voice profile was usable with every engine and the profile grid just showed them all. Introducing Kokoro and Qwen CustomVoice — which work from preset voices rather than cloned samples — broke that assumption for the first time. An early cut on `main` filtered the grid by the selected engine, which left users running pre-release builds thinking their cloned voices had vanished whenever they switched to a preset-only engine.
+
+This release ships the resolution before it ever reaches a tagged version:
+
+- **Grey-out instead of filter** — all profiles are always visible; unsupported ones render dimmed with a compatibility hint at the bottom of the grid
+- **Auto-switch on selection** — clicking a greyed-out profile selects it AND switches the engine to a compatible one, instead of silently doing nothing
+- **Instruct toggle restored for Qwen CustomVoice** — the floating generate box now reveals a delivery-instructions input (tone, emotion, pace) when CustomVoice is selected. Hidden across the board while the new multi-engine lineup was stabilizing because most engines don't honor the kwarg; now conditionally exposed only for the one engine that was actually trained for instruction-based style control
+- Supported profiles sort first; the grid scrolls the selected profile into view after engine/sort changes
+- Fixed engine desync on tab navigation — the form now initializes its engine from the store
+- Fixed the disabled-and-selected card click edge case by bouncing selection to re-trigger the auto-switch
+- Cleaned up scroll effect timers (requestAnimationFrame + setTimeout) to prevent stale DOM writes on unmount or rapid selection changes
+
+### GPU & Platform
+
+#### Intel Arc (XPU) Support ([#320](https://github.com/jamiepine/voicebox/pull/320))
+- First-class Intel Arc support across all PyTorch-based backends
+- Device-aware seeding, XPU detection in the GPU status panel, and setup flow detection
+- Reports correct device name and VRAM in settings
+
+#### Blackwell / RTX 50-series Support ([#316](https://github.com/jamiepine/voicebox/pull/316), [#401](https://github.com/jamiepine/voicebox/pull/401))
+- Upgraded the CUDA backend from cu126 → cu128 for RTX 50-series support
+- Added `sm_120+PTX` to the CUDA build via `TORCH_CUDA_ARCH_LIST` for forward-compatibility with Blackwell architectures (closes 5 open reports: #386, #395, #396, #399, #400)
+- GPU settings UI fixes around install/uninstall state
+
+#### GPU Compatibility Diagnostics ([#367](https://github.com/jamiepine/voicebox/pull/367), adapted)
+- New `check_cuda_compatibility()` compares the current device's compute capability against the bundled PyTorch's architecture list
+- Health endpoint exposes a `gpu_compatibility_warning` field so the UI can surface mismatches
+- Startup logs a `WARN` when the installed PyTorch build doesn't support the detected GPU
+- GPU status label shows `[UNSUPPORTED - see logs]` — no more silent "no kernel image" failures
+
+#### Split CUDA Backend ([#298](https://github.com/jamiepine/voicebox/pull/298))
+- CUDA backend now ships as two independently versioned archives: a small server binary and a large libs archive (the ~4 GB of PyTorch/CUDA DLLs)
+- Upgrading Voicebox no longer redownloads the libs archive when only the server binary changed
+- Added `asyncio.Lock` around `download_cuda_binary()` so auto-update and manual download can't race on the same temp file ([#428](https://github.com/jamiepine/voicebox/pull/428))
+- Updated `package_cuda.py` for PyInstaller 6.18 onedir layout
+- Temp archives are always cleaned up on failure, even when the install aborts mid-extract
+
+### Bug Fixes
+
+#### Critical: TTS Generation
+- **numpy 2.x `torch.from_numpy` crash** ([#361](https://github.com/jamiepine/voicebox/pull/361)) — torch compiled against numpy 1.x ABI fails silently when paired with numpy 2.x, causing `RuntimeError: Numpy is not available` / `Unable to create tensor` on every TTS request in bundled macOS Intel / Rosetta builds. Pinned `numpy<2.0` in requirements and added a PyInstaller runtime hook with a `ctypes.memmove` fallback as belt-and-suspenders. Hardened afterward to raise on unknown dtypes instead of silently reinterpreting bytes as float32.
+
+#### Platform Reliability
+- **Windows background server** ([#402](https://github.com/jamiepine/voicebox/pull/402)) — "keep server running after close" now actually keeps the server running. The HTTP `/watchdog/disable` request could lose the race against process exit on Windows; added a `.keep-running` sentinel file as a synchronous fallback, with stale-sentinel cleanup on startup to avoid orphan server processes
+- **macOS 11 launch crash** ([#424](https://github.com/jamiepine/voicebox/pull/424)) — weak-linked ScreenCaptureKit so the app can launch on macOS < 12.3 instead of crashing at dyld resolution. Gated system audio capture behind a real `sw_vers` version check so unsupported systems cleanly advertise "not available" rather than crashing at runtime
+- **macOS Intel (x86_64) setup** ([#416](https://github.com/jamiepine/voicebox/pull/416)) — relaxed `torch>=2.7.0` → `torch>=2.2.0`. PyTorch dropped pre-built x86_64 wheels after 2.2.2, so Intel Mac devs could no longer `pip install`. Now resolves to the latest compatible torch per platform
+- **Offline model loading** ([#318](https://github.com/jamiepine/voicebox/pull/318)) — Qwen TTS and Whisper force offline mode when loading cached models, so startup works without network access
+- **GUI startup with external server** ([#319](https://github.com/jamiepine/voicebox/pull/319)) — fixed GUI launch when pointed at a remote/external server, and added data refresh on server switch; hardened health validation and error handling
+- **Qwen3-TTS cache split on Windows** (adapted from [#218](https://github.com/jamiepine/voicebox/pull/218)) — route `Qwen3TTSModel.from_pretrained` through `hf_constants.HF_HUB_CACHE` so the speech tokenizer and `preprocessor_config.json` resolve from a single cache root
+- **Qwen3-TTS bundling** ([#305](https://github.com/jamiepine/voicebox/pull/305)) — bundle `qwen_tts` source files in the PyInstaller build to fix `inspect.getsource` errors in frozen builds
+- **Backend import paths** ([#345](https://github.com/jamiepine/voicebox/pull/345)) — moved lazy imports to top-level with absolute paths to resolve the "Failed to Save" preset error caused by `ModuleNotFoundError` in production builds
+- **Effects service import** ([#384](https://github.com/jamiepine/voicebox/pull/384)) — fixed `ModuleNotFoundError` on preset create/update by switching to relative imports (#349)
+
+#### Audio & Playback
+- **cpal stream silent playback** ([#405](https://github.com/jamiepine/voicebox/pull/405)) — `cpal::Stream` was dropped on function return immediately after `play()`, causing every playback to fall silent. Now holds the stream until either the buffer drains or the stop flag fires (#404)
+
+#### Stories & History
+- **Clip-splitting race** ([#403](https://github.com/jamiepine/voicebox/pull/403)) — rapid double-clicks on split could race through `split_story_item` with inconsistent state. Added `with_for_update()` row locking on the backend and an `isPending` guard on the frontend (#366)
+- **History `status` staleness** ([#394](https://github.com/jamiepine/voicebox/pull/394)) — `GET /history/{id}` was hardcoding `status="completed"` regardless of the DB row, breaking any client polling for job completion. Now returns `status`, `error`, `engine`, `model_size`, and `is_favorited` from the actual row
+- **"Clear failed" bulk button** ([#412](https://github.com/jamiepine/voicebox/pull/412)) — new `DELETE /history/failed` endpoint and a header strip showing `"N failed generations"` with a Clear button, complementing the per-row trash icon added in #321 (#410)
+- **Delete failed generations** ([#321](https://github.com/jamiepine/voicebox/pull/321)) — added a trash icon next to the retry button so failed entries can be cleaned up without having to retry first
+
+#### Security & Safety
+- **Voice prompt cache hardening** ([#429](https://github.com/jamiepine/voicebox/pull/429)) — `torch.load(weights_only=True)` on cached voice prompts per PyTorch 2.6 recommendation; replaced string-based SPA path guard with `Path.is_relative_to()` for more robust path-traversal protection
+
+#### Infrastructure & Docker
+- **Docker web build** ([#344](https://github.com/jamiepine/voicebox/pull/344)) — include `CHANGELOG.md` in the Docker web build so the in-app changelog page works in Docker deployments
+- **Docker numba cache** ([#425](https://github.com/jamiepine/voicebox/pull/425)) — set `NUMBA_CACHE_DIR` in docker-compose so numba can write its JIT cache in container runtime (#308)
+- **Relative media paths** ([#332](https://github.com/jamiepine/voicebox/pull/332)) — media paths now stored relative to the configured data dir rather than resolved against CWD, so the data directory is portable between installs
+
+### Developer Tooling
+
+- New `triage-prs` agent skill — encodes the end-to-end PR-speedrun workflow (classification → triage doc → rebase → squash-merge → follow-ups) so future release cycles can reproduce it
+- Rewrote the TTS engine guide with the patterns learned from adding TADA and Kokoro
+- Added the API refactor plan and CUDA libs addon design doc
+- Fixed broken links in the Get Started section ([#332](https://github.com/jamiepine/voicebox/pull/332))
+
+### New Contributors
+
+Huge thank you to everyone who contributed their first PR to Voicebox in this release:
+
+[@liorshahverdi](https://github.com/liorshahverdi), [@nicoschtein](https://github.com/nicoschtein), [@ArfianID](https://github.com/ArfianID), [@aimaaaimaa](https://github.com/aimaaaimaa), [@maxmcoding](https://github.com/maxmcoding), [@Khalodddd](https://github.com/Khalodddd), [@LuisSambrano](https://github.com/LuisSambrano), [@shaun0927](https://github.com/shaun0927), [@malletfils](https://github.com/malletfils), [@mvanhorn](https://github.com/mvanhorn), [@kuishou68](https://github.com/kuishou68), [@txhno](https://github.com/txhno), [@MukundaKatta](https://github.com/MukundaKatta)
+
 ## [0.3.0] - 2026-03-17
 
 This release rewrites the backend into a modular architecture, overhauls the settings UI into routed sub-pages, fixes audio player freezing, migrates documentation to Fumadocs, and ships a batch of bug fixes targeting the most-reported issues from the tracker.
@@ -444,7 +555,9 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jamiepine/voicebox/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/jamiepine/voicebox/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/jamiepine/voicebox/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/jamiepine/voicebox/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/jamiepine/voicebox/compare/v0.1.13...v0.2.1
