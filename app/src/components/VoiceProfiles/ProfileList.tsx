@@ -28,7 +28,9 @@ export function ProfileList() {
       // Temporarily apply scroll-margin so it doesn't land flush at the top
       el.style.scrollMarginTop = '180px';
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      timeoutId = setTimeout(() => { el.style.scrollMarginTop = ''; }, 500);
+      timeoutId = setTimeout(() => {
+        el.style.scrollMarginTop = '';
+      }, 500);
     });
     return () => {
       cancelAnimationFrame(rafId);

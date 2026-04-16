@@ -131,7 +131,8 @@ export function useModelDownloadToast({
                 )}
               </div>
             ),
-            duration: progress.status === 'complete' || progress.status === 'error' ? 5000 : Infinity,
+            duration:
+              progress.status === 'complete' || progress.status === 'error' ? 5000 : Infinity,
           });
 
           // Close connection and dismiss toast on completion or error
