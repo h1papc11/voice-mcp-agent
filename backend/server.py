@@ -169,6 +169,19 @@ def _start_parent_watchdog(parent_pid, data_dir=None):
         if not alive:
             watchdog_logger.warning(f"Parent PID {parent_pid} not found on first check — disabling watchdog")
             return
+        # Clear any stale .keep-running sentinel from a previous session. The
+        # sentinel is only removed by the watchdog when it's consumed during a
+        # grace period; if the HTTP /watchdog/disable path wins the race on a
+        # "keep running" exit, the sentinel is left on disk. Wipe it here so a
+        # future session can't inherit that stale signal.
+        if data_dir:
+            stale = os.path.join(data_dir, ".keep-running")
+            if os.path.exists(stale):
+                try:
+                    os.remove(stale)
+                    watchdog_logger.info("Removed stale .keep-running sentinel from previous session")
+                except OSError as e:
+                    watchdog_logger.warning(f"Failed to remove stale sentinel: {e}")
         while True:
             if _watchdog_disabled:
                 watchdog_logger.info("Watchdog disabled (keep server running), stopping monitor")
