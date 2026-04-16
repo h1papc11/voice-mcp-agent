@@ -136,7 +136,9 @@ export function useGenerationForm(options: UseGenerationFormOptions = {}) {
 
       const hasModelSizes =
         engine === 'qwen' || engine === 'qwen_custom_voice' || engine === 'tada';
-      const supportsInstruct = engine === 'qwen' || engine === 'qwen_custom_voice';
+      // Only Qwen CustomVoice actually honors the instruct kwarg at model level.
+      // Base Qwen3-TTS accepts the kwarg but ignores it.
+      const supportsInstruct = engine === 'qwen_custom_voice';
       const effectsChain = options.getEffectsChain?.();
       // This now returns immediately with status="generating"
       const result = await generation.mutateAsync({

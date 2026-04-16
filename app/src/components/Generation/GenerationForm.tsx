@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { Loader2, Mic } from 'lucide-react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -24,7 +24,11 @@ import { getLanguageOptionsForEngine, type LanguageCode } from '@/lib/constants/
 import { useGenerationForm } from '@/lib/hooks/useGenerationForm';
 import { useProfile } from '@/lib/hooks/useProfiles';
 import { useUIStore } from '@/stores/uiStore';
-import { EngineModelSelector, applyEngineSelection, getEngineDescription } from './EngineModelSelector';
+import {
+  applyEngineSelection,
+  EngineModelSelector,
+  getEngineDescription,
+} from './EngineModelSelector';
 import { ParalinguisticInput } from './ParalinguisticInput';
 
 function getEngineSelectValue(engine: string): string {
@@ -114,7 +118,7 @@ export function GenerationForm() {
               )}
             />
 
-            {(form.watch('engine') === 'qwen' || form.watch('engine') === 'qwen_custom_voice') && (
+            {form.watch('engine') === 'qwen_custom_voice' && (
               <FormField
                 control={form.control}
                 name="instruct"
