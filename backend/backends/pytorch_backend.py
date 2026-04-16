@@ -99,16 +99,25 @@ class PyTorchTTSBackend:
             model_path = self._get_model_path(model_size)
             logger.info("Loading TTS model %s on %s...", model_size, self.device)
 
+            # Route both HF Hub and Transformers through a single cache root.
+            # On Windows local setups, model assets can otherwise split between
+            # .hf-cache/hub and .hf-cache/transformers, causing speech_tokenizer
+            # and preprocessor_config.json to fail to resolve during load.
+            from huggingface_hub import constants as hf_constants
+            tts_cache_dir = hf_constants.HF_HUB_CACHE
+
             with force_offline_if_cached(is_cached, model_name):
                 if self.device == "cpu":
                     self.model = Qwen3TTSModel.from_pretrained(
                         model_path,
+                        cache_dir=tts_cache_dir,
                         torch_dtype=torch.float32,
                         low_cpu_mem_usage=False,
                     )
                 else:
                     self.model = Qwen3TTSModel.from_pretrained(
                         model_path,
+                        cache_dir=tts_cache_dir,
                         device_map=self.device,
                         torch_dtype=torch.bfloat16,
                     )
