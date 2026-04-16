@@ -182,8 +182,8 @@ function ChangelogEntryCard({ entry }: { entry: ChangelogEntry }) {
 
   return (
     <div className="border-b border-border/50 pb-6">
-      <div className="flex items-baseline gap-3 mb-1">
-        <h3 className="text-sm font-medium">{entry.version}</h3>
+      <div className="flex items-baseline gap-3 mb-3">
+        <h3 className="text-xl font-semibold tracking-tight">{entry.version}</h3>
         {entry.date && <span className="text-xs text-muted-foreground">{entry.date}</span>}
         {entry.version === 'Unreleased' && <Badge variant="outline">dev</Badge>}
       </div>
