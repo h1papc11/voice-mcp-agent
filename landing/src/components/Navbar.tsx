@@ -1,9 +1,9 @@
 'use client';
 
-import { Github } from 'lucide-react';
+import { Coffee, Github } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { GITHUB_REPO } from '@/lib/constants';
+import { DONATE_URL, GITHUB_REPO } from '@/lib/constants';
 
 function formatStarCount(count: number): string {
   if (count >= 1000) {
@@ -75,21 +75,33 @@ export function Navbar() {
           </a>
         </div>
 
-        {/* GitHub star button */}
-        <a
-          href={GITHUB_REPO}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2 justify-self-end rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-border"
-        >
-          <Github className="h-4 w-4" />
-          <span className="text-[13px] font-medium">Star</span>
-          {starCount !== null && (
-            <span className="border-l border-border/60 pl-2 text-[13px] font-semibold text-foreground">
-              {formatStarCount(starCount)}
-            </span>
-          )}
-        </a>
+        {/* Donate + GitHub star buttons */}
+        <div className="flex items-center gap-2 justify-self-end">
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-[#FFDD00]/40"
+            aria-label="Donate via Buy Me a Coffee"
+          >
+            <Coffee className="h-4 w-4 text-[#FFDD00]" />
+            <span className="text-[13px] font-medium">Donate</span>
+          </a>
+          <a
+            href={GITHUB_REPO}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-border"
+          >
+            <Github className="h-4 w-4" />
+            <span className="text-[13px] font-medium">Star</span>
+            {starCount !== null && (
+              <span className="border-l border-border/60 pl-2 text-[13px] font-semibold text-foreground">
+                {formatStarCount(starCount)}
+              </span>
+            )}
+          </a>
+        </div>
       </div>
     </nav>
   );

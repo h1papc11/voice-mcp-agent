@@ -1,6 +1,6 @@
 'use client';
 
-import { Github, Globe, Languages, MessageSquare, Zap } from 'lucide-react';
+import { Github, Globe, Languages, MessageSquare, SlidersHorizontal, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ControlUI } from '@/components/ControlUI';
 import { Features } from '@/components/Features';
@@ -233,6 +233,101 @@ export default function Home() {
                 </span>
                 <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
                   48kHz output
+                </span>
+              </div>
+            </div>
+
+            {/* Qwen CustomVoice */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Qwen CustomVoice</h3>
+                  <span className="text-xs text-muted-foreground/60">by Alibaba</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    1.7B
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    0.6B
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Nine premium preset speakers with natural-language style control. Tell the model how
+                to deliver — "speak slowly with warmth", "authoritative and clear" — and it adapts
+                tone, emotion, and pace.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <SlidersHorizontal className="h-3 w-3" />
+                  Instruct control
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Globe className="h-3 w-3" />
+                  10 languages
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  9 preset voices
+                </span>
+              </div>
+            </div>
+
+            {/* HumeAI TADA */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">TADA</h3>
+                  <span className="text-xs text-muted-foreground/60">by Hume AI</span>
+                </div>
+                <div className="flex gap-1.5">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    3B
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                    1B
+                  </span>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Speech-language model with text-acoustic dual alignment. Built for long-form
+                generation — produces 700s+ of coherent audio without drift. Multilingual at 3B,
+                English-focused at 1B.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Globe className="h-3 w-3" />
+                  10 languages
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  Long-form coherent
+                </span>
+              </div>
+            </div>
+
+            {/* Kokoro 82M */}
+            <div className="rounded-xl border border-border bg-card/60 backdrop-blur-sm p-6 transition-colors hover:border-accent/30">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Kokoro</h3>
+                  <span className="text-xs text-muted-foreground/60">by hexgrad · Apache 2.0</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-background text-muted-foreground">
+                  82M
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                Tiny 82M-parameter TTS that runs at CPU realtime with negligible VRAM. Pre-built
+                voice styles instead of cloning — pick a voice, type, generate. Smallest footprint
+                of any engine.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  <Zap className="h-3 w-3" />
+                  CPU realtime
+                </span>
+                <span className="flex items-center gap-1 text-[11px] text-muted-foreground/70">
+                  Preset voices
                 </span>
               </div>
             </div>
