@@ -55,10 +55,23 @@ def build_server(cuda=False):
     # numpy 2.x / torch ABI mismatch fix: install memmove fallback for
     # torch.from_numpy() before the app starts. Runtime hooks run after
     # FrozenImporter is registered so frozen torch/numpy are importable.
+    # Paths are passed relative to backend_dir because os.chdir(backend_dir)
+    # runs before PyInstaller. Absolute paths would get baked into the
+    # generated .spec, breaking reproducible builds on other machines / CI.
     args.extend(
         [
             "--runtime-hook",
-            str(backend_dir / "pyi_rth_numpy_compat.py"),
+            "pyi_rth_numpy_compat.py",
+            # Stub torch.compiler.disable before transformers imports
+            # flex_attention, which otherwise triggers torch._dynamo →
+            # torch._numpy._ufuncs and crashes at module load under
+            # PyInstaller. See pyi_rth_torch_compiler_disable.py.
+            "--runtime-hook",
+            "pyi_rth_torch_compiler_disable.py",
+            # Per-module collection overrides (e.g. forcing scipy.stats._distn_infrastructure
+            # to bundle .py source alongside .pyc so the runtime hook can source-patch it).
+            "--additional-hooks-dir",
+            "pyi_hooks",
         ]
     )
 
@@ -125,6 +138,11 @@ def build_server(cuda=False):
             "backend.backends.chatterbox_backend",
             "--hidden-import",
             "backend.backends.chatterbox_turbo_backend",
+            # chatterbox multilingual uses spacy_pkuseg for Chinese word
+            # segmentation, which ships pickled dict files (dicts/default.pkl)
+            # and native .so extensions that --hidden-import alone won't bundle.
+            "--collect-all",
+            "spacy_pkuseg",
             "--hidden-import",
             "backend.backends.luxtts_backend",
             "--hidden-import",
@@ -241,20 +259,13 @@ def build_server(cuda=False):
             "--collect-submodules",
             "tada",
             # Kokoro 82M — lightweight TTS engine using misaki G2P
+            # collect-all is required because transformers introspects .py source
+            # files at runtime (e.g. _can_set_attn_implementation opens the class
+            # file); hidden-import alone only bundles bytecode.
             "--hidden-import",
             "backend.backends.kokoro_backend",
-            "--hidden-import",
+            "--collect-all",
             "kokoro",
-            "--hidden-import",
-            "kokoro.pipeline",
-            "--hidden-import",
-            "kokoro.model",
-            "--hidden-import",
-            "kokoro.istftnet",
-            "--hidden-import",
-            "kokoro.modules",
-            "--hidden-import",
-            "kokoro.custom_stft",
             # misaki ships G2P data files (dictionaries, phoneme tables)
             # that must be bundled for espeak/en/ja/zh G2P to work
             "--collect-all",
