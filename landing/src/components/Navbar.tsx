@@ -57,7 +57,7 @@ export function Navbar() {
             href="#about"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            About
+            Models
           </a>
           <a
             href="#api"
