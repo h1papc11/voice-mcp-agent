@@ -7,6 +7,46 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-04-18
+
+A fast follow-up to 0.4.0 focused on making the new engines actually load in the production binary — plus generation cancellation, Linux system-audio capture, and the repo's first PR-time type check. Five first-time contributors shipped in this release.
+
+0.4.0 introduced three new TTS engines, but the frozen PyInstaller binary tripped over several Python-ecosystem quirks that don't show up in the dev venv: `transformers` opening `.py` sources at runtime, `scipy.stats._distn_infrastructure` hitting a frozen-importer `NameError`, and `chatterbox-multilingual` failing to find its Chinese segmenter dictionary. This release patches all of those in one sweep.
+
+### Frozen-Binary Reliability ([#438](https://github.com/jamiepine/voicebox/pull/438))
+- **Kokoro** now bundles `.py` sources alongside `.pyc` via `--collect-all kokoro` so `transformers`' `_can_set_attn_implementation` regex scan can read them — previously `FileNotFoundError: kokoro/modules.py` killed Kokoro loading in production builds
+- **Chatterbox Multilingual** now bundles `spacy_pkuseg/dicts/default.pkl` and the package's native `.so` extensions via `--collect-all spacy_pkuseg` — previously the Chinese word segmenter crashed with `FileNotFoundError` on first load
+- **scipy.stats._distn_infrastructure** — new runtime hook source-patches the trailing `del obj` (which raises `NameError` under PyInstaller's frozen importer because the preceding list comprehension evaluates empty) to `globals().pop('obj', None)`, unblocking `librosa` → `scipy.signal` → `scipy.stats` for every TTS engine that depends on librosa
+- **transformers.masking_utils** — same runtime hook forces `_is_torch_greater_or_equal_than_2_6 = False` so the older `sdpa_mask_older_torch` path is selected; the 2.6+ path uses `TransformGetItemToIndex()`, a real `torch._dynamo` graph transform our permissive stub can't reproduce
+- **torch._dynamo** — no-op stub replaces the real module before `transformers` imports it, preventing the `torch._numpy._ufuncs` import crash (`NameError: name 'name' is not defined`) that blocked Kokoro and every engine pulling in `flex_attention`
+- `.spec` paths are now repo-relative instead of absolute, so the generated spec is portable across machines and CI
+
+### Generation
+- **Cancel queued or running generations** ([#444](https://github.com/jamiepine/voicebox/pull/444)) — new `/generate/{id}/cancel` endpoint and a Stop button on the history row while generating. The serial queue now tracks per-ID state (queued / running / cancelled) so queued jobs are skipped before the worker picks them up and running jobs are `.cancel()`-ed mid-flight; `run_generation` catches `CancelledError` and marks the row `failed` with a "cancelled" error.
+- **Legacy `data/` path prefix resolution** ([#440](https://github.com/jamiepine/voicebox/pull/440)) — generations stored with the old `data/` prefix under pre-0.4 installs now resolve correctly after the storage root moved, fixing 404s for historical audio.
+
+### Model Migration
+- Migration dialog no longer hangs when the cache is empty ([#439](https://github.com/jamiepine/voicebox/pull/439)) — the backend now emits a completion SSE event even when zero models are moved.
+- Storage-change flow surfaces a toast when there's nothing to migrate ([#433](https://github.com/jamiepine/voicebox/pull/433)) instead of proceeding with a no-op move and restarting the server.
+- Deleting all generations from a voice profile now deletes the associated version files and DB rows too ([#447](https://github.com/jamiepine/voicebox/pull/447)) — previously orphaned versions accumulated in storage.
+
+### Platform
+- **Linux system audio capture** ([#457](https://github.com/jamiepine/voicebox/pull/457)) — `cpal`'s ALSA backend doesn't expose PulseAudio/PipeWire monitor sources by name, so the previous device-name search never matched and silently fell back to the microphone. Detection now uses `pactl get-default-sink` + `pactl list short sources` and routes via `PULSE_SOURCE`, with the name-based search retained as a fallback when `pactl` is absent.
+
+### Frontend CI
+- First PR-time quality gate ([#418](https://github.com/jamiepine/voicebox/pull/418)) — new `.github/workflows/ci.yml` runs `bun run typecheck` + `bun run build:web` on every PR. Fixed pre-existing type issues that were being suppressed with `@ts-expect-error`, cleaned up a dep-array typo (`[platform.metadata.isTauricheckOnMountcheckForUpdates]`) in `useAutoUpdater`, and removed 100+ lines of dead `ModelItem` code from `ModelManagement.tsx`.
+- Follow-up: widened `apiClient.migrateModels()` return type to include `moved` and `errors` so the storage-change handler typechecks against the real backend response ([#470](https://github.com/jamiepine/voicebox/pull/470)).
+
+### Docs
+- Clarified in the Quick Start + README that paralinguistic tags (`[laugh]`, `[sigh]`) only work with Chatterbox Turbo; other engines read them as literal text ([#450](https://github.com/jamiepine/voicebox/pull/450)).
+
+### New Contributors
+- [@Bortlesboat](https://github.com/Bortlesboat) — generation cancellation (#444)
+- [@gaojulong](https://github.com/gaojulong) — migration dialog hang fix (#439)
+- [@fuleinist](https://github.com/fuleinist) — migration no-op toast (#433)
+- [@erionjuniordeandrade-a11y](https://github.com/erionjuniordeandrade-a11y) — frontend CI + type hardening (#418)
+- [@estefrac](https://github.com/estefrac) — Linux pactl system-audio capture (#457)
+
 ## [0.4.0] - 2026-04-16
 
 The biggest Voicebox release yet. Three new TTS engines bring the lineup to **seven** — HumeAI TADA, Kokoro 82M, and Qwen CustomVoice join Qwen3-TTS, LuxTTS, Chatterbox Multilingual, and Chatterbox Turbo. GPU support broadens to Intel Arc (XPU) and NVIDIA Blackwell (RTX 50-series), with runtime diagnostics that warn when your PyTorch build doesn't match your GPU. The CUDA backend is now split into independently versioned server and library archives, so upgrading no longer redownloads 4 GB of PyTorch/CUDA DLLs.
@@ -555,7 +595,8 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/jamiepine/voicebox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jamiepine/voicebox/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamiepine/voicebox/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/jamiepine/voicebox/compare/v0.2.2...v0.2.3
