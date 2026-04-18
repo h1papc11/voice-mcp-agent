@@ -390,7 +390,9 @@ class ApiClient {
     return this.request<{ path: string }>('/models/cache-dir');
   }
 
-  async migrateModels(destination: string): Promise<{ source: string; destination: string }> {
+  async migrateModels(
+    destination: string,
+  ): Promise<{ source: string; destination: string; moved: number; errors: string[] }> {
     return this.request('/models/migrate', {
       method: 'POST',
       body: JSON.stringify({ destination }),
