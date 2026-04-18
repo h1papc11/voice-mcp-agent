@@ -63,3 +63,8 @@ nul
 tmp/
 temp/
 *.tmp
+
+# E2E test artifacts
+backend/tests/results/
+backend/tests/fixtures/reference_voice.wav
+backend/tests/fixtures/reference_voice.txt

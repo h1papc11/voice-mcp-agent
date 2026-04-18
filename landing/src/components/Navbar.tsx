@@ -60,6 +60,12 @@ export function Navbar() {
             About
           </a>
           <a
+            href="#api"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            API
+          </a>
+          <a
             href="#download"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >

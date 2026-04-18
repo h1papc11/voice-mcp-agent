@@ -295,6 +295,15 @@ fix-python: _ensure-venv
 test: _ensure-venv
     {{ venv_bin }}/python -m pytest {{ backend_dir }}/tests -v
 
+# E2E: generate with every TTS model against the frozen binary (pass extra flags like --only kokoro)
+[unix]
+test-models *ARGS: _ensure-venv
+    {{ venv_bin }}/python {{ backend_dir }}/tests/test_all_models_e2e.py {{ ARGS }}
+
+[windows]
+test-models *ARGS: _ensure-venv
+    & "{{ python }}" {{ backend_dir }}/tests/test_all_models_e2e.py {{ ARGS }}
+
 # ─── Database ─────────────────────────────────────────────────────────
 
 # Initialize SQLite database
