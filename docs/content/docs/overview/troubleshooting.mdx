@@ -29,6 +29,14 @@ Windows SmartScreen may warn that the app is unrecognized.
   This is expected for unsigned applications. We're working on code signing for future releases.
 </Callout>
 
+### Linux: AppImage Won't Run
+
+**Solution:**
+```bash
+chmod +x voicebox-*.AppImage
+./voicebox-*.AppImage
+```
+
 ## Server Issues
 
 ### Backend Server Won't Start
@@ -82,6 +90,52 @@ Windows SmartScreen may warn that the app is unrecognized.
     ```bash
     type %APPDATA%\sh.voicebox.app\logs\server.log
     ```
+  </Accordion>
+</AccordionGroup>
+
+### `flash-attn is not installed` Warning in Server Logs
+
+**Symptoms:**
+```
+Warning: flash-attn is not installed. Will only run the manual PyTorch version.
+Please install flash-attn for faster inference.
+```
+
+**This is harmless.** The warning is emitted by our transformer-based engines (Chatterbox / Qwen) on every startup. FlashAttention is an optional acceleration library — when it's not present, PyTorch's built-in scaled-dot-product attention (SDPA) runs instead, which is near-FA2 throughput on modern GPUs. Generation works normally.
+
+**Why it shows up on every platform:**
+- **Windows:** `flash-attn` has no official Windows support. The upstream project (Dao-AILab/flash-attention) still only says it *might* work, and source builds typically fail on recent CUDA/MSVC combinations.
+- **macOS (Apple Silicon):** FlashAttention is CUDA-only and doesn't apply here at all. MLX has its own optimized attention kernels.
+- **Linux:** It's not pinned in our requirements because installing it is fragile and version-sensitive; users who want it install it themselves.
+
+**Solutions (all optional):**
+
+<AccordionGroup>
+  <Accordion title="Ignore it (recommended)">
+    PyTorch SDPA is what actually runs the model, and on Ampere/Ada/Hopper GPUs it's within a few percent of FA2 for our workloads. You won't notice a meaningful speed difference.
+  </Accordion>
+
+  <Accordion title="Install flash-attn on Linux">
+    ```bash
+    pip install flash-attn --no-build-isolation
+    ```
+
+    Requires a matching CUDA toolkit. Build can take 20+ minutes.
+  </Accordion>
+
+  <Accordion title="Install flash-attn on Windows (community wheels)">
+    Official builds don't exist, but community maintainers publish prebuilt wheels:
+
+    - [kingbri1/flash-attention releases](https://github.com/kingbri1/flash-attention/releases)
+    - [bdashore3/flash-attention releases](https://github.com/bdashore3/flash-attention/releases)
+
+    Pick the wheel matching your exact CUDA + PyTorch + Python combination. Example:
+
+    ```bash
+    pip install https://github.com/kingbri1/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu128torch2.8.0cxx11abiFALSE-cp312-cp312-win_amd64.whl
+    ```
+
+    Alternatively, run Voicebox's backend inside WSL2 and use the standard Linux wheels.
   </Accordion>
 </AccordionGroup>
 
@@ -171,6 +225,34 @@ This is expected behavior. The first generation downloads the selected TTS engin
 
   <Accordion title="Reduce Batch Size">
     For long text, split it into smaller chunks instead of generating all at once.
+  </Accordion>
+</AccordionGroup>
+
+### MLX "Failed to load the default metallib" (Apple Silicon)
+
+**Symptoms:**
+- Generation fails with "library not found" or "metallib" errors
+- Server logs reference missing Metal shader libraries
+
+**Solutions:**
+
+<AccordionGroup>
+  <Accordion title="Rebuild the Server Binary">
+    ```bash
+    just build-server
+    ```
+
+    The build script bundles MLX Metal shader libraries on Apple Silicon automatically.
+  </Accordion>
+
+  <Accordion title="Reinstall MLX Dependencies">
+    ```bash
+    pip install -r backend/requirements-mlx.txt
+    ```
+  </Accordion>
+
+  <Accordion title="Verify Backend Detection">
+    Check Settings → Server Status. Should show **Backend: MLX** on Apple Silicon. If it shows **Backend: PYTORCH**, MLX isn't installed correctly.
   </Accordion>
 </AccordionGroup>
 
@@ -357,7 +439,26 @@ Restart the app to create a fresh database.
 - Check your internet connection
 - Check HuggingFace Hub status
 - Try using a VPN if HuggingFace is blocked in your region
-- Manually download and place in cache directory
+- Manually download via the HuggingFace CLI and place in the cache directory:
+
+  ```bash
+  pip install huggingface_hub
+  huggingface-cli download Qwen/Qwen3-TTS-12Hz-1.7B-Base
+  ```
+
+### Qwen 0.6B Downloads the Same Files as 1.7B on Apple Silicon
+
+**Symptoms:**
+- You select Qwen 0.6B on an Apple Silicon Mac and the download is the same size as 1.7B
+- Generation speed and VRAM usage match 1.7B, not the expected smaller model
+
+**Explanation:**
+This is intentional, not a bug. The MLX community only publishes `mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16` — there is no 0.6B MLX build. Voicebox's model registry falls back to the 1.7B weights when 0.6B is selected on MLX (see `backend/backends/__init__.py`).
+
+**Solution:**
+- On Apple Silicon, both size options use the 1.7B model — pick either.
+- If you specifically need a smaller model, switch to **Kokoro 82M** (~350 MB) or **LuxTTS** (~300 MB) — both CPU-realtime.
+- On Windows/Linux with PyTorch, 0.6B and 1.7B are distinct repos and behave differently.
 
 ### Wrong Model Version
 
@@ -404,6 +505,16 @@ rmdir /s %USERPROFILE%\.cache\huggingface\hub\models--Qwen*
   <Accordion title="Update GPU Drivers">
     Outdated drivers can cause performance issues. Update to the latest NVIDIA drivers.
   </Accordion>
+
+  <Accordion title="Apple Silicon: Confirm MLX Backend">
+    Check Settings → Server Status. Should show **Backend: MLX** on Apple Silicon — MLX is 4–5× faster than PyTorch here. If it shows **Backend: PYTORCH**, reinstall MLX:
+
+    ```bash
+    pip install -r backend/requirements-mlx.txt
+    ```
+
+    GPU availability should read "Metal (Apple Silicon via MLX)".
+  </Accordion>
 </AccordionGroup>
 
 ### High Memory Usage
@@ -416,6 +527,21 @@ rmdir /s %USERPROFILE%\.cache\huggingface\hub\models--Qwen*
 - Close unused voice profiles
 - Clear generation history
 - Restart the app periodically
+
+## Update Issues
+
+### "Update Check Failed"
+
+**Solutions:**
+- Confirm your internet connection — updates are fetched from GitHub releases.
+- Ensure `github.com` is accessible and not blocked by a firewall or proxy.
+- As a fallback, download the latest release from GitHub and install manually.
+
+### "Invalid Signature" Error
+
+**Solutions:**
+- Re-download the installer — the signature may have been corrupted in transit.
+- Verify the `.sig` file matches the installer; if it doesn't, file an issue.
 
 ## Remote Mode Issues
 
@@ -482,5 +608,3 @@ python --version
 # GPU info (if generation issues)
 nvidia-smi  # NVIDIA GPUs
 ```
-
-For more detailed troubleshooting, see the [TROUBLESHOOTING.md](https://github.com/jamiepine/voicebox/blob/main/docs/TROUBLESHOOTING.md) file in the repository.

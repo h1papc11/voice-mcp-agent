@@ -45,7 +45,7 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#download" className="hover:text-foreground transition-colors">
+                <a href="/download" className="hover:text-foreground transition-colors">
                   Download
                 </a>
               </li>

@@ -359,7 +359,7 @@ Releases are managed by maintainers:
 
 ## Troubleshooting
 
-See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and solutions.
+See [docs/content/docs/overview/troubleshooting.mdx](docs/content/docs/overview/troubleshooting.mdx) for common issues and solutions.
 
 **Quick fixes:**
 
@@ -372,7 +372,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and sol
 - Open an issue for bugs or feature requests
 - Check existing issues and discussions
 - Review the codebase to understand patterns
-- See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues
+- See [docs/content/docs/overview/troubleshooting.mdx](docs/content/docs/overview/troubleshooting.mdx) for common issues
 
 ## Additional Resources
 

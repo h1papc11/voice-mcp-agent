@@ -1,6 +1,6 @@
 # Voicebox Project Status & Roadmap
 
-> Last updated: 2026-04-18 | Current version: **v0.4.1** | ~155 open issues | 12 open PRs
+> Last updated: 2026-04-18 | Current version: **v0.4.1** | 232 open issues | 12 open PRs
 
 ---
 
@@ -224,6 +224,8 @@ POST /generate
 - **Blackwell (RTX 50-series) CUDA**: cu128 + sm_120 kernel support shipped (PR #401, #316), but users still report `cudaErrorNoKernelImageForDevice` (#417, #400, #396, #395, #390, #362) — likely a stale CUDA binary on upgraded installs. Needs a follow-up diagnostic / forced re-download path.
 - **Long text 50k character limit** (#464, #365, #354): Still hit on GPU despite chunking (PR #266). Chunking reliability needs another pass.
 - **ROCm on RDNA 3/4** (#469): `HSA_OVERRIDE_GFX_VERSION` is hardcoded and harms newer cards.
+- **`flash-attn is not installed` warning on every platform (cosmetic, common user complaint)**: Our transformer-based engines (Chatterbox / Qwen) emit `Warning: flash-attn is not installed. Will only run the manual PyTorch version. Please install flash-attn for faster inference.` on every startup, on every platform — we don't pin `flash-attn` in requirements because installing it is fragile and version-sensitive. Fallback is PyTorch SDPA, which is near-FA2 throughput on Ampere+ and is what actually runs. **Per-platform reality:** (a) **macOS/Apple Silicon** — FlashAttention is CUDA-only, irrelevant here; MLX has its own attention kernels. (b) **Linux** — `pip install flash-attn --no-build-isolation` works but takes 20+ min to compile. (c) **Windows** — no official support (Dao-AILab README still says only "Might work"; source builds routinely fail on recent CUDA/MSVC, issues #1715, #1828, #2395). Windows users can install community prebuilt wheels from `kingbri1/flash-attention` or `bdashore3/flash-attention` (latest v2.8.3, Aug 2025; `win_amd64` wheels for CUDA 12.4/12.8, Torch 2.6–2.9, Python 3.10–3.13) matching their exact CUDA/Torch/Python, or use WSL2. **Native-Windows alternatives worth considering as a build-time swap:** SageAttention (thu-ml, Apache 2.0, claims 2–5× over FA2) and xformers (official Windows wheels). **Action for us:** troubleshooting doc now covers it (see `docs/content/docs/overview/troubleshooting.mdx`), and we should optionally suppress the warning via `logging.getLogger(...).setLevel(ERROR)` at backend import since the fallback is functionally fine.
+- **WebAudio playback dies after audio-session interruption** (#41, plus an internal repro where the app is backgrounded long enough): WaveSurfer's `AudioContext` gets suspended by macOS — either because another app grabs the audio output, or because the WKWebView throttles when backgrounded. `play()` resolves and `timeupdate` can still fire, but no audio reaches the output. Only app restart fixes it. **Things already tried that didn't work:** (a) swapping WaveSurfer backend away from WebAudio — introduced more bugs, not an option; (b) remount hook on the player — doesn't help because a freshly-created `AudioContext` is born suspended and only resumes on a user gesture. PR #293 was a prior partial fix that doesn't cover this path. **Next thing to try** (not yet attempted — confirmed via grep of `AudioPlayer.tsx`): call `wavesurfer.getMediaElement().getGainNode().context.resume()` on the play button click (the click itself is a valid user gesture), plus a `visibilitychange` + `statechange` listener as belt-and-suspenders. The `ctx.resume()` pattern already exists in the codebase at `useStoryPlayback.ts:52` — just not wired into the main player.
 
 ---
 
@@ -303,9 +305,15 @@ POST /generate
 
 Still reported. Users get stuck downloads, can't resume, offline mode edge cases.
 
-**Key issues:** #475 (MAC CustomVoice install error), #449 (infinite loading macOS), #445 (can't download CustomVoice), #462 (Qwen requires internet even when loaded — regression from #150), #434 (infinite retry loop offline — PR #443 open), #432 (storage location change hangs when empty — partly fixed by PR #439/#433), #181, #180.
+**Key issues:** #475 (MAC CustomVoice install error), #449 (infinite loading macOS), #445 (can't download CustomVoice), #462 (Qwen requires internet even when loaded — regression from #150), #434 (infinite retry loop offline — PR #443 open), #432 (storage location change hangs when empty — partly fixed by PR #439/#433), #348 (TADA 3B Multilingual download fails), #336 (TADA model not listed in app), #275 (`No module named 'chatterbox'` on download), #304 (whisper-base feature extractor load error), #287 (macOS ARM `check_model_inputs` ImportError on new version), #181, #180.
 
-**Fix path:** PR #443 addresses infinite offline retry. CustomVoice-specific download failures (#475, #445) need triage — likely related to frozen-binary import fixes in PR #438.
+**Fix path:** PR #443 addresses infinite offline retry. CustomVoice-specific download failures (#475, #445) need triage — likely related to frozen-binary import fixes in PR #438. TADA cluster (#336, #348) and macOS ARM import regressions (#287, #275, #304) need a dedicated triage pass.
+
+**Qwen 0.6B-downloads-1.7B reports:** **#485** (2026-04-19), **#423** (macOS M1), **#329**. Platform-dependent:
+
+- **On MLX (Apple Silicon) — not a bug.** `mlx-community` only publishes 1.7B-Base-bf16 weights, so the 0.6B Base option intentionally resolves to the same repo (`backend/backends/__init__.py:180` — `# 0.6B not available in MLX, falls back`). UX gap: the selector offers a size that doesn't exist on the active backend. Fix: (a) hide the 0.6B option on MLX, or (b) label it "0.6B (uses 1.7B on Apple Silicon)".
+- **On PyTorch (Windows/Linux/CUDA/ROCm/XPU/CPU) — real bug if reported.** Both 0.6B and 1.7B have distinct repos (`Qwen/Qwen3-TTS-12Hz-0.6B-Base` vs `-1.7B-Base`). Triage each report by platform before merging into the MLX cluster.
+- **Qwen CustomVoice (either platform)** — no fallback, both sizes always have dedicated repos.
 
 ### Language Requests (ongoing)
 
@@ -364,6 +372,9 @@ Notable:
 - **#383** — Concatenate partial reference audio into generated audio
 - **#382** — Lightning.ai support
 - **#376** — Remote mode
+- **#353** — Audio transcoding
+- **#317** — Voice pitch control
+- **#189** — "Auto" language option
 - **#173** — Vocal intonation/inflection control
 - **#165, #270** — Audiobook mode (PR #154 open)
 - **#242** — Seed value pinning
@@ -371,17 +382,40 @@ Notable:
 - **#235** — Finetuned Qwen3-TTS tokenizer (PR #253 open)
 - **#144** — Copy text to clipboard
 
+### Housekeeping / Triage Needed
+
+| Issue | Reason |
+|-------|--------|
+| **#431**, **#408** | Spam — Chinese "free Claude API" promos. Close. |
+| **#398** ("Excelente") | Non-issue. Close. |
+| **#357** | Informational — project featured in Awesome MLX. Close after acknowledgement. |
+| **#374**, **#377** | Version-release questions, no bug. Close. |
+| **#306** ("voice model"), **#389** ("New model"), **#473** ("New functionality") | Title-only issues, no content. Request details or close. |
+| **#309** | Uninstall/cleanup question. Answer and close. |
+| **#241** | "How to use in Colab" — support question, not a bug. |
+| **#423** / **#485** / **#329** | Platform-dependent. On MLX: not a bug (0.6B weights don't exist upstream, fallback is intentional — fix UX). On PyTorch: real bug if reproducible. Classify each by reporter's platform before deduping. |
+| **#336** / **#348** | TADA download/registration cluster — triage together. |
+| **#287** / **#275** / **#304** | macOS ARM import regressions on new version — likely one root cause. |
+| **#292**, **#349** | Possibly already fixed by merged PRs (#321/#412 and #345). Verify + close. |
+
+**~70 older issues (pre-#170) not individually categorized above.** Most are long-tail support questions or duplicates of problems now addressed by the multi-engine / model-registry work. A dedicated backlog-sweep pass is overdue.
+
 ### Bugs (ongoing)
 
 | Category | Issues |
 |----------|--------|
-| Generation failures | #476, #467, #452, #459 (voice clone fetch error), #468 (tada-1b marked error), #437, #282 |
-| Audio quality | #456 (clipping errors v0.4.0), #436 (emotion labels), #333 (pitch/echo), #307 (by-model breakdown) |
-| File ops | #477 (spacy_pkuseg dict missing on frozen Windows build), #472 (storage location change) |
-| Windows | #466 (install problem), #273 (port 8000 conflict) |
-| Linux | #471 (thread-safe PULSE_SOURCE), #413 (Arch build), #409 (Kubuntu build), #341 |
-| macOS | #441 (older macOS), #369 (malware flag), #171 (ARM64 binary won't open) |
-| Profile/UI | #360 (Kokoro profile hides others — partly addressed by auto-switch), #299 (drag-drop on Win11), #329 (size selector state bug) |
+| Generation failures | #476, #467, #452, #459 (voice clone fetch error), #468 (tada-1b marked error), #437, #300, #301, #282 |
+| Audio quality | #456 (clipping errors v0.4.0), #436 (emotion labels), #333 (pitch/echo), #307 (by-model breakdown), #340 (all generations say "www...") |
+| Transcription | #371 (fails every time), #291 (extract transcription from generated audio) |
+| Effects / presets | #349 ("Failed to save" when creating effects presets — possibly fixed by merged #345) |
+| File ops | #477 (spacy_pkuseg dict missing on frozen Windows build), #472 (storage location change), #283 (allow longer files for voice creation + in-app trim), #350 (failed to add sample) |
+| History | #292 (can't delete failed generations — possibly fixed by merged #321/#412) |
+| Windows | #466 (install problem), #375 (WinError 5 access denied), #273 (port 8000 conflict), #201 (model doesn't stay loaded) |
+| Linux | #471 (thread-safe PULSE_SOURCE), #413 (Arch build), #409 (Kubuntu build), #351, #341 |
+| macOS | #441 (older macOS), #369 (malware flag), #334 (microphone permission), #287 (`check_model_inputs` ImportError — regression), #171 (ARM64 binary won't open) |
+| Profile/UI | #360 (Kokoro profile hides others — partly addressed by auto-switch), #299 (drag-drop on Win11), #329 (size selector state bug), #393 (stuck loading screen after reinstall to new dir) |
+| Integrations | #397 (SAMMI-bot 422 Unprocessable Entity) |
+| Audio playback / session | **#41** (macOS: Voicebox goes silent after another app takes audio output; restart restores it) — see deep-dive below |
 | Database | #174 (sqlite3 IntegrityError) |
 
 ---

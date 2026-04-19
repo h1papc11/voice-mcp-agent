@@ -3,13 +3,14 @@
   "version": "0.4.1",
   "description": "Landing page for voicebox.sh",
   "scripts": {
-    "dev": "bun --bun next dev --turbo",
+    "dev": "next dev --turbo",
     "build": "bun --bun next build",
     "start": "bun --bun next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@fontsource/space-grotesk": "^5.2.10",
+    "@icons-pack/react-simple-icons": "^13.13.0",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "autoprefixer": "^10.4.17",

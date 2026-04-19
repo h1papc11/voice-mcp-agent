@@ -17,12 +17,9 @@ import {Navbar} from "@/components/Navbar";
 import {AppleIcon, LinuxIcon, WindowsIcon} from "@/components/PlatformIcons";
 import {TutorialsSection} from "@/components/TutorialsSection";
 import {VoiceCreator} from "@/components/VoiceCreator";
-import {DOWNLOAD_LINKS, GITHUB_REPO} from "@/lib/constants";
-import type {DownloadLinks} from "@/lib/releases";
+import {GITHUB_REPO} from "@/lib/constants";
 
 export default function Home() {
-	const [downloadLinks, setDownloadLinks] =
-		useState<DownloadLinks>(DOWNLOAD_LINKS);
 	const [version, setVersion] = useState<string | null>(null);
 	const [totalDownloads, setTotalDownloads] = useState<number | null>(null);
 
@@ -33,7 +30,6 @@ export default function Home() {
 				return res.json();
 			})
 			.then((data) => {
-				if (data.downloadLinks) setDownloadLinks(data.downloadLinks);
 				if (data.version) setVersion(data.version);
 				if (data.totalDownloads != null) setTotalDownloads(data.totalDownloads);
 			})
@@ -92,7 +88,7 @@ export default function Home() {
 						style={{animationDelay: "300ms"}}
 					>
 						<a
-							href="#download"
+							href="/download"
 							className="rounded-full bg-accent px-8 py-3.5 text-sm font-semibold uppercase tracking-wider text-white shadow-[0_4px_20px_hsl(43_60%_50%/0.3),inset_0_2px_0_rgba(255,255,255,0.2),inset_0_-2px_0_rgba(0,0,0,0.1)] transition-all hover:bg-accent-faint active:shadow-[0_2px_10px_hsl(43_60%_50%/0.3),inset_0_4px_8px_rgba(0,0,0,0.3)]"
 						>
 							Download
@@ -403,8 +399,7 @@ export default function Home() {
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
 						{/* macOS ARM */}
 						<a
-							href={downloadLinks.macArm}
-							download
+							href="/download?platform=macArm"
 							className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 transition-all hover:border-accent/30 hover:bg-card group"
 						>
 							<AppleIcon className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -418,8 +413,7 @@ export default function Home() {
 
 						{/* macOS Intel */}
 						<a
-							href={downloadLinks.macIntel}
-							download
+							href="/download?platform=macIntel"
 							className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 transition-all hover:border-accent/30 hover:bg-card group"
 						>
 							<AppleIcon className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -431,8 +425,7 @@ export default function Home() {
 
 						{/* Windows */}
 						<a
-							href={downloadLinks.windows}
-							download
+							href="/download?platform=windows"
 							className="flex items-center rounded-xl border border-border bg-card/60 backdrop-blur-sm px-5 py-4 transition-all hover:border-accent/30 hover:bg-card group"
 						>
 							<WindowsIcon className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />

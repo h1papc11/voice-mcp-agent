@@ -33,7 +33,8 @@
   <a href="https://docs.voicebox.sh">Docs</a> •
   <a href="#download">Download</a> •
   <a href="#features">Features</a> •
-  <a href="#api">API</a>
+  <a href="#api">API</a> •
+  <a href="docs/content/docs/overview/troubleshooting.mdx">Troubleshooting</a>
 </p>
 
 <br/>
@@ -90,6 +91,8 @@ Voicebox is a **local-first voice cloning studio** — a free and open-source al
 > **[View all binaries →](https://github.com/jamiepine/voicebox/releases/latest)**
 
 > **Linux** — Pre-built binaries are not yet available. See [voicebox.sh/linux-install](https://voicebox.sh/linux-install) for build-from-source instructions.
+
+> **Having trouble?** See the [Troubleshooting Guide](docs/content/docs/overview/troubleshooting.mdx) for common install, generation, model-download, and GPU issues.
 
 ---
 
