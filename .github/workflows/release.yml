@@ -68,6 +68,15 @@ jobs:
         if: matrix.backend == 'mlx'
         run: |
           pip install -r backend/requirements-mlx.txt
+          # mlx-audio>=0.3.1 and mlx-lm>=0.31.1 both declare transformers>=5.x,
+          # which conflicts with our 4.57.x cap. The runtime APIs we use work
+          # fine on transformers 4.57.x in practice (verified in dev), so install
+          # them --no-deps. mlx-audio's other runtime deps (huggingface_hub,
+          # librosa, numpy, numba, pyloudnorm) are already in requirements.txt;
+          # the rest (sounddevice, miniaudio, protobuf, sentencepiece, pyyaml,
+          # jinja2) are pulled in by other engines.
+          pip install --no-deps mlx-lm==0.31.1
+          pip install --no-deps mlx-audio==0.4.1
 
       - name: Build Python server (Linux/macOS)
         if: matrix.platform != 'windows-latest'
