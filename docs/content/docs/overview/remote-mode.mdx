@@ -31,8 +31,16 @@ In Remote Mode, the Voicebox desktop app (running on your local machine) communi
 
     # Install Python dependencies
     pip install -r requirements.txt
+
+    # Engines with incompatible transitive pins — install with --no-deps
+    pip install --no-deps chatterbox-tts
+    pip install --no-deps hume-tada
+
+    # Qwen3-TTS from source
     pip install git+https://github.com/QwenLM/Qwen3-TTS.git
     ```
+
+    Or just run `just setup` from the repo root, which handles all of this.
   </Step>
 
   <Step title="Start the Server">
@@ -135,4 +143,4 @@ Expected performance on various GPUs:
 
 ## Troubleshooting
 
-See the [Troubleshooting Guide](/guides/troubleshooting#remote-mode-issues) for common remote mode issues.
+See the [Troubleshooting Guide](/overview/troubleshooting) for common issues.

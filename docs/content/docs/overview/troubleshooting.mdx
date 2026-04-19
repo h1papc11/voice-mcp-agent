@@ -66,7 +66,7 @@ Windows SmartScreen may warn that the app is unrecognized.
 
     ```bash
     # macOS/Linux
-    chmod +x ~/Library/Application\ Support/com.voicebox.app/backend/voicebox-server
+    chmod +x ~/Library/Application\ Support/sh.voicebox.app/backend/voicebox-server
     ```
   </Accordion>
 
@@ -75,12 +75,12 @@ Windows SmartScreen may warn that the app is unrecognized.
 
     **macOS:**
     ```bash
-    tail -f ~/Library/Application\ Support/com.voicebox.app/logs/server.log
+    tail -f ~/Library/Application\ Support/sh.voicebox.app/logs/server.log
     ```
 
     **Windows:**
     ```bash
-    type %APPDATA%\com.voicebox.app\logs\server.log
+    type %APPDATA%\sh.voicebox.app\logs\server.log
     ```
   </Accordion>
 </AccordionGroup>
@@ -105,12 +105,13 @@ Windows SmartScreen may warn that the app is unrecognized.
 - Progress indicator stuck at "Loading model..."
 
 **Explanation:**
-This is expected behavior. The first generation downloads the Qwen3-TTS model (~2-4GB) and initializes it.
+This is expected behavior. The first generation downloads the selected TTS engine's model and initializes it. Sizes range from 350 MB (Kokoro) to 8 GB (TADA 3B).
 
 **Solution:**
-- Wait for the initial download to complete
-- Subsequent generations will be much faster
+- Wait for the initial download to complete (progress is shown in Settings → Models)
+- Subsequent generations reuse the cached model and are much faster
 - Check your internet connection
+- For low-bandwidth setups, start with Kokoro (~350 MB) or LuxTTS (~300 MB)
 
 ### Poor Voice Quality
 
@@ -202,7 +203,7 @@ This is expected behavior. The first generation downloads the Qwen3-TTS model (~
 ### Backend Won't Start in Dev Mode
 
 **Symptoms:**
-- `bun run dev:server` fails
+- `just dev-backend` or `just dev` fails
 - Import errors or module not found
 
 **Solutions:**
@@ -233,11 +234,19 @@ This is expected behavior. The first generation downloads the Qwen3-TTS model (~
   </Accordion>
 
   <Accordion title="Dependencies">
-    Reinstall dependencies:
+    Reinstall dependencies — easiest via `just`:
+
+    ```bash
+    just setup
+    ```
+
+    Or manually:
 
     ```bash
     cd backend
     pip install -r requirements.txt
+    pip install --no-deps chatterbox-tts
+    pip install --no-deps hume-tada
     pip install git+https://github.com/QwenLM/Qwen3-TTS.git
     ```
   </Accordion>
@@ -310,8 +319,8 @@ bun run tauri build
 - Delete the lock file:
   ```bash
   # macOS
-  rm ~/Library/Application\ Support/com.voicebox.app/data/voicebox.db-shm
-  rm ~/Library/Application\ Support/com.voicebox.app/data/voicebox.db-wal
+  rm ~/Library/Application\ Support/sh.voicebox.app/data/voicebox.db-shm
+  rm ~/Library/Application\ Support/sh.voicebox.app/data/voicebox.db-wal
   ```
 
 ### Corrupted Database
@@ -328,10 +337,10 @@ bun run tauri build
 
 ```bash
 # macOS
-rm ~/Library/Application\ Support/com.voicebox.app/data/voicebox.db
+rm ~/Library/Application\ Support/sh.voicebox.app/data/voicebox.db
 
 # Windows
-del %APPDATA%\com.voicebox.app\data\voicebox.db
+del %APPDATA%\sh.voicebox.app\data\voicebox.db
 ```
 
 Restart the app to create a fresh database.
@@ -357,10 +366,10 @@ Restart the app to create a fresh database.
 - Different voice output
 
 **Solutions:**
-Clear the model cache and re-download:
+Clear the model cache and re-download. Replace the `Qwen*` glob with the engine org prefix for other engines (`ResembleAI*` for Chatterbox, `HumeAI*` for TADA, `hexgrad*` for Kokoro, etc.) or use `DELETE /models/{name}` via the API.
 
 ```bash
-# macOS
+# macOS / Linux
 rm -rf ~/.cache/huggingface/hub/models--Qwen*
 
 # Windows

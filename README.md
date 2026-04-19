@@ -23,6 +23,9 @@
   <a href="https://github.com/jamiepine/voicebox/blob/main/LICENSE">
     <img src="https://img.shields.io/github/license/jamiepine/voicebox?style=flat" alt="License" />
   </a>
+  <a href="https://deepwiki.com/jamiepine/voicebox">
+    <img src="https://img.shields.io/static/v1?label=Ask&message=DeepWiki&color=5B6EF7" alt="Ask DeepWiki" />
+  </a>
 </p>
 
 <p align="center">
@@ -254,6 +257,8 @@ Full API documentation available at `http://localhost:17493/docs`.
 | **More Models**         | XTTS, Bark, and other open-source voice models  |
 | **Plugin Architecture** | Extend with custom models and effects          |
 | **Mobile Companion**    | Control Voicebox from your phone               |
+
+For the **full engineering status, open-issue triage, and prioritized work queue**, see [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — a living document that tracks what's shipped, what's in-flight, candidate TTS engines under evaluation, and why we've accepted or backlogged specific integrations.
 
 ---
 

@@ -145,64 +145,55 @@ The updater only works in production Tauri builds. It doesn't run during `just d
 
 ## CUDA Backend Updates
 
-The CUDA-enabled backend is distributed separately from the main app due to its large size (~2.43 GB). Unlike the Tauri auto-updater, this uses a custom download system built into the Python backend.
+The CUDA-enabled backend is distributed separately from the main app because bundling CUDA would bloat the installer by several gigabytes for users who don't have an NVIDIA GPU. Unlike the Tauri auto-updater, the CUDA backend uses a custom download system built into the Python server.
 
-**Size comparison:**
-- Standard app bundle: ~410 MB
-- CUDA backend binary: ~2.43 GB (6× larger)
+**Size comparison (approximate):**
+- Standard CPU bundle (in the installer): ~200–400 MB
+- CUDA server core: ~945 MB (versioned with each Voicebox release)
+- CUDA libs (NVIDIA runtime DLLs): ~1.7 GB (versioned independently, cached across upgrades)
 
-### Why Split?
+### Two-archive split
 
-GitHub Releases has file size limits, and the CUDA-enabled `voicebox-server` binary is too large to include in the main Tauri bundle. Instead:
+Since v0.4, the CUDA binary is packaged as **two archives** instead of one:
 
-- **Standard release**: Includes CPU-only backend (~50MB)
-- **CUDA release**: Split into multiple parts and downloaded on-demand by users who need GPU acceleration
+- **Server core** (`voicebox-server-cuda.tar.gz`) — the Python server + PyTorch code, changes every release.
+- **CUDA libs** (`cuda-libs-cu128-v1.tar.gz`) — the heavy NVIDIA CUDA/cuDNN DLLs, only re-downloaded when the CUDA toolkit major version changes.
+
+This means most Voicebox upgrades only re-download the ~945 MB server core, not the full ~2.5 GB bundle.
 
 ### Download Process
 
-When a user clicks "Enable CUDA" in the settings:
+When a user clicks "Install CUDA backend" in Settings → GPU:
 
-1. **Manifest Fetch** - Backend fetches `{version}/voicebox-server-cuda.manifest` from GitHub Releases
-2. **Part Download** - Downloads each split part sequentially (e.g., `voicebox-server-cuda.part1`, `.part2`, etc.)
-3. **Assembly** - Concatenates parts into a single binary
-4. **Verification** - SHA-256 checksum verification (optional, if `.sha256` file exists)
-5. **Placement** - Binary moved to `{data_dir}/backends/voicebox-server-cuda.exe`
-6. **Restart** - Backend must restart to use the CUDA binary
+1. **Server-core archive** — Downloaded from GitHub Releases and extracted.
+2. **CUDA libs archive** — Downloaded separately (or reused if the installed version still matches).
+3. **Verification** — SHA-256 checksum verification for integrity.
+4. **Placement** — Extracted into `{data_dir}/backends/cuda/`.
+5. **Restart** — The Voicebox server restarts and swaps in the CUDA backend.
 
 ### Auto-Update on Startup
 
-On server startup, `check_and_update_cuda_binary()` compares the installed CUDA binary version with the app version:
-
-```python
-# backend/services/cuda.py
-cuda_version = get_cuda_binary_version()  # runs `voicebox-server-cuda --version`
-current_version = __version__
-
-if cuda_version != current_version:
-    await download_cuda_binary()  # Auto-download in background
-```
-
-If versions mismatch, the backend automatically downloads the matching CUDA binary version without user intervention.
+On startup, the backend compares the installed CUDA server-core version with the current app version. If they differ, the core archive is pulled in the background. If the libs version pinned by the new release also differs (rare — e.g. on a cu126 → cu128 bump), the user is prompted to confirm the larger download.
 
 ### Storage Location
 
-Downloaded CUDA binaries are stored in the app's data directory:
+Downloaded CUDA binaries live in the app's data directory:
 
 ```
-{data_dir}/
-  backends/
-    voicebox-server-cuda.exe    # Windows
-    voicebox-server-cuda        # macOS/Linux
+{data_dir}/backends/cuda/
+  voicebox-server-cuda.exe    # Windows
+  voicebox-server-cuda        # macOS/Linux
+  <NVIDIA CUDA runtime DLLs>
 ```
 
 ### API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/backend/cuda-status` | GET | Check if CUDA binary available/active |
-| `/backend/download-cuda` | POST | Start download |
+| `/backend/cuda-status` | GET | Check if the CUDA backend is available/active and which versions are installed |
+| `/backend/download-cuda` | POST | Trigger server-core + libs download |
 | `/backend/cuda-progress` | GET | SSE stream of download progress |
-| `/backend/cuda` | DELETE | Remove downloaded binary |
+| `/backend/cuda` | DELETE | Remove the downloaded CUDA backend |
 
 ### Progress Tracking
 
@@ -212,15 +203,16 @@ Downloads report progress via Server-Sent Events (SSE):
 GET /backend/cuda-progress
 
 event: progress
-data: {"current": 52428800, "total": 104857600, "filename": "Downloading CUDA backend (2/4)", "status": "downloading"}
+data: {"current": 52428800, "total": 945000000, "filename": "voicebox-server-cuda.tar.gz", "status": "downloading"}
 ```
 
-The frontend subscribes to this endpoint to show real-time download progress in the UI.
+The frontend subscribes to this endpoint to show real-time progress, including which archive (server core vs libs) is currently downloading.
 
 ### Release Artifacts
 
-For each release, these CUDA-related files are uploaded to GitHub:
+For each CUDA-capable release, these files are uploaded to GitHub:
 
-- `voicebox-server-cuda.manifest` - List of split part filenames
-- `voicebox-server-cuda.part1` through `voicebox-server-cuda.partN` - Binary chunks
-- `voicebox-server-cuda.sha256` - SHA-256 checksum for integrity verification
+- `voicebox-server-cuda.tar.gz` — server-core archive
+- `voicebox-server-cuda.tar.gz.sha256` — checksum
+- `cuda-libs-cu128-v1.tar.gz` — CUDA runtime libs (only when the libs version bumps)
+- `cuda-libs-cu128-v1.tar.gz.sha256` — checksum

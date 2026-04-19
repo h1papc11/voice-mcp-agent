@@ -604,18 +604,25 @@ for name, mod in [("dac", types.ModuleType("dac")),
 - Do NOT use `@torch.jit.script` in the shim (see above)
 - Only reimplement what the model actually uses — check the import chain carefully
 
-## Upcoming Engines
+## Candidate Engines
 
-Based on the current model landscape, these are candidates for future integration:
+The [`docs/PROJECT_STATUS.md`](https://github.com/jamiepine/voicebox/blob/main/docs/PROJECT_STATUS.md) file is the canonical, living list of candidates under evaluation — including why some have been backlogged (e.g. VoxCPM, which is effectively CUDA-only upstream).
 
-| Model | Languages | Size | Key Features | Status |
-|-------|-----------|------|--------------|--------|
-| **CosyVoice2-0.5B** | Multilingual | ~500MB | Instruct support (`inference_instruct2()`) | Ready |
-| **Fish Speech** | 50+ | Medium | Word-level control via inline text | Ready |
-| **Kokoro-82M** | English | 82M | CPU realtime, Apache 2.0 | Ready |
-| **XTTS-v2** | 17+ | Medium | Zero-shot cloning | Ready |
-| **MOSS-TTS** | Multilingual | Medium | Text-to-voice design, multi-speaker dialogue | Needs vetting |
-| **Pocket TTS** | English | ~100M | CPU-first, >1× realtime | Needs vetting |
+At a glance, current top candidates:
+
+| Model | Tier | Size | Cross-platform? | Key Features |
+|-------|------|------|-----------------|--------------|
+| **MOSS-TTS-Nano** | 1 | 0.1 B | Yes (CPU realtime) | 48 kHz stereo, Apache 2.0, released 2026-04-13 |
+| **Voxtral TTS** | 2 | 4 B | Likely | `mistralai/Voxtral-4B-TTS-2603` — presets + cloning |
+| **VibeVoice** | 2 | ~500 M | Yes | Podcast-style multi-speaker dialogue |
+| **Dia2** | 3 | TBD | TBD | Successor to the original Dia |
+| **Fish Audio S2 Pro** | 3 | Medium | Yes | Word-level control via inline text |
+
+**Backlogged:**
+
+- **VoxCPM** (2B, Apache 2.0) — CUDA ≥12 required upstream; MPS broken in issues #232/#248; CPU path rejected by maintainers (#256). Keep watching for a PR that relaxes the device requirement.
+
+Update `PROJECT_STATUS.md` when you pick one up or mark one as shipped/backlogged.
 
 ## Implementation Checklist
 

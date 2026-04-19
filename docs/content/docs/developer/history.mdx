@@ -15,16 +15,23 @@ The history module tracks all generated audio, providing a searchable record of 
 class Generation(Base):
     __tablename__ = "generations"
 
-    id = Column(String, primary_key=True)
-    profile_id = Column(String, ForeignKey("profiles.id"))
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    profile_id = Column(String, ForeignKey("profiles.id"), nullable=False)
     text = Column(Text, nullable=False)
     language = Column(String, default="en")
-    audio_path = Column(String, nullable=False)
-    duration = Column(Float, nullable=False)
+    audio_path = Column(String, nullable=True)
+    duration = Column(Float, nullable=True)
     seed = Column(Integer)
     instruct = Column(Text)
-    created_at = Column(DateTime)
+    engine = Column(String, default="qwen")
+    model_size = Column(String, nullable=True)
+    status = Column(String, default="completed")  # pending | completed | failed
+    error = Column(Text, nullable=True)
+    is_favorited = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 ```
+
+Each generation can also have multiple **generation versions** — processed variants with different effects chains applied. The original (`clean`) version plus any number of processed versions live in a separate `generation_versions` table. See [Effects Pipeline](/developer/effects-pipeline).
 
 ## File Storage
 
@@ -230,7 +237,12 @@ GET /history?profile_id=uuid&search=hello&limit=50&offset=0
       "duration": 1.5,
       "seed": 42,
       "instruct": null,
-      "created_at": "2024-01-15T10:30:00Z"
+      "engine": "qwen",
+      "model_size": "1.7B",
+      "status": "completed",
+      "error": null,
+      "is_favorited": false,
+      "created_at": "2026-04-18T10:30:00Z"
     }
   ],
   "total": 150

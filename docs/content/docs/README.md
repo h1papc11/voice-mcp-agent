@@ -7,61 +7,32 @@ This directory contains the documentation for Voicebox, built with [Fumadocs](ht
 
 ## Development
 
-### Prerequisites
-
-Install Mintlify globally using bun:
-
-```bash
-bun add -g mintlify
-```
-
-Or use the helper script:
-
-```bash
-bun run install:mintlify
-```
-
 ### Running Locally
 
+From the `docs/` directory:
+
 ```bash
+bun install
 bun run dev
 ```
 
-This will start the Mintlify dev server.
-
-The docs will be available at `http://localhost:3000`
+The docs will be available at `http://localhost:3000`.
 
 ### Structure
 
-```
-docs/
-├── mint.json           # Mintlify configuration
-├── custom.css          # Custom styles
-├── overview/           # Getting started & feature docs
-├── guides/             # User guides
-├── api/                # API reference
-├── development/        # Developer documentation
-├── logo/               # Logo assets
-└── public/             # Static assets
-```
+- `content/docs/overview/` — user-facing guides (installation, quick start, feature walkthroughs)
+- `content/docs/developer/` — architecture, backend internals, and contributor guides
+- `content/docs/api-reference/` — auto-generated from the backend's OpenAPI schema
+- `content/docs/index.mdx` — landing page
+- `public/` — static assets (images, screenshots, videos)
 
 ### Writing Docs
 
 - Use `.mdx` files for all documentation pages
-- Follow the existing structure in `mint.json` for navigation
-- Use Mintlify components for enhanced formatting (Card, CardGroup, Accordion, etc.)
-- Reference the [Mintlify documentation](https://mintlify.com/docs) for available components
+- Navigation is generated from `content/docs/meta.json` files
+- Fumadocs components available: `Callout`, `Cards` / `Card`, `Tabs` / `Tab`, `Steps` / `Step`, `Accordion` / `AccordionGroup`, `Files` / `Folder` / `File`
+- API reference pages under `api-reference/` are regenerated from the backend's OpenAPI schema — don't edit them by hand
 
 ## Deployment
 
-Docs are automatically deployed when changes are pushed to the main branch.
-
-To manually deploy:
-
-```bash
-mintlify deploy
-```
-
-## Contributing
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines.
+Docs are automatically deployed when changes land on `main`.

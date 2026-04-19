@@ -59,24 +59,64 @@ Ensure you have these installed:
 
 ## Just Commands
 
-Run `just --list` to see all available commands:
+Run `just --list` to see all available commands. Highlights:
+
+### Setup
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Full setup (Python venv + JS deps) |
-| `just dev` | Start backend + desktop app |
-| `just dev-web` | Start backend + web app (no Tauri) |
-| `just dev-backend` | Start backend only |
-| `just dev-frontend` | Start desktop app only (backend must be running) |
-| `just build` | Build desktop app for production |
-| `just build-web` | Build web app for production |
-| `just check` | Run all checks (JS + Python lint + format) |
-| `just fix` | Fix lint + format issues |
-| `just test` | Run Python tests |
+| `just setup` | Full setup (Python venv + JS deps + dev sidecar). Detects Apple Silicon for MLX and NVIDIA/Intel Arc on Windows for accelerated PyTorch. |
+| `just setup-python` | Python venv + dependencies only |
+| `just setup-js` | `bun install` only |
+
+### Development
+
+| Command | Description |
+|---------|-------------|
+| `just dev` | Start backend + Tauri desktop app (reuses a running backend if one exists) |
+| `just dev-web` | Start backend + web app (no Tauri/Rust build) |
+| `just dev-backend` | Backend only |
+| `just dev-frontend` | Tauri app only (backend must already be running) |
+| `just kill` | Stop all dev processes |
+
+### Build
+
+| Command | Description |
+|---------|-------------|
+| `just build` | CPU server binary + Tauri installer |
+| `just build-local` | **Windows:** CPU + CUDA server binaries + Tauri installer |
+| `just build-server` | CPU server binary only |
+| `just build-server-cuda` | **Windows:** CUDA server binary only, placed in `%APPDATA%/sh.voicebox.app/backends/cuda` for local testing |
+| `just build-tauri` | Tauri app only |
+| `just build-web` | Web app only |
+
+### Quality
+
+| Command | Description |
+|---------|-------------|
+| `just check` | Lint + format + typecheck (Biome + ruff) |
+| `just fix` | Auto-fix lint + format issues |
+| `just lint` / `just format` | Lint or format only |
+| `just test` | Run Python tests (pytest) |
+| `just test-models` | End-to-end generation against every TTS engine using the frozen binary |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
 | `just db-init` | Initialize SQLite database |
-| `just db-reset` | Reset database (delete + reinit) |
-| `just clean` | Clean build artifacts |
-| `just clean-all` | Nuclear clean (includes node_modules) |
+| `just db-reset` | Delete and reinitialize the database |
+
+### Utilities
+
+| Command | Description |
+|---------|-------------|
+| `just generate-api` | Generate TypeScript API client from the backend's OpenAPI schema |
+| `just docs` | Open `http://localhost:17493/docs` in your browser |
+| `just logs` | Tail backend logs |
+| `just clean` | Remove build artifacts |
+| `just clean-python` | Remove the Python venv + `__pycache__` |
+| `just clean-all` | Nuclear clean (includes all `node_modules`) |
 
 ## Project Structure
 
@@ -133,10 +173,12 @@ HTTP request → **routes/** (validate input) → **services/** (business logic)
 
 ## Model Downloads
 
-Models are automatically downloaded from HuggingFace Hub on first use:
+Models are automatically downloaded from HuggingFace Hub on first use, with live progress streamed to the UI:
 
-- **Whisper** (transcription): Auto-downloads on first transcription
-- **Qwen3-TTS** (voice cloning): Auto-downloads on first generation (~2-4GB)
+- **Whisper** (transcription) — auto-downloads on first transcription
+- **TTS engines** — auto-download on first generation. Sizes range from 82 M (Kokoro, ~350 MB) to 3 B (TADA, ~8 GB)
+
+See [Model Management](/developer/model-management) for the full list.
 
 <Callout type="warn">
   First-time usage will be slower due to model downloads, but subsequent runs will use cached models.
@@ -150,7 +192,7 @@ After starting the backend server, generate the TypeScript API client:
 just generate-api
 ```
 
-This downloads the OpenAPI schema and generates the TypeScript client in `app/src/lib/api/`
+This downloads the OpenAPI schema and generates the TypeScript client in `app/src/lib/api/`.
 
 ## Manual Setup (Advanced)
 
@@ -186,8 +228,17 @@ pip install -r requirements.txt
 # Apple Silicon: install MLX dependencies
 pip install -r requirements-mlx.txt
 
-# Install Qwen3-TTS
+# Chatterbox pins numpy<1.26 / torch==2.6 which break on Python 3.12+
+pip install --no-deps chatterbox-tts
+
+# HumeAI TADA pins torch>=2.7,<2.8 which conflicts with our torch>=2.1
+pip install --no-deps hume-tada
+
+# Install Qwen3-TTS from source
 pip install git+https://github.com/QwenLM/Qwen3-TTS.git
+
+# PyInstaller and linting tools
+pip install pyinstaller ruff pytest pytest-asyncio
 ```
 
 ### 3. Start Development
@@ -208,17 +259,17 @@ bun run tauri dev
 ## Next Steps
 
 <Cards>
-  <Card title="Architecture" href="/development/architecture">
+  <Card title="Architecture" href="/developer/architecture">
     Understand the system architecture
   </Card>
-  <Card title="Contributing" href="/development/contributing">
+  <Card title="Contributing" href="/developer/contributing">
     Read the contribution guidelines
   </Card>
-  <Card title="Building" href="/development/building">
+  <Card title="Building" href="/developer/building">
     Learn how to build production releases
   </Card>
-  <Card title="API Reference" href="/api-reference">
-    Explore the REST API
+  <Card title="TTS Engines" href="/developer/tts-engines">
+    Add a new TTS engine end-to-end
   </Card>
 </Cards>
 

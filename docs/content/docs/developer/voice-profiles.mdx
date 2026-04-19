@@ -179,8 +179,8 @@ async def create_voice_prompt_for_profile(
 Reference audio is validated before being accepted:
 
 - **Duration:** 3-30 seconds recommended
-- **Format:** WAV, MP3, FLAC, OGG supported
-- **Sample Rate:** Resampled to 24kHz
+- **Format:** WAV, MP3, FLAC, OGG, M4A supported
+- **Sample Rate:** Engine-specific — the audio utility resamples to whatever the active engine expects (Whisper uses 16 kHz, most TTS engines use 24 kHz, LuxTTS outputs 48 kHz). Resampling happens on the fly; the stored sample retains its original rate.
 - **Channels:** Converted to mono if stereo
 
 ## Export/Import

@@ -5,250 +5,91 @@ description: "How Whisper-based audio transcription works in Voicebox"
 
 ## Overview
 
-Voicebox uses OpenAI's Whisper model for automatic speech recognition (ASR). This powers the transcription feature for creating reference text from audio recordings.
+Voicebox uses OpenAI's Whisper for automatic speech recognition (ASR). Transcription powers two flows:
+
+1. **Reference-text auto-fill** — when a user records or uploads a voice sample, the backend transcribes it and populates the `reference_text` field so cloning can use it.
+2. **On-demand transcription** — a user-facing `/transcribe` endpoint for arbitrary audio.
+
+On Apple Silicon, the transcription path runs through **MLX-Whisper** (from `mlx-audio`) for ~8× faster inference than PyTorch. Everywhere else it runs through PyTorch's `transformers` Whisper.
 
 ## Architecture
 
-The transcription system is built around the `WhisperModel` class:
-
-**Model Loading:** Lazy loading with HuggingFace Hub download.
-
-**Audio Processing:** Resampling and preprocessing for Whisper.
-
-**Inference:** Running transcription with optional language hints.
-
-## WhisperModel Class
+Transcription is wired through the same backend abstraction as TTS. The `STTBackend` protocol lives in `backend/backends/__init__.py`:
 
 ```python
-class WhisperModel:
-    def __init__(self, model_size: str = "base"):
-        self.model = None
-        self.processor = None
-        self.model_size = model_size
-        self.device = self._get_device()
+@runtime_checkable
+class STTBackend(Protocol):
+    async def load_model(self, model_size: str) -> None: ...
+    async def transcribe(
+        self,
+        audio_path: str,
+        language: Optional[str] = None,
+        model_size: Optional[str] = None,
+    ) -> str: ...
+    def unload_model(self) -> None: ...
+    def is_loaded(self) -> bool: ...
 ```
 
-### Model Sizes
+Two implementations ship today:
 
-| Size | Parameters | VRAM | Speed | Quality |
-|------|------------|------|-------|---------|
-| tiny | 39M | ~1GB | Fastest | Basic |
-| base | 74M | ~1GB | Fast | Good |
-| small | 244M | ~2GB | Medium | Better |
-| medium | 769M | ~5GB | Slow | High |
-| large | 1550M | ~10GB | Slowest | Best |
+- **`MLXSTTBackend`** (`backends/mlx_backend.py`) — uses `mlx_audio.stt.load()`. Default on Apple Silicon.
+- **`PyTorchSTTBackend`** (`backends/pytorch_backend.py`) — uses `transformers.WhisperForConditionalGeneration`. Default everywhere else.
 
-Default is `base` for balance of speed and quality.
+`get_stt_backend()` picks the right one based on `get_backend_type()`. `backend/services/transcribe.py` is a thin wrapper that delegates to the backend.
+
+## Model Sizes
+
+Five Whisper variants are registered in `ModelConfig`:
+
+| Model | HuggingFace Repo | Size | Notes |
+|-------|------------------|------|-------|
+| **Base** | `openai/whisper-base` | ~300 MB | Default; fast, decent quality |
+| **Small** | `openai/whisper-small` | ~500 MB | Better quality, still fast |
+| **Medium** | `openai/whisper-medium` | ~1.5 GB | High quality |
+| **Large** | `openai/whisper-large-v3` | ~3 GB | Best quality, slow on CPU |
+| **Turbo** | `openai/whisper-large-v3-turbo` | ~1.5 GB | Large-tier quality, ~5× faster than Large |
+
+The `tiny` model is **not** exposed — the quality gap to `base` wasn't worth the download.
+
+`Turbo` + MLX-Whisper on Apple Silicon dropped user-facing transcription latency from ~20s to ~2-3s in v0.1.10.
+
+## Language Hints
+
+Whisper can auto-detect language, but providing a hint improves accuracy on short clips:
+
+```python
+text = await backend.transcribe(audio_path, language="en")
+```
+
+Accepted language codes are the standard Whisper set (99+ languages). The frontend typically passes the profile's language if available, or lets Whisper detect otherwise.
 
 ## Model Loading
 
-Models are downloaded from HuggingFace Hub:
+Both backends are lazy: the model is loaded on first use and cached in memory. Switching sizes unloads the previous model.
+
+On MLX, the model is loaded via `mlx_audio.stt.load(hf_repo)`. On PyTorch, via:
 
 ```python
-def load_model(self, model_size: Optional[str] = None):
-    from transformers import WhisperProcessor, WhisperForConditionalGeneration
-    
-    model_name = f"openai/whisper-{model_size}"
-    
-    # Track download progress
-    progress_manager = get_progress_manager()
-    task_manager = get_task_manager()
-    task_manager.start_download(f"whisper-{model_size}")
-    
-    # Load processor and model
-    with tracker.patch_download():
-        self.processor = WhisperProcessor.from_pretrained(model_name)
-        self.model = WhisperForConditionalGeneration.from_pretrained(model_name)
-    
-    self.model.to(self.device)
-    
-    # Mark complete
-    progress_manager.mark_complete(f"whisper-{model_size}")
-    task_manager.complete_download(f"whisper-{model_size}")
+WhisperProcessor.from_pretrained(hf_repo)
+WhisperForConditionalGeneration.from_pretrained(hf_repo).to(device)
 ```
 
-### Async Loading
-
-Like TTS, loading runs in a thread pool:
-
-```python
-async def load_model_async(self, model_size: Optional[str] = None):
-    if self.model is not None and self.model_size == model_size:
-        return
-    await asyncio.to_thread(self.load_model, model_size)
-```
-
-## Transcription
-
-### Basic Transcription
-
-```python
-async def transcribe(
-    self,
-    audio_path: str,
-    language: Optional[str] = None,
-) -> str:
-    await self.load_model_async()
-    
-    def _transcribe_sync():
-        # Load and resample to 16kHz (Whisper requirement)
-        audio, sr = load_audio(audio_path, sample_rate=16000)
-        
-        # Process audio
-        inputs = self.processor(
-            audio,
-            sampling_rate=16000,
-            return_tensors="pt",
-        )
-        inputs = inputs.to(self.device)
-        
-        # Set language hint if provided
-        forced_decoder_ids = None
-        if language:
-            forced_decoder_ids = self.processor.get_decoder_prompt_ids(
-                language=language,
-                task="transcribe",
-            )
-        
-        # Generate
-        with torch.no_grad():
-            predicted_ids = self.model.generate(
-                inputs["input_features"],
-                forced_decoder_ids=forced_decoder_ids,
-            )
-        
-        # Decode
-        transcription = self.processor.batch_decode(
-            predicted_ids,
-            skip_special_tokens=True,
-        )[0]
-        
-        return transcription.strip()
-    
-    return await asyncio.to_thread(_transcribe_sync)
-```
-
-### Supported Languages
-
-Whisper supports 99+ languages. Common ones in Voicebox:
-
-| Code | Language |
-|------|----------|
-| en | English |
-| zh | Chinese |
-| ja | Japanese |
-| ko | Korean |
-| de | German |
-| fr | French |
-| ru | Russian |
-| pt | Portuguese |
-| es | Spanish |
-| it | Italian |
-
-### Language Detection
-
-When no language is specified, Whisper auto-detects:
-
-```python
-# Without language hint - auto-detect
-transcription = await whisper.transcribe(audio_path)
-
-# With language hint - more accurate for short clips
-transcription = await whisper.transcribe(audio_path, language="en")
-```
-
-## Transcription with Timestamps
-
-For advanced use cases, word-level timestamps are available:
-
-```python
-async def transcribe_with_timestamps(
-    self,
-    audio_path: str,
-    language: Optional[str] = None,
-) -> List[Dict[str, any]]:
-    await self.load_model_async()
-    
-    def _transcribe_timestamps_sync():
-        audio, sr = load_audio(audio_path, sample_rate=16000)
-        inputs = self.processor(audio, sampling_rate=16000, return_tensors="pt")
-        
-        with torch.no_grad():
-            predicted_ids = self.model.generate(
-                inputs["input_features"],
-                return_timestamps=True,
-            )
-        
-        # Parse timestamps
-        return [
-            {
-                "text": transcription,
-                "start": 0.0,
-                "end": len(audio) / sr,
-            }
-        ]
-    
-    return await asyncio.to_thread(_transcribe_timestamps_sync)
-```
-
-## Memory Management
-
-### Unloading
-
-Free memory when not needed:
-
-```python
-def unload_model(self):
-    if self.model is not None:
-        del self.model
-        del self.processor
-        self.model = None
-        self.processor = None
-        
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-```
-
-### Global Instance
-
-A singleton pattern manages the model:
-
-```python
-_whisper_model: Optional[WhisperModel] = None
-
-def get_whisper_model() -> WhisperModel:
-    global _whisper_model
-    if _whisper_model is None:
-        _whisper_model = WhisperModel()
-    return _whisper_model
-```
+Both load paths use `model_load_progress()` from `backends/base.py` so the frontend sees live download progress on the first use.
 
 ## Audio Preprocessing
 
-### Resampling
+Whisper expects mono 16 kHz audio. The audio utility in `backend/utils/audio.py` handles resampling and format conversion transparently:
 
-Whisper requires 16kHz audio:
+- **Formats:** WAV, MP3, FLAC, OGG, M4A (via soundfile / librosa)
+- **Target:** mono, 16 kHz, float32
 
-```python
-audio, sr = load_audio(audio_path, sample_rate=16000)
-```
-
-### Format Support
-
-The `load_audio` utility handles:
-- WAV
-- MP3
-- FLAC
-- OGG
-- M4A
-
-All formats are converted to mono 16kHz.
+Files longer than Whisper's 30-second window are handled by the underlying library's chunking logic — no explicit splitting in Voicebox code.
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/transcribe` | Transcribe audio file |
+| POST | `/transcribe` | Transcribe an uploaded audio file |
 
 ### Request
 
@@ -259,7 +100,8 @@ POST /transcribe
 Content-Type: multipart/form-data
 
 file: <audio_file>
-language: en  (optional)
+language: en         # optional
+model_size: base     # optional (default: "base")
 ```
 
 ### Response
@@ -275,25 +117,44 @@ language: en  (optional)
 
 ### Reference Text for Voice Cloning
 
-1. User records audio sample
-2. Audio is sent to `/transcribe`
-3. Transcription becomes `reference_text`
-4. Both are added to voice profile
+Adding a voice sample triggers transcription automatically:
+
+1. User uploads or records audio.
+2. The backend writes the audio file and calls `/transcribe` internally (or the frontend calls it separately).
+3. The returned text becomes `reference_text` on the new `profile_samples` row.
+4. Cloning engines that need reference text (Chatterbox, TADA, etc.) read it from there.
 
 ### Quality Tips
 
-- Provide language hint for short audio
-- Use clean audio with minimal noise
-- Longer audio (>5s) improves accuracy
-- Consider `small` or `medium` model for better quality
+- Provide a language hint for short clips (under 5 seconds) — auto-detection is unreliable on little audio.
+- Use Turbo or Large for noisy audio — Base can hallucinate on hard inputs.
+- Prefer clean audio; transcription errors become reference-text errors, which become cloning errors.
+
+## Memory Management
+
+`unload_model()` drops the model reference and clears the CUDA cache if applicable. `/models/unload` wires this up for manual control.
+
+A singleton per backend is returned by `get_stt_backend()` — multiple callers share one Whisper instance.
 
 ## Error Handling
 
-Common issues:
-
 | Error | Cause | Solution |
 |-------|-------|----------|
-| Model not found | First run, download failed | Retry with network |
-| OOM | Model too large | Use smaller model |
-| Empty result | No speech detected | Check audio has speech |
-| Wrong language | Auto-detect failed | Provide language hint |
+| Model not found | First run + network failure | Retry; check connectivity |
+| OOM on load | Large model on low-VRAM GPU | Switch to Small or Turbo |
+| Empty result | No speech in audio | Confirm input has voice; check trim |
+| Wrong language | Auto-detect misfired | Pass `language` hint |
+
+## Next Steps
+
+<Cards>
+  <Card title="Model Management" href="/developer/model-management">
+    Download / load / unload any model
+  </Card>
+  <Card title="Voice Profiles" href="/developer/voice-profiles">
+    How reference text is stored alongside samples
+  </Card>
+  <Card title="GPU Acceleration" href="/overview/gpu-acceleration">
+    Platform-specific acceleration including MLX-Whisper
+  </Card>
+</Cards>

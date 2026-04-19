@@ -100,9 +100,9 @@ chmod +x voicebox-*.AppImage
 **Solutions:**
 1. **Rebuild server binary**
    ```bash
-   bun run build:server
+   just build-server
    ```
-   The build script should automatically include MLX Metal shader libraries.
+   The build script automatically includes MLX Metal shader libraries on Apple Silicon.
 
 2. **Check MLX installation**
    ```bash
@@ -219,9 +219,9 @@ chmod +x voicebox-*.AppImage
 
 **Solutions:**
 1. **Check data directory**
-   - macOS: `~/Library/Application Support/voicebox/`
-   - Windows: `%APPDATA%/voicebox/`
-   - Linux: `~/.local/share/voicebox/`
+   - macOS: `~/Library/Application Support/sh.voicebox.app/`
+   - Windows: `%APPDATA%/sh.voicebox.app/`
+   - Linux: `~/.config/sh.voicebox.app/`
 
 2. **Check database**
    - Database: `data/voicebox.db`
@@ -266,7 +266,7 @@ chmod +x voicebox-*.AppImage
    cd tauri/src-tauri
    cargo clean
    cd ../..
-   bun run build
+   just build
    ```
 
 ### API client generation fails
@@ -274,7 +274,7 @@ chmod +x voicebox-*.AppImage
 **Solutions:**
 1. **Start backend server**
    ```bash
-   bun run dev:server
+   just dev-backend
    ```
 
 2. **Check OpenAPI endpoint**
@@ -284,7 +284,7 @@ chmod +x voicebox-*.AppImage
 
 3. **Regenerate client**
    ```bash
-   bun run generate:api
+   just generate-api
    ```
 
 ## Still Having Issues?

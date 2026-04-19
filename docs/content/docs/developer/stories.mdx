@@ -50,34 +50,15 @@ class StoryItem(Base):
 
 ### Start Time
 
-`start_time_ms` defines when an item begins on the timeline:
-
-```
-Timeline (ms):  0----1000----2000----3000----4000
-Item 1:         [======]
-Item 2:                      [==========]
-Item 3:                [====]
-```
+`start_time_ms` is the absolute position on the timeline where an item begins playing. Items on the same track cannot overlap; items on different tracks can.
 
 ### Tracks
 
-Multiple tracks allow overlapping audio:
-
-```
-Track 0:  [Item 1]        [Item 3]
-Track 1:            [Item 2]
-```
+A `track` is an integer (0-indexed) that identifies the horizontal row an item sits on. Audio on separate tracks plays concurrently, so tracks are the primary way to layer multiple voices or sound effects.
 
 ### Trimming
 
-Trim values cut audio from the start or end without destroying the original:
-
-```
-Original:    [=========AUDIO=========]
-trim_start:   ^^
-trim_end:                           ^^
-Result:        [=====AUDIO=====]
-```
+`trim_start_ms` and `trim_end_ms` hide the leading/trailing portions of the source generation without modifying the underlying audio file. The effective playback length is `generation.duration * 1000 - trim_start_ms - trim_end_ms`. Trimming is non-destructive — the same generation can be trimmed differently in different stories.
 
 ## Core Operations
 

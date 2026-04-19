@@ -146,7 +146,7 @@ export function FloatingGenerateBox({
       // Cloned/designed profile with no default — ensure a compatible (non-preset) engine
       const currentEngine = form.getValues('engine');
       const presetEngines = new Set(['kokoro', 'qwen_custom_voice']);
-      if (presetEngines.has(currentEngine)) {
+      if (currentEngine && presetEngines.has(currentEngine)) {
         form.setValue('engine', 'qwen');
       }
     }

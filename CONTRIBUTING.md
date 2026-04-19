@@ -260,7 +260,7 @@ voicebox/
 
 ### ✨ New Features
 
-- Check the roadmap in README.md
+- Check the roadmap in README.md and the engineering status in [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) before proposing work — it lists prioritized tasks (Tier 1 → 3), known architectural bottlenecks, and candidate TTS engines already under evaluation (including why some have been backlogged)
 - Discuss major features in an issue first
 - Keep features focused and well-scoped
 
@@ -378,6 +378,7 @@ See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues and sol
 
 - [README.md](README.md) - Project overview
 - [backend/README.md](backend/README.md) - API documentation
+- [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) - Living engineering roadmap: architecture, shipped vs in-flight work, prioritized open issues, candidate TTS engines under evaluation, architectural bottlenecks. Keep this updated when you ship significant features, close or backlog a model integration, or identify new bottlenecks.
 - [docs/AUTOUPDATER_QUICKSTART.md](docs/AUTOUPDATER_QUICKSTART.md) - Auto-updater setup
 - [SECURITY.md](SECURITY.md) - Security policy
 - [CHANGELOG.md](CHANGELOG.md) - Version history

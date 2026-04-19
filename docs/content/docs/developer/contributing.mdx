@@ -17,9 +17,10 @@ Thank you for your interest in contributing to Voicebox! This guide will help yo
 Before you start contributing, make sure you have:
 
 1. **Read the documentation** to understand how Voicebox works
-2. **Set up your development environment** - see [Development Setup](/development/setup)
+2. **Set up your development environment** — see [Development Setup](/developer/setup)
 3. **Explored the codebase** to understand the project structure
-4. **Checked existing issues** to see if someone else is working on something similar
+4. **Checked [`docs/PROJECT_STATUS.md`](https://github.com/jamiepine/voicebox/blob/main/docs/PROJECT_STATUS.md)** — the living engineering roadmap that tracks prioritized tasks (Tier 1 → 3), architectural bottlenecks, and candidate TTS engines under evaluation (including why some are backlogged)
+5. **Checked existing issues** to see if someone else is working on something similar
 
 ## Ways to Contribute
 
@@ -173,10 +174,15 @@ When creating a pull request:
       <File name="stores/" />
     </Folder>
     <Folder name="backend">
+      <File name="app.py" />
       <File name="main.py" />
-      <File name="tts.py" />
-      <File name="database.py" />
+      <File name="server.py" />
       <File name="models.py" />
+      <Folder name="routes" />
+      <Folder name="services" />
+      <Folder name="backends" />
+      <Folder name="database" />
+      <Folder name="utils" />
     </Folder>
     <Folder name="tauri">
       <File name="src-tauri/" />
@@ -197,9 +203,10 @@ When creating a pull request:
 
 ### New Features
 
-- Check the [roadmap](https://github.com/jamiepine/voicebox#roadmap) for planned features
+- Check [`docs/PROJECT_STATUS.md`](https://github.com/jamiepine/voicebox/blob/main/docs/PROJECT_STATUS.md) and the [roadmap](https://github.com/jamiepine/voicebox#roadmap) before proposing work — the status doc lists prioritized tasks (Tier 1 → 3), known architectural bottlenecks, and candidate TTS engines already under evaluation (including why some have been backlogged)
 - Discuss major features in an issue first
 - Keep features focused and well-scoped
+- Adding a new TTS engine? See [TTS Engines](/developer/tts-engines) for the phased workflow
 
 ### Documentation
 
@@ -253,7 +260,7 @@ When adding new API endpoints:
 
   <Step title="Regenerate Client">
     ```bash
-    bun run generate:api
+    just generate-api
     ```
 
     This updates the TypeScript client with type-safe bindings.
@@ -263,7 +270,7 @@ When adding new API endpoints:
     The API documentation is automatically generated from the OpenAPI schema. Ensure your endpoint has proper docstrings and type hints, then regenerate the docs:
     
     ```bash
-    bun run generate:api
+    just generate-api
     ```
   </Step>
 </Steps>
@@ -324,8 +331,9 @@ By contributing, you agree that your contributions will be licensed under the MI
 If you have questions:
 
 1. Check the [documentation](/overview/introduction)
-2. Search [existing issues](https://github.com/jamiepine/voicebox/issues)
-3. Open a new issue or discussion
-4. See [CONTRIBUTING.md](https://github.com/jamiepine/voicebox/blob/main/CONTRIBUTING.md) in the repo
+2. Read [`docs/PROJECT_STATUS.md`](https://github.com/jamiepine/voicebox/blob/main/docs/PROJECT_STATUS.md) for current engineering priorities
+3. Search [existing issues](https://github.com/jamiepine/voicebox/issues)
+4. Open a new issue or discussion
+5. See [CONTRIBUTING.md](https://github.com/jamiepine/voicebox/blob/main/CONTRIBUTING.md) in the repo
 
 Thank you for contributing to Voicebox! 🎉
