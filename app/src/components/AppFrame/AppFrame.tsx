@@ -1,5 +1,6 @@
 import { useRouterState } from '@tanstack/react-router';
 import { TitleBarDragRegion } from '@/components/TitleBarDragRegion';
+import { AudioKeepAlive } from '@/components/AudioPlayer/AudioKeepAlive';
 import { AudioPlayer } from '@/components/AudioPlayer/AudioPlayer';
 import { StoryTrackEditor } from '@/components/StoriesTab/StoryTrackEditor';
 import { TOP_SAFE_AREA_PADDING } from '@/lib/constants/ui';
@@ -26,6 +27,7 @@ export function AppFrame({ children }: AppFrameProps) {
       className={cn('h-screen bg-background flex flex-col overflow-hidden', TOP_SAFE_AREA_PADDING)}
     >
       <TitleBarDragRegion />
+      <AudioKeepAlive />
       {children}
       {showTrackEditor ? (
         <StoryTrackEditor storyId={story.id} items={story.items} />
