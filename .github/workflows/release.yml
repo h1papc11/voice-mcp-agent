@@ -26,11 +26,44 @@ jobs:
             args: ""
             python-version: "3.12"
             backend: "pytorch"
+          - platform: "ubuntu-22.04"
+            # --config override disables updater-artifact generation on Linux.
+            # tauri.conf.json has createUpdaterArtifacts: "v1Compatible" which
+            # on Linux wants to synthesize a .AppImage.tar.gz by downloading
+            # linuxdeploy at build time — this is what silently hangs CI
+            # (see v0.4.2 round 2, 25 min of no output after rpm bundling).
+            # We ship deb+rpm only; Linux users update via apt/dnf, not the
+            # Tauri in-app updater.
+            args: '--target x86_64-unknown-linux-gnu --bundles deb,rpm --verbose --config {"bundle":{"createUpdaterArtifacts":false}}'
+            python-version: "3.12"
+            backend: "pytorch"
 
     runs-on: ${{ matrix.platform }}
 
     steps:
       - uses: actions/checkout@v4
+
+      # Ubuntu runners ship with ~14 GB free; pip + PyInstaller + torch can
+      # peak well above that during the build. Reclaim ~25 GB by pruning
+      # preinstalled toolchains we don't use. This is what likely tripped
+      # the March 2026 Linux release attempts (see commit 103e98b
+      # "github runners suck") — not a code issue, a disk-pressure one.
+      - name: Free up disk space (ubuntu)
+        if: contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')
+        # Pinned to v1.3.1 (SHA) — this job runs with contents: write and
+        # handles signing secrets later, so we don't want a floating ref.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          # large-packages: true would `apt-get remove '^llvm-.*'`, which
+          # cascade-removes reverse deps that won't be pulled back in by the
+          # `llvm-dev` install below. The other flags already free ~20 GB,
+          # enough for the Python + torch + PyInstaller build.
+          large-packages: false
+          swap-storage: true
 
       - name: Install dependencies (ubuntu only)
         if: contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')
@@ -133,6 +166,21 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      - name: Disk / environment snapshot (pre-bundle debug)
+        if: contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')
+        run: |
+          echo "=== df -h ==="
+          df -h
+          echo "=== free -h ==="
+          free -h
+          echo "=== Rust / Cargo ==="
+          rustc --version
+          cargo --version
+          echo "=== Bun ==="
+          bun --version
+          echo "=== Tauri CLI ==="
+          cd tauri && bun run tauri --version
+
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         shell: bash
@@ -156,7 +204,13 @@ jobs:
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
+      # Linux hang watchdog: previous releases silently wedged inside tauri
+      # bundling (possibly linuxdeploy/AppImage download, possibly cargo link).
+      # Cap the step at 30 min so we get logs instead of waiting out the 6hr
+      # job timeout. Other platforms historically complete in ~25 min, so 45
+      # is comfortable.
       - uses: tauri-apps/tauri-action@v0.6
+        timeout-minutes: ${{ (contains(matrix.platform, 'ubuntu') || contains(matrix.platform, 'namespace')) && 30 || 45 }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -168,6 +222,9 @@ jobs:
           APPLE_PROVIDER_SHORT_NAME: ${{ secrets.APPLE_PROVIDER_SHORT_NAME }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          # Stream subprocess stdout/stderr so the hang is visible in logs.
+          CARGO_TERM_VERBOSE: "true"
+          RUST_BACKTRACE: "1"
         with:
           projectPath: tauri
           tagName: v__VERSION__
