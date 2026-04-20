@@ -45,11 +45,9 @@ class MLXTTSBackend:
         Returns:
             HuggingFace Hub model ID for MLX
         """
-        # MLX model mapping
         mlx_model_map = {
             "1.7B": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
-            # 0.6B not yet converted to MLX format
-            "0.6B": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",  # Fallback to 1.7B
+            "0.6B": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-bf16",
         }
 
         if model_size not in mlx_model_map:
