@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, GripVertical, Plus, Power, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -55,6 +56,7 @@ export function EffectsChainEditor({
   compact = false,
   showPresets = true,
 }: EffectsChainEditorProps) {
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Maintain stable IDs for each effect across renders.
@@ -177,17 +179,27 @@ export function EffectsChainEditor({
             }}
           >
             <SelectTrigger className="h-8 flex-1 text-xs focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="Load preset..." />
+              <SelectValue placeholder={t('effects.chain.loadPreset')} />
             </SelectTrigger>
             <SelectContent>
-              {presets?.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                  {p.description && (
-                    <span className="ml-1 text-muted-foreground">- {p.description}</span>
-                  )}
-                </SelectItem>
-              ))}
+              {presets?.map((p) => {
+                const name = p.is_builtin
+                  ? t(`effects.builtinPresets.${p.name}.name`, { defaultValue: p.name })
+                  : p.name;
+                const description = p.is_builtin
+                  ? t(`effects.builtinPresets.${p.name}.description`, {
+                      defaultValue: p.description ?? '',
+                    })
+                  : p.description;
+                return (
+                  <SelectItem key={p.id} value={p.id}>
+                    {name}
+                    {description && (
+                      <span className="ml-1 text-muted-foreground">- {description}</span>
+                    )}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
 
@@ -198,7 +210,7 @@ export function EffectsChainEditor({
               className="h-8 px-2 text-xs text-muted-foreground"
               onClick={clearAll}
             >
-              Clear
+              {t('effects.chain.clear')}
             </Button>
           )}
         </div>
@@ -229,12 +241,12 @@ export function EffectsChainEditor({
         <Select onValueChange={addEffect}>
           <SelectTrigger className="h-8 border-dashed text-xs text-muted-foreground focus:ring-0 focus:ring-offset-0">
             <Plus className="mr-1 h-3.5 w-3.5" />
-            <SelectValue placeholder="Add effect..." />
+            <SelectValue placeholder={t('effects.chain.addEffect')} />
           </SelectTrigger>
           <SelectContent>
             {availableEffects.effects.map((e) => (
               <SelectItem key={e.type} value={e.type}>
-                {e.label}
+                {t(`effects.types.${e.type}.label`, { defaultValue: e.label })}
               </SelectItem>
             ))}
           </SelectContent>
@@ -270,6 +282,7 @@ function SortableEffectItem({
   onToggleEnabled,
   onUpdateParam,
 }: SortableEffectItemProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -280,7 +293,9 @@ function SortableEffectItem({
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const label = effectDef?.label ?? effect.type;
+  const label = t(`effects.types.${effect.type}.label`, {
+    defaultValue: effectDef?.label ?? effect.type,
+  });
 
   return (
     <div
@@ -328,7 +343,7 @@ function SortableEffectItem({
             effect.enabled ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
           )}
           onClick={onToggleEnabled}
-          title={effect.enabled ? 'Disable' : 'Enable'}
+          title={effect.enabled ? t('effects.chain.disable') : t('effects.chain.enable')}
         >
           <Power className="h-3.5 w-3.5" />
         </button>
@@ -337,7 +352,7 @@ function SortableEffectItem({
           type="button"
           className="p-0.5 text-muted-foreground hover:text-destructive"
           onClick={onRemove}
-          title="Remove"
+          title={t('effects.chain.remove')}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -352,7 +367,9 @@ function SortableEffectItem({
               <div key={paramName} className="space-y-1">
                 <div className="flex items-center justify-between">
                   <Label className="text-[11px] text-muted-foreground">
-                    {paramDef.description}
+                    {t(`effects.types.${effect.type}.params.${paramName}`, {
+                      defaultValue: paramDef.description,
+                    })}
                   </Label>
                   <span className="text-[11px] font-mono tabular-nums text-foreground">
                     {currentValue.toFixed(

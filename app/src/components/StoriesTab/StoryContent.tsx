@@ -17,6 +17,7 @@ import { Link } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Download, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Loader from 'react-loaders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ import { useStoryStore } from '@/stores/storyStore';
 import { SortableStoryChatItem } from './StoryChatItem';
 
 export function StoryContent() {
+  const { t } = useTranslation();
   const selectedStoryId = useStoryStore((state) => state.selectedStoryId);
   const { data: story, isLoading } = useStory(selectedStoryId);
   const removeItem = useRemoveStoryItem();
@@ -147,7 +149,7 @@ export function StoryContent() {
       {
         onError: (error) => {
           toast({
-            title: 'Failed to remove item',
+            title: t('storyContent.toast.removeFailed'),
             description: error.message,
             variant: 'destructive',
           });
@@ -179,7 +181,7 @@ export function StoryContent() {
       {
         onError: (error) => {
           toast({
-            title: 'Failed to reorder items',
+            title: t('storyContent.toast.reorderFailed'),
             description: error.message,
             variant: 'destructive',
           });
@@ -199,7 +201,7 @@ export function StoryContent() {
       {
         onError: (error) => {
           toast({
-            title: 'Failed to export audio',
+            title: t('storyContent.toast.exportFailed'),
             description: error.message,
             variant: 'destructive',
           });
@@ -223,7 +225,7 @@ export function StoryContent() {
         },
         onError: (error) => {
           toast({
-            title: 'Failed to add generation',
+            title: t('storyContent.toast.addFailed'),
             description: error.message,
             variant: 'destructive',
           });
@@ -236,8 +238,8 @@ export function StoryContent() {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center">
-          <p className="text-lg font-medium mb-2">Select a story</p>
-          <p className="text-sm">Choose a story from the list to view its content</p>
+          <p className="text-lg font-medium mb-2">{t('storyContent.selectStory.title')}</p>
+          <p className="text-sm">{t('storyContent.selectStory.hint')}</p>
         </div>
       </div>
     );
@@ -246,7 +248,7 @@ export function StoryContent() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Loading story...</div>
+        <div className="text-muted-foreground">{t('storyContent.loading')}</div>
       </div>
     );
   }
@@ -255,8 +257,8 @@ export function StoryContent() {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
         <div className="text-center">
-          <p className="text-lg font-medium mb-2">Story not found</p>
-          <p className="text-sm">The selected story could not be loaded</p>
+          <p className="text-lg font-medium mb-2">{t('storyContent.notFound.title')}</p>
+          <p className="text-sm">{t('storyContent.notFound.hint')}</p>
         </div>
       </div>
     );
@@ -291,7 +293,7 @@ export function StoryContent() {
                     </div>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    Generating {pendingCount} {pendingCount === 1 ? 'audio' : 'audios'}
+                    {t('storyContent.generatingCount', { count: pendingCount })}
                   </span>
                 </Link>
               </motion.div>
@@ -301,13 +303,13 @@ export function StoryContent() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
                 <Plus className="mr-2 h-4 w-4" />
-                Add
+                {t('storyContent.add')}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0" align="end">
               <div className="p-2 border-b">
                 <Input
-                  placeholder="Search by name or transcript..."
+                  placeholder={t('storyContent.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
@@ -316,7 +318,9 @@ export function StoryContent() {
               <div className="max-h-60 overflow-y-auto">
                 {availableGenerations.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
-                    {searchQuery ? 'No matching generations found' : 'No available generations'}
+                    {searchQuery
+                      ? t('storyContent.searchNoMatches')
+                      : t('storyContent.searchNoAvailable')}
                   </div>
                 ) : (
                   availableGenerations.map((gen) => (
@@ -344,7 +348,7 @@ export function StoryContent() {
               disabled={exportAudio.isPending}
             >
               <Download className="mr-2 h-4 w-4" />
-              Export Audio
+              {t('storyContent.exportAudio')}
             </Button>
           )}
         </div>
@@ -358,8 +362,8 @@ export function StoryContent() {
       >
         {sortedItems.length === 0 ? (
           <div className="text-center py-12 px-5 border-2 border-dashed border-muted rounded-md text-muted-foreground">
-            <p className="text-sm">No items in this story</p>
-            <p className="text-xs mt-2">Generate speech using the box below to add items</p>
+            <p className="text-sm">{t('storyContent.empty.title')}</p>
+            <p className="text-xs mt-2">{t('storyContent.empty.hint')}</p>
           </div>
         ) : (
           <DndContext

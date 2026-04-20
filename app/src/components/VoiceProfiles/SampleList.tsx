@@ -1,5 +1,6 @@
 import { Check, Edit, Pause, Play, Plus, Trash2, Volume2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { CircleButton } from '@/components/ui/circle-button';
 import {
@@ -24,6 +25,7 @@ interface MiniSamplePlayerProps {
 }
 
 function MiniSamplePlayer({ audioUrl }: MiniSamplePlayerProps) {
+  const { t } = useTranslation();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -102,7 +104,7 @@ function MiniSamplePlayer({ audioUrl }: MiniSamplePlayerProps) {
           className="h-7 w-7 shrink-0"
           onClick={handlePlayPause}
           disabled={isLoading}
-          aria-label={isPlaying ? 'Pause sample' : 'Play sample'}
+          aria-label={isPlaying ? t('sampleList.player.pause') : t('sampleList.player.play')}
         >
           {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
         </Button>
@@ -114,8 +116,11 @@ function MiniSamplePlayer({ audioUrl }: MiniSamplePlayerProps) {
             max={100}
             step={0.1}
             className="flex-1"
-            aria-label="Sample playback position"
-            aria-valuetext={`${formatAudioDuration(currentTime)} of ${formatAudioDuration(duration)}`}
+            aria-label={t('sampleList.player.position')}
+            aria-valuetext={t('sampleList.player.positionValue', {
+              current: formatAudioDuration(currentTime),
+              total: formatAudioDuration(duration),
+            })}
           />
           <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 min-w-[70px]">
             <span className="font-mono">{formatAudioDuration(currentTime)}</span>
@@ -130,8 +135,8 @@ function MiniSamplePlayer({ audioUrl }: MiniSamplePlayerProps) {
           size="icon"
           className="h-7 w-7 shrink-0"
           onClick={handleStop}
-          title="Stop"
-          aria-label="Stop playback"
+          title={t('sampleList.player.stop')}
+          aria-label={t('sampleList.player.stopAria')}
         >
           <X className="h-3.5 w-3.5" />
         </Button>
@@ -145,6 +150,7 @@ interface SampleListProps {
 }
 
 export function SampleList({ profileId }: SampleListProps) {
+  const { t } = useTranslation();
   const { data: samples, isLoading } = useProfileSamples(profileId);
   const deleteSample = useDeleteSample();
   const updateSample = useUpdateSample();
@@ -181,8 +187,8 @@ export function SampleList({ profileId }: SampleListProps) {
   const handleSaveEdit = async (sampleId: string) => {
     if (!editedText.trim()) {
       toast({
-        title: 'Invalid text',
-        description: 'Reference text cannot be empty.',
+        title: t('sampleList.toast.invalidText'),
+        description: t('sampleList.toast.invalidTextDescription'),
         variant: 'destructive',
       });
       return;
@@ -191,22 +197,23 @@ export function SampleList({ profileId }: SampleListProps) {
     try {
       await updateSample.mutateAsync({ sampleId, referenceText: editedText.trim() });
       toast({
-        title: 'Sample updated',
-        description: 'Reference text has been updated successfully.',
+        title: t('sampleList.toast.updated'),
+        description: t('sampleList.toast.updatedDescription'),
       });
       setEditingSampleId(null);
       setEditedText('');
     } catch (error) {
       toast({
-        title: 'Update failed',
-        description: error instanceof Error ? error.message : 'Failed to update sample',
+        title: t('sampleList.toast.updateFailed'),
+        description:
+          error instanceof Error ? error.message : t('sampleList.toast.updateFailedFallback'),
         variant: 'destructive',
       });
     }
   };
 
   if (isLoading) {
-    return <div className="text-sm text-muted-foreground">Loading samples...</div>;
+    return <div className="text-sm text-muted-foreground">{t('sampleList.loading')}</div>;
   }
 
   return (
@@ -214,10 +221,8 @@ export function SampleList({ profileId }: SampleListProps) {
       {samples && samples.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center border border-dashed rounded-lg">
           <Volume2 className="h-8 w-8 text-muted-foreground/50 mb-2" />
-          <p className="text-sm text-muted-foreground">No samples yet</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">
-            Add your first audio sample to get started
-          </p>
+          <p className="text-sm text-muted-foreground">{t('sampleList.empty.title')}</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">{t('sampleList.empty.hint')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -237,13 +242,13 @@ export function SampleList({ profileId }: SampleListProps) {
                   <div className="p-4 space-y-3">
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                       <Edit className="h-3 w-3" />
-                      <span>Editing transcription</span>
+                      <span>{t('sampleList.editing')}</span>
                     </div>
                     <Textarea
                       value={editedText}
                       onChange={(e) => setEditedText(e.target.value)}
                       className="min-h-[100px] text-sm resize-none"
-                      placeholder="Enter reference text..."
+                      placeholder={t('sampleList.placeholder')}
                       autoFocus
                     />
                     <div className="flex items-center justify-end gap-2 pt-1">
@@ -255,7 +260,7 @@ export function SampleList({ profileId }: SampleListProps) {
                         disabled={updateSample.isPending}
                       >
                         <X className="h-4 w-4 mr-1" />
-                        Cancel
+                        {t('common.cancel')}
                       </Button>
                       <Button
                         type="button"
@@ -264,7 +269,7 @@ export function SampleList({ profileId }: SampleListProps) {
                         disabled={updateSample.isPending}
                       >
                         <Check className="h-4 w-4 mr-1" />
-                        {updateSample.isPending ? 'Saving...' : 'Save'}
+                        {updateSample.isPending ? t('sampleList.saving') : t('common.save')}
                       </Button>
                     </div>
                   </div>
@@ -283,12 +288,12 @@ export function SampleList({ profileId }: SampleListProps) {
                       <div className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         <CircleButton
                           icon={Edit}
-                          title="Edit transcription"
+                          title={t('sampleList.editTranscription')}
                           onClick={() => handleStartEdit(sample.id, sample.reference_text)}
                         />
                         <CircleButton
                           icon={Trash2}
-                          title="Delete sample"
+                          title={t('sampleList.deleteSample')}
                           onClick={() => handleDeleteClick(sample.id)}
                           disabled={deleteSample.isPending}
                         />
@@ -317,24 +322,18 @@ export function SampleList({ profileId }: SampleListProps) {
         onClick={() => setUploadOpen(true)}
       >
         <Plus className="mr-2 h-4 w-4" />
-        Add Sample
+        {t('sampleList.addSample')}
       </Button>
 
-      <p className="text-xs text-muted-foreground text-center px-2">
-        Note: A single 30-second sample is the sweet spot. Quality may decrease with multiple
-        samples. In a future update samples might be interchangeable and tagged for varying styles
-        of the same voice.
-      </p>
+      <p className="text-xs text-muted-foreground text-center px-2">{t('sampleList.note')}</p>
 
       <SampleUpload profileId={profileId} open={uploadOpen} onOpenChange={setUploadOpen} />
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Sample</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this audio sample? This action cannot be undone.
-            </DialogDescription>
+            <DialogTitle>{t('sampleList.deleteDialog.title')}</DialogTitle>
+            <DialogDescription>{t('sampleList.deleteDialog.description')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -344,14 +343,14 @@ export function SampleList({ profileId }: SampleListProps) {
                 setSampleToDelete(null);
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleteSample.isPending}
             >
-              {deleteSample.isPending ? 'Deleting...' : 'Delete'}
+              {deleteSample.isPending ? t('sampleList.deleteDialog.deleting') : t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

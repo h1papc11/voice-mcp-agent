@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { type LogEntry, useLogStore } from '@/stores/logStore';
@@ -32,6 +33,7 @@ function LogLine({ entry }: { entry: LogEntry }) {
 }
 
 export function LogsPage() {
+  const { t } = useTranslation();
   const entries = useLogStore((s) => s.entries);
   const clear = useLogStore((s) => s.clear);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,9 +58,9 @@ export function LogsPage() {
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-medium">Server Logs</h3>
+          <h3 className="text-sm font-medium">{t('settings.logs.title')}</h3>
           <p className="text-sm text-muted-foreground">
-            {entries.length} {entries.length === 1 ? 'line' : 'lines'}
+            {t('settings.logs.lineCount', { count: entries.length })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -71,11 +73,11 @@ export function LogsPage() {
                 containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight });
               }}
             >
-              Scroll to bottom
+              {t('settings.logs.scrollToBottom')}
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={clear}>
-            Clear
+            {t('settings.logs.clear')}
           </Button>
         </div>
       </div>
@@ -87,13 +89,8 @@ export function LogsPage() {
       >
         {entries.length === 0 ? (
           <div className="text-sm text-muted-foreground/50 font-mono space-y-1">
-            <p>No log output yet.</p>
-            {!import.meta.env?.PROD && (
-              <p>
-                Server logs are only captured when the app manages the server process (production
-                builds).
-              </p>
-            )}
+            <p>{t('settings.logs.empty')}</p>
+            {!import.meta.env?.PROD && <p>{t('settings.logs.devHint')}</p>}
           </div>
         ) : (
           entries.map((entry) => <LogLine key={entry.id} entry={entry} />)

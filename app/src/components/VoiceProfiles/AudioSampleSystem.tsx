@@ -1,4 +1,5 @@
 import { Mic, Monitor, Pause, Play, Square } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
 import { formatAudioDuration } from '@/lib/utils/audio';
@@ -28,6 +29,7 @@ export function AudioSampleSystem({
   isPlaying,
   isTranscribing = false,
 }: AudioSampleSystemProps) {
+  const { t } = useTranslation();
   return (
     <FormItem>
       <FormControl>
@@ -36,10 +38,10 @@ export function AudioSampleSystem({
             <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-dashed rounded-lg min-h-[180px]">
               <Button type="button" onClick={onStart} size="lg" className="flex items-center gap-2">
                 <Monitor className="h-5 w-5" />
-                Start Capture
+                {t('audioSample.startCapture')}
               </Button>
               <p className="text-sm text-muted-foreground text-center">
-                Capture audio from your system. Maximum duration: 30 seconds.
+                {t('audioSample.systemHint')}
               </p>
             </div>
           )}
@@ -61,10 +63,10 @@ export function AudioSampleSystem({
                 className="flex items-center gap-2"
               >
                 <Square className="h-4 w-4" />
-                Stop Capture
+                {t('audioSample.stopCapture')}
               </Button>
               <p className="text-sm text-muted-foreground text-center">
-                {formatAudioDuration(30 - duration)} remaining
+                {t('audioSample.remaining', { time: formatAudioDuration(30 - duration) })}
               </p>
             </div>
           )}
@@ -73,16 +75,18 @@ export function AudioSampleSystem({
             <div className="flex flex-col items-center justify-center gap-4 p-4 border-2 border-primary rounded-lg bg-primary/5 min-h-[180px]">
               <div className="flex items-center gap-2">
                 <Monitor className="h-5 w-5 text-primary" />
-                <span className="font-medium">Capture complete</span>
+                <span className="font-medium">{t('audioSample.captureComplete')}</span>
               </div>
-              <p className="text-sm text-muted-foreground text-center">File: {file.name}</p>
+              <p className="text-sm text-muted-foreground text-center">
+                {t('audioSample.fileLabel', { name: file.name })}
+              </p>
               <div className="flex gap-2">
                 <Button
                   type="button"
                   size="icon"
                   variant="outline"
                   onClick={onPlayPause}
-                  aria-label={isPlaying ? 'Pause' : 'Play'}
+                  aria-label={isPlaying ? t('audioSample.pause') : t('audioSample.play')}
                 >
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
@@ -94,7 +98,7 @@ export function AudioSampleSystem({
                   className="flex items-center gap-2"
                 >
                   <Mic className="h-4 w-4" />
-                  {isTranscribing ? 'Transcribing...' : 'Transcribe'}
+                  {isTranscribing ? t('audioSample.transcribing') : t('audioSample.transcribe')}
                 </Button>
                 <Button
                   type="button"
@@ -102,7 +106,7 @@ export function AudioSampleSystem({
                   onClick={onCancel}
                   className="flex items-center gap-2"
                 >
-                  Capture Again
+                  {t('audioSample.captureAgain')}
                 </Button>
               </div>
             </div>

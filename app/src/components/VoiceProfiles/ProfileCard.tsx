@@ -1,5 +1,6 @@
 import { Download, Edit, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ interface ProfileCardProps {
 }
 
 export function ProfileCard({ profile, disabled }: ProfileCardProps) {
+  const { t } = useTranslation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const deleteProfile = useDeleteProfile();
@@ -41,7 +43,6 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
   const isSelected = selectedProfileId === profile.id;
 
   const handleSelect = () => {
-    // If disabled but already selected, bounce the selection to re-trigger engine auto-switch
     if (disabled && isSelected) {
       setSelectedProfileId(null);
       setTimeout(() => setSelectedProfileId(profile.id), 0);
@@ -79,9 +80,10 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
     }
   };
 
-  const selectLabel = isSelected
-    ? `${profile.name}, ${profile.language}. Selected as voice for generation.`
-    : `${profile.name}, ${profile.language}. Select as voice for generation.`;
+  const selectLabel = t(
+    isSelected ? 'profiles.card.selectLabelSelected' : 'profiles.card.selectLabel',
+    { name: profile.name, language: profile.language },
+  );
 
   return (
     <>
@@ -105,7 +107,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
         </CardHeader>
         <CardContent className="p-3 pt-0 flex flex-col flex-1">
           <p className="text-xs text-muted-foreground mb-1.5 line-clamp-2 leading-relaxed">
-            {profile.description || 'No description'}
+            {profile.description || t('profiles.card.noDescription')}
           </p>
           <div className="mb-2 flex items-center gap-1.5">
             <Badge variant="outline" className="text-xs h-5 px-1.5 text-muted-foreground">
@@ -118,7 +120,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
             )}
             {profile.voice_type === 'designed' && (
               <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                designed
+                {t('profiles.card.designed')}
               </Badge>
             )}
             {profile.effects_chain && profile.effects_chain.length > 0 && (
@@ -130,7 +132,7 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
               icon={Download}
               onClick={handleExport}
               disabled={exportProfile.isPending}
-              aria-label="Export profile"
+              aria-label={t('profiles.card.export')}
             />
             <CircleButton
               icon={Edit}
@@ -138,13 +140,13 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
                 e.stopPropagation();
                 handleEdit();
               }}
-              aria-label="Edit profile"
+              aria-label={t('profiles.card.edit')}
             />
             <CircleButton
               icon={Trash2}
               onClick={handleDeleteClick}
               disabled={deleteProfile.isPending}
-              aria-label="Delete profile"
+              aria-label={t('profiles.card.delete')}
             />
           </div>
         </CardContent>
@@ -153,21 +155,21 @@ export function ProfileCard({ profile, disabled }: ProfileCardProps) {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Profile</DialogTitle>
+            <DialogTitle>{t('profiles.deleteDialog.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{profile.name}"? This action cannot be undone.
+              {t('profiles.deleteDialog.body', { name: profile.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleteProfile.isPending}
             >
-              {deleteProfile.isPending ? 'Deleting...' : 'Delete'}
+              {deleteProfile.isPending ? t('profiles.deleteDialog.deleting') : t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import changelogRaw from 'virtual:changelog';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { type ChangelogEntry, parseChangelog } from '@/lib/utils/parseChangelog';
 
@@ -176,6 +177,7 @@ function inlineMarkdown(text: string): React.ReactNode {
 }
 
 function ChangelogEntryCard({ entry }: { entry: ChangelogEntry }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const content = useMemo(() => renderMarkdown(entry.body), [entry.body]);
   const isLong = entry.body.split('\n').length > 12;
@@ -185,7 +187,9 @@ function ChangelogEntryCard({ entry }: { entry: ChangelogEntry }) {
       <div className="flex items-baseline gap-3 mb-3">
         <h3 className="text-xl font-semibold tracking-tight">{entry.version}</h3>
         {entry.date && <span className="text-xs text-muted-foreground">{entry.date}</span>}
-        {entry.version === 'Unreleased' && <Badge variant="outline">dev</Badge>}
+        {entry.version === 'Unreleased' && (
+          <Badge variant="outline">{t('settings.changelog.devBadge')}</Badge>
+        )}
       </div>
 
       <div className={isLong && !expanded ? 'max-h-48 overflow-hidden relative' : ''}>
@@ -200,7 +204,7 @@ function ChangelogEntryCard({ entry }: { entry: ChangelogEntry }) {
           onClick={() => setExpanded(!expanded)}
           className="text-xs text-accent hover:underline mt-2"
         >
-          {expanded ? 'Show less' : 'Show more'}
+          {expanded ? t('settings.changelog.showLess') : t('settings.changelog.showMore')}
         </button>
       )}
     </div>

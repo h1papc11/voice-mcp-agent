@@ -3,6 +3,7 @@ import { useMatchRoute } from '@tanstack/react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import {
@@ -34,6 +35,7 @@ export function FloatingGenerateBox({
   isPlayerOpen = false,
   showVoiceSelector = false,
 }: FloatingGenerateBoxProps) {
+  const { t } = useTranslation();
   const selectedProfileId = useUIStore((state) => state.selectedProfileId);
   const setSelectedProfileId = useUIStore((state) => state.setSelectedProfileId);
   const setSelectedEngine = useUIStore((state) => state.setSelectedEngine);
@@ -276,10 +278,12 @@ export function FloatingGenerateBox({
                               onChange={field.onChange}
                               placeholder={
                                 isStoriesRoute && currentStory
-                                  ? `Generate speech for "${currentStory.name}"... (type / for effects)`
+                                  ? t('generation.placeholder.storyWithEffects', {
+                                      name: currentStory.name,
+                                    })
                                   : selectedProfile
-                                    ? `Type / for effects like [laugh], [sigh]...`
-                                    : 'Select a voice profile above...'
+                                    ? t('generation.placeholder.effectsHint')
+                                    : t('generation.placeholder.selectVoice')
                               }
                               className="px-3 py-2 resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm w-full"
                               style={{
@@ -302,10 +306,12 @@ export function FloatingGenerateBox({
                               }}
                               placeholder={
                                 isStoriesRoute && currentStory
-                                  ? `Generate speech for "${currentStory.name}"...`
+                                  ? t('generation.placeholder.story', { name: currentStory.name })
                                   : selectedProfile
-                                    ? `Generate speech using ${selectedProfile.name}...`
-                                    : 'Select a voice profile above...'
+                                    ? t('generation.placeholder.profile', {
+                                        name: selectedProfile.name,
+                                      })
+                                    : t('generation.placeholder.selectVoice')
                               }
                               className="resize-none bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:ring-0 outline-none ring-0 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full"
                               style={{
@@ -334,10 +340,10 @@ export function FloatingGenerateBox({
                     size="icon"
                     aria-label={
                       isPending
-                        ? 'Generating...'
+                        ? t('generation.button.generating')
                         : !selectedProfileId
-                          ? 'Select a voice profile first'
-                          : 'Generate speech'
+                          ? t('generation.button.selectFirst')
+                          : t('generation.button.generate')
                     }
                   >
                     {isPending ? (
@@ -348,10 +354,10 @@ export function FloatingGenerateBox({
                   </Button>
                   <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground border border-border opacity-0 transition-opacity group-hover:opacity-100 z-[9999]">
                     {isPending
-                      ? 'Generating...'
+                      ? t('generation.button.generating')
                       : !selectedProfileId
-                        ? 'Select a voice profile first'
-                        : 'Generate speech'}
+                        ? t('generation.button.selectFirst')
+                        : t('generation.button.generate')}
                   </span>
                 </div>
 
@@ -379,15 +385,15 @@ export function FloatingGenerateBox({
                           )}
                           aria-label={
                             isInstructExpanded
-                              ? 'Hide delivery instructions'
-                              : 'Show delivery instructions'
+                              ? t('generation.instruct.hide')
+                              : t('generation.instruct.show')
                           }
                           aria-pressed={isInstructExpanded}
                         >
                           <SlidersHorizontal className="h-4 w-4" />
                         </Button>
                         <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 whitespace-nowrap rounded-md bg-popover px-3 py-1.5 text-xs text-popover-foreground border border-border opacity-0 transition-opacity group-hover:opacity-100 z-[9999]">
-                          Delivery instructions (tone, emotion, pace)
+                          {t('generation.instruct.tooltip')}
                         </span>
                       </div>
                     </motion.div>
@@ -414,7 +420,7 @@ export function FloatingGenerateBox({
                         <FormControl>
                           <Textarea
                             {...field}
-                            placeholder="Delivery instructions — e.g. Speak slowly with warmth, Authoritative and clear..."
+                            placeholder={t('generation.instruct.placeholder')}
                             className="resize-none bg-transparent border border-accent/20 focus-visible:ring-1 focus-visible:ring-accent/40 rounded-2xl text-sm placeholder:text-muted-foreground/60 w-full px-3 py-2"
                             style={{ minHeight: '60px', maxHeight: '160px' }}
                             maxLength={500}
@@ -444,7 +450,7 @@ export function FloatingGenerateBox({
                         onValueChange={(value) => setSelectedProfileId(value || null)}
                       >
                         <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all w-full">
-                          <SelectValue placeholder="Select a voice..." />
+                          <SelectValue placeholder={t('generation.voiceSelector.placeholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {profiles?.map((profile) => (
@@ -498,16 +504,16 @@ export function FloatingGenerateBox({
                       }
                     >
                       <SelectTrigger className="h-8 text-xs bg-card border-border rounded-full hover:bg-background/50 transition-all">
-                        <SelectValue placeholder="No effects" />
+                        <SelectValue placeholder={t('generation.effects.none')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none" className="text-xs">
-                          No effects
+                          {t('generation.effects.none')}
                         </SelectItem>
                         {selectedProfile?.effects_chain &&
                           selectedProfile.effects_chain.length > 0 && (
                             <SelectItem value="_profile" className="text-xs">
-                              Profile default
+                              {t('generation.effects.profileDefault')}
                             </SelectItem>
                           )}
                         {effectPresets?.map((preset) => (

@@ -2,6 +2,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Mic, MoreHorizontal, Play, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,6 +35,7 @@ export function StoryChatItem({
   dragHandleProps,
   isDragging,
 }: StoryChatItemProps) {
+  const { t } = useTranslation();
   const seek = useStoryStore((state) => state.seek);
   const serverUrl = useServerStore((state) => state.serverUrl);
   const [avatarError, setAvatarError] = useState(false);
@@ -118,21 +120,26 @@ export function StoryChatItem({
       <div className="shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label={t('history.actions.menu')}
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={handlePlay}>
               <Play className="mr-2 h-4 w-4" />
-              Play from here
+              {t('storyContent.itemActions.playFromHere')}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={onRemove}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              Remove from Story
+              {t('storyContent.itemActions.removeFromStory')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

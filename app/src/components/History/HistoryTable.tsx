@@ -14,6 +14,7 @@ import {
   Wand2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,7 @@ function AudioBars({ mode }: { mode: 'idle' | 'generating' | 'playing' }) {
 
 // NEW ALTERNATE HISTORY VIEW - FIXED HEIGHT ROWS WITH INFINITE SCROLL
 export function HistoryTable() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(0);
   const [allHistory, setAllHistory] = useState<HistoryResponse[]>([]);
   const [total, setTotal] = useState(0);
@@ -671,46 +673,47 @@ export function HistoryTable() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 text-muted-foreground/50 hover:bg-muted-foreground/20 hover:text-muted-foreground"
-                              aria-label="Actions"
+                              aria-label={t('history.actions.menu')}
                               disabled={isGenerating}
                             >
                               <MoreHorizontal className="h-2 w-2" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}>
+                            <DropdownMenuItem
+                              onClick={() => handlePlay(gen.id, gen.text, gen.profile_id)}
+                            >
                               <Play className="mr-2 h-4 w-4" />
-                              Play
+                              {t('history.actions.play')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDownloadAudio(gen.id, gen.text)}
                               disabled={exportGenerationAudio.isPending}
                             >
                               <Download className="mr-2 h-4 w-4" />
-                              Export Audio
+                              {t('history.actions.exportAudio')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleExportPackage(gen.id, gen.text)}
                               disabled={exportGeneration.isPending}
                             >
                               <FileArchive className="mr-2 h-4 w-4" />
-                              Export Package
+                              {t('history.actions.exportPackage')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleApplyEffects(gen.id)}>
                               <Wand2 className="mr-2 h-4 w-4" />
-                              Apply Effects
+                              {t('history.actions.applyEffects')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleRegenerate(gen.id)}>
                               <RotateCcw className="mr-2 h-4 w-4" />
-                              Regenerate
+                              {t('history.actions.regenerate')}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => handleDeleteClick(gen.id, gen.profile_name)}
                               disabled={deleteGeneration.isPending}
-                              // className="text-destructive focus:text-destructive"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
+                              {t('common.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -802,10 +805,9 @@ export function HistoryTable() {
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Generation</DialogTitle>
+            <DialogTitle>{t('history.deleteDialog.title')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this generation from "{generationToDelete?.name}"?
-              This action cannot be undone.
+              {t('history.deleteDialog.body', { name: generationToDelete?.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -816,14 +818,14 @@ export function HistoryTable() {
                 setGenerationToDelete(null);
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteConfirm}
               disabled={deleteGeneration.isPending}
             >
-              {deleteGeneration.isPending ? 'Deleting...' : 'Delete'}
+              {deleteGeneration.isPending ? t('history.deleteDialog.deleting') : t('common.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -832,23 +834,23 @@ export function HistoryTable() {
       <Dialog open={clearFailedDialogOpen} onOpenChange={setClearFailedDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Clear failed generations</DialogTitle>
+            <DialogTitle>{t('history.clearFailedDialog.title')}</DialogTitle>
             <DialogDescription>
-              This will permanently delete {failedCount} failed{' '}
-              {failedCount === 1 ? 'generation' : 'generations'} from your history. This cannot be
-              undone.
+              {t('history.clearFailedDialog.body', { count: failedCount })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setClearFailedDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleClearFailedConfirm}
               disabled={clearFailed.isPending}
             >
-              {clearFailed.isPending ? 'Clearing...' : 'Clear all'}
+              {clearFailed.isPending
+                ? t('history.clearFailedDialog.clearing')
+                : t('history.clearFailedDialog.clearAll')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -857,9 +859,9 @@ export function HistoryTable() {
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Import Generation</DialogTitle>
+            <DialogTitle>{t('history.importDialog.title')}</DialogTitle>
             <DialogDescription>
-              Import the generation from "{selectedFile?.name}". This will add it to your history.
+              {t('history.importDialog.body', { name: selectedFile?.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -873,13 +875,15 @@ export function HistoryTable() {
                 }
               }}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleImportConfirm}
               disabled={importGeneration.isPending || !selectedFile}
             >
-              {importGeneration.isPending ? 'Importing...' : 'Import'}
+              {importGeneration.isPending
+                ? t('history.importDialog.importing')
+                : t('history.importDialog.action')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -888,21 +892,20 @@ export function HistoryTable() {
       <Dialog open={effectsDialogOpen} onOpenChange={setEffectsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Apply Effects</DialogTitle>
-            <DialogDescription>
-              Configure post-processing effects to apply to this generation. A new version will be
-              created.
-            </DialogDescription>
+            <DialogTitle>{t('history.effectsDialog.title')}</DialogTitle>
+            <DialogDescription>{t('history.effectsDialog.body')}</DialogDescription>
           </DialogHeader>
           {effectsTargetVersions.length > 1 && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Source</label>
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('history.effectsDialog.sourceLabel')}
+              </label>
               <Select
                 value={effectsSourceVersionId ?? ''}
                 onValueChange={(val) => setEffectsSourceVersionId(val || null)}
               >
                 <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select source version" />
+                  <SelectValue placeholder={t('history.effectsDialog.sourcePlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {effectsTargetVersions.map((v) => (
@@ -924,13 +927,15 @@ export function HistoryTable() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEffectsDialogOpen(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleApplyEffectsConfirm}
               disabled={applyingEffects || effectsChain.length === 0}
             >
-              {applyingEffects ? 'Applying...' : 'Apply'}
+              {applyingEffects
+                ? t('history.effectsDialog.applying')
+                : t('history.effectsDialog.apply')}
             </Button>
           </DialogFooter>
         </DialogContent>

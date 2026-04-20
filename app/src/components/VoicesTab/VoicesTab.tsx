@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Mic, Plus, Search, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -25,6 +26,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { VoiceInspector } from './VoiceInspector';
 
 export function VoicesTab() {
+  const { t } = useTranslation();
   const { data: profiles, isLoading } = useProfiles();
   const queryClient = useQueryClient();
   const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
@@ -95,7 +97,7 @@ export function VoicesTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Loading voices...</div>
+        <div className="text-muted-foreground">{t('voicesTab.loading')}</div>
       </div>
     );
   }
@@ -110,12 +112,12 @@ export function VoicesTab() {
         {/* Fixed Header */}
         <div className="absolute top-0 left-0 right-0 z-20 pl-8 pr-8">
           <div className="flex items-center gap-3 mb-6">
-            <h1 className="text-2xl font-bold">Voices</h1>
+            <h1 className="text-2xl font-bold">{t('voicesTab.title')}</h1>
             <div className="flex-1" />
             <div className="relative w-[240px]">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                placeholder="Search voices..."
+                placeholder={t('voicesTab.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-10 pl-8 text-sm rounded-full focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -123,7 +125,7 @@ export function VoicesTab() {
             </div>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              New Voice
+              {t('voicesTab.newVoice')}
             </Button>
           </div>
         </div>
@@ -139,12 +141,12 @@ export function VoicesTab() {
           <Table className="table-fixed [&_td:first-child]:pl-8 [&_th:first-child]:pl-8">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[30%]">Name</TableHead>
-                <TableHead className="w-[10%]">Language</TableHead>
-                <TableHead className="w-[10%]">Generations</TableHead>
-                <TableHead className="w-[8%]">Samples</TableHead>
-                <TableHead className="w-[8%]">Effects</TableHead>
-                <TableHead className="w-[24%]">Channels</TableHead>
+                <TableHead className="w-[30%]">{t('voicesTab.columns.name')}</TableHead>
+                <TableHead className="w-[10%]">{t('voicesTab.columns.language')}</TableHead>
+                <TableHead className="w-[10%]">{t('voicesTab.columns.generations')}</TableHead>
+                <TableHead className="w-[8%]">{t('voicesTab.columns.samples')}</TableHead>
+                <TableHead className="w-[8%]">{t('voicesTab.columns.effects')}</TableHead>
+                <TableHead className="w-[24%]">{t('voicesTab.columns.channels')}</TableHead>
                 <TableHead className="w-6"></TableHead>
               </TableRow>
             </TableHeader>
@@ -194,6 +196,7 @@ function VoiceRow({
   channels,
   onChannelChange,
 }: VoiceRowProps) {
+  const { t } = useTranslation();
   const serverUrl = useServerStore((state) => state.serverUrl);
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = profile.avatar_path ? `${serverUrl}/profiles/${profile.id}/avatar` : null;
@@ -212,7 +215,7 @@ function VoiceRow({
             {avatarUrl && !avatarError ? (
               <img
                 src={avatarUrl}
-                alt={`${profile.name} avatar`}
+                alt={t('voicesTab.avatarAlt', { name: profile.name })}
                 className="h-full w-full object-cover"
                 onError={() => setAvatarError(true)}
               />
@@ -248,11 +251,11 @@ function VoiceRow({
         <MultiSelect
           options={channels.map((ch) => ({
             value: ch.id,
-            label: `${ch.name}${ch.is_default ? ' (Default)' : ''}`,
+            label: ch.is_default ? t('voicesTab.channelDefaultLabel', { name: ch.name }) : ch.name,
           }))}
           value={channelIds}
           onChange={onChannelChange}
-          placeholder="Select channels..."
+          placeholder={t('voicesTab.selectChannels')}
           className="w-full"
         />
       </TableCell>

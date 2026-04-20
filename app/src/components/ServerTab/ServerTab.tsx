@@ -1,11 +1,12 @@
 import { Link, Outlet, useMatchRoute } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { BOTTOM_SAFE_AREA_PADDING } from '@/lib/constants/ui';
 import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
 import { usePlayerStore } from '@/stores/playerStore';
 
 interface SettingsTab {
-  label: string;
+  labelKey: string;
   path:
     | '/settings'
     | '/settings/generation'
@@ -17,15 +18,16 @@ interface SettingsTab {
 }
 
 const tabs: SettingsTab[] = [
-  { label: 'General', path: '/settings' },
-  { label: 'Generation', path: '/settings/generation' },
-  { label: 'GPU', path: '/settings/gpu', tauriOnly: true },
-  { label: 'Logs', path: '/settings/logs', tauriOnly: true },
-  { label: 'Changelog', path: '/settings/changelog' },
-  { label: 'About', path: '/settings/about' },
+  { labelKey: 'settings.tabs.general', path: '/settings' },
+  { labelKey: 'settings.tabs.generation', path: '/settings/generation' },
+  { labelKey: 'settings.tabs.gpu', path: '/settings/gpu', tauriOnly: true },
+  { labelKey: 'settings.tabs.logs', path: '/settings/logs', tauriOnly: true },
+  { labelKey: 'settings.tabs.changelog', path: '/settings/changelog' },
+  { labelKey: 'settings.tabs.about', path: '/settings/about' },
 ];
 
 export function SettingsLayout() {
+  const { t } = useTranslation();
   const platform = usePlatform();
   const isPlayerVisible = !!usePlayerStore((state) => state.audioUrl);
   const matchRoute = useMatchRoute();
@@ -52,7 +54,7 @@ export function SettingsLayout() {
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30',
               )}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </Link>
           );
         })}

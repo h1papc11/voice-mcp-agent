@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Plus, Sparkles, Wand2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api/client';
 import type { EffectPresetResponse } from '@/lib/api/types';
@@ -7,6 +8,7 @@ import { cn } from '@/lib/utils/cn';
 import { useEffectsStore } from '@/stores/effectsStore';
 
 export function EffectsList() {
+  const { t } = useTranslation();
   const selectedPresetId = useEffectsStore((s) => s.selectedPresetId);
   const setSelectedPresetId = useEffectsStore((s) => s.setSelectedPresetId);
   const setWorkingChain = useEffectsStore((s) => s.setWorkingChain);
@@ -44,10 +46,10 @@ export function EffectsList() {
     <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Effects</h2>
+        <h2 className="text-lg font-semibold">{t('effects.title')}</h2>
         <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={handleCreateNew}>
           <Plus className="h-3.5 w-3.5" />
-          New Preset
+          {t('effects.newPreset')}
         </Button>
       </div>
 
@@ -57,7 +59,7 @@ export function EffectsList() {
         {builtIn.length > 0 && (
           <div>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-2 px-1">
-              Built-in
+              {t('effects.sections.builtin')}
             </div>
             <div className="space-y-1.5">
               {builtIn.map((preset) => (
@@ -76,7 +78,7 @@ export function EffectsList() {
         {userPresets.length > 0 && (
           <div>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-2 px-1">
-              Custom
+              {t('effects.sections.custom')}
             </div>
             <div className="space-y-1.5">
               {userPresets.map((preset) => (
@@ -95,16 +97,14 @@ export function EffectsList() {
         {isCreatingNew && (
           <div>
             <div className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider mb-2 px-1">
-              New
+              {t('effects.sections.new')}
             </div>
             <div className="rounded-xl border-2 border-accent/40 bg-accent/5 p-3">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-accent" />
-                <span className="text-sm font-medium">Unsaved Preset</span>
+                <span className="text-sm font-medium">{t('effects.unsaved.title')}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Configure effects in the panel on the right.
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{t('effects.unsaved.hint')}</p>
             </div>
           </div>
         )}
@@ -122,7 +122,16 @@ function PresetCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const { t } = useTranslation();
   const effectCount = preset.effects_chain.length;
+  const name = preset.is_builtin
+    ? t(`effects.builtinPresets.${preset.name}.name`, { defaultValue: preset.name })
+    : preset.name;
+  const description = preset.is_builtin
+    ? t(`effects.builtinPresets.${preset.name}.description`, {
+        defaultValue: preset.description ?? '',
+      })
+    : preset.description;
 
   return (
     <button
@@ -139,19 +148,19 @@ function PresetCard({
         <Wand2
           className={cn('h-4 w-4 shrink-0', isSelected ? 'text-accent' : 'text-muted-foreground')}
         />
-        <span className="text-sm font-medium truncate">{preset.name}</span>
+        <span className="text-sm font-medium truncate">{name}</span>
         {preset.is_builtin && (
           <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full shrink-0">
-            built-in
+            {t('effects.badge.builtin')}
           </span>
         )}
       </div>
       <p className="text-xs text-muted-foreground mt-1 line-clamp-1 pl-6">
-        {preset.description || 'No description'}
+        {description || t('effects.noDescription')}
       </p>
       <div className="flex items-center gap-2 mt-1.5 pl-6">
         <span className="text-[10px] text-muted-foreground">
-          {effectCount} effect{effectCount !== 1 ? 's' : ''}
+          {t('effects.effectCount', { count: effectCount })}
         </span>
         <span className="text-[10px] text-muted-foreground/50">
           {preset.effects_chain

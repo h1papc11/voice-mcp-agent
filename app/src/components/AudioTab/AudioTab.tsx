@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, CheckCircle2, Edit, Plus, Speaker, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +34,7 @@ interface AudioDevice {
 }
 
 export function AudioTab() {
+  const { t } = useTranslation();
   const platform = usePlatform();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingChannel, setEditingChannel] = useState<string | null>(null);
@@ -119,14 +121,14 @@ export function AudioTab() {
   if (channelsLoading || devicesLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Loading...</div>
+        <div className="text-muted-foreground">{t('audioChannels.loading')}</div>
       </div>
     );
   }
 
   const handleChannelDelete = async (e: React.MouseEvent, channelId: string) => {
     e.stopPropagation();
-    if (await confirm('Delete this channel?')) {
+    if (await confirm(t('audioChannels.confirmDelete'))) {
       deleteChannel.mutate(channelId);
     }
   };
@@ -140,10 +142,10 @@ export function AudioTab() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-6 shrink-0">
-        <h2 className="text-2xl font-bold">Audio Channels</h2>
+        <h2 className="text-2xl font-bold">{t('audioChannels.title')}</h2>
         <Button onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
-          New Channel
+          {t('audioChannels.newChannel')}
         </Button>
       </div>
 
@@ -158,13 +160,10 @@ export function AudioTab() {
           {allChannels.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-muted rounded-md">
               <Speaker className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                No audio channels yet. Create your first channel to route voices to specific
-                devices.
-              </p>
+              <p className="text-muted-foreground mb-4">{t('audioChannels.empty.message')}</p>
               <Button onClick={() => setCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                Create Channel
+                {t('audioChannels.empty.action')}
               </Button>
             </div>
           ) : (
@@ -195,7 +194,7 @@ export function AudioTab() {
                         <div className="space-y-2.5 ml-10">
                           <div>
                             <div className="text-xs font-medium text-muted-foreground mb-1">
-                              Output Devices
+                              {t('audioChannels.labels.outputDevices')}
                             </div>
                             <div className="flex flex-wrap gap-1.5">
                               {channel.device_ids.length > 0
@@ -224,7 +223,7 @@ export function AudioTab() {
 
                           <div>
                             <div className="text-xs font-medium text-muted-foreground mb-1">
-                              Assigned Voices
+                              {t('audioChannels.labels.assignedVoices')}
                             </div>
                             <ChannelVoicesList channelId={channel.id} />
                           </div>
@@ -270,13 +269,13 @@ export function AudioTab() {
           )}
         >
           <div className="shrink-0 mb-4">
-            <h3 className="text-lg font-semibold">Available Devices</h3>
+            <h3 className="text-lg font-semibold">{t('audioChannels.devices.title')}</h3>
             <p className="text-sm text-muted-foreground mt-1">
               {selectedChannelId
                 ? selectedChannel?.is_default
-                  ? 'Default channel uses system default device'
-                  : 'Click devices to add or remove them from the selected channel'
-                : 'Select a channel to assign devices'}
+                  ? t('audioChannels.devices.defaultNote')
+                  : t('audioChannels.devices.toggleHint')
+                : t('audioChannels.devices.selectHint')}
             </p>
           </div>
           {allDevices.length > 0 ? (
@@ -344,8 +343,8 @@ export function AudioTab() {
               <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-center">
                 {platform.metadata.isTauri
-                  ? 'No audio devices found'
-                  : 'Audio device selection requires Tauri'}
+                  ? t('audioChannels.devices.empty')
+                  : t('audioChannels.devices.requiresTauri')}
               </p>
             </div>
           )}
@@ -394,6 +393,7 @@ export function AudioTab() {
 }
 
 function ChannelVoicesList({ channelId }: { channelId: string }) {
+  const { t } = useTranslation();
   const { data: voices } = useQuery({
     queryKey: ['channel-voices', channelId],
     queryFn: () => apiClient.getChannelVoices(channelId),
@@ -416,7 +416,7 @@ function ChannelVoicesList({ channelId }: { channelId: string }) {
           </Badge>
         ))
       ) : (
-        <span className="text-sm text-muted-foreground">No voices assigned</span>
+        <span className="text-sm text-muted-foreground">{t('audioChannels.noVoicesAssigned')}</span>
       )}
     </div>
   );
@@ -430,6 +430,7 @@ interface CreateChannelDialogProps {
 }
 
 function CreateChannelDialog({ open, onOpenChange, devices, onCreate }: CreateChannelDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
 
@@ -445,23 +446,21 @@ function CreateChannelDialog({ open, onOpenChange, devices, onCreate }: CreateCh
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Audio Channel</DialogTitle>
-          <DialogDescription>
-            Create a new audio channel (bus) to route voices to specific output devices.
-          </DialogDescription>
+          <DialogTitle>{t('audioChannels.createDialog.title')}</DialogTitle>
+          <DialogDescription>{t('audioChannels.createDialog.description')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="channel-name">Channel Name</Label>
+            <Label htmlFor="channel-name">{t('audioChannels.fields.name')}</Label>
             <Input
               id="channel-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., Virtual Cable, Broadcast"
+              placeholder={t('audioChannels.fields.namePlaceholder')}
             />
           </div>
           <div>
-            <Label>Output Devices</Label>
+            <Label>{t('audioChannels.labels.outputDevices')}</Label>
             <Select
               value={selectedDevices[0] || ''}
               onValueChange={(value) => {
@@ -471,12 +470,12 @@ function CreateChannelDialog({ open, onOpenChange, devices, onCreate }: CreateCh
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select device" />
+                <SelectValue placeholder={t('audioChannels.selectDevice')} />
               </SelectTrigger>
               <SelectContent>
                 {devices.map((device) => (
                   <SelectItem key={device.id} value={device.id}>
-                    {device.name} {device.is_default && '(default)'}
+                    {device.name} {device.is_default && `(${t('audioChannels.defaultSuffix')})`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -509,10 +508,10 @@ function CreateChannelDialog({ open, onOpenChange, devices, onCreate }: CreateCh
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={!name.trim()}>
-            Create
+            {t('audioChannels.createDialog.action')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -545,6 +544,7 @@ function EditChannelDialog({
   onUpdate,
   onSetVoices,
 }: EditChannelDialogProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(channel.name);
   const [selectedDevices, setSelectedDevices] = useState<string[]>(channel.device_ids);
   const [selectedVoices, setSelectedVoices] = useState<string[]>(channelVoices);
@@ -560,16 +560,16 @@ function EditChannelDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit Channel</DialogTitle>
-          <DialogDescription>Update channel settings and voice assignments.</DialogDescription>
+          <DialogTitle>{t('audioChannels.editDialog.title')}</DialogTitle>
+          <DialogDescription>{t('audioChannels.editDialog.description')}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="edit-channel-name">Channel Name</Label>
+            <Label htmlFor="edit-channel-name">{t('audioChannels.fields.name')}</Label>
             <Input id="edit-channel-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div>
-            <Label>Output Devices</Label>
+            <Label>{t('audioChannels.labels.outputDevices')}</Label>
             <Select
               value=""
               onValueChange={(value) => {
@@ -579,12 +579,12 @@ function EditChannelDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Add device" />
+                <SelectValue placeholder={t('audioChannels.addDevice')} />
               </SelectTrigger>
               <SelectContent>
                 {devices.map((device) => (
                   <SelectItem key={device.id} value={device.id}>
-                    {device.name} {device.is_default && '(default)'}
+                    {device.name} {device.is_default && `(${t('audioChannels.defaultSuffix')})`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -615,7 +615,7 @@ function EditChannelDialog({
             )}
           </div>
           <div>
-            <Label>Assigned Voices</Label>
+            <Label>{t('audioChannels.labels.assignedVoices')}</Label>
             <Select
               value=""
               onValueChange={(value) => {
@@ -625,7 +625,7 @@ function EditChannelDialog({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Add voice" />
+                <SelectValue placeholder={t('audioChannels.addVoice')} />
               </SelectTrigger>
               <SelectContent>
                 {profiles.map((profile) => (
@@ -663,10 +663,10 @@ function EditChannelDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} disabled={!name.trim()}>
-            Save
+            {t('common.save')}
           </Button>
         </DialogFooter>
       </DialogContent>

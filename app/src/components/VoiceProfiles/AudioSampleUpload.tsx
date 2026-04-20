@@ -1,5 +1,6 @@
 import { Mic, Pause, Play, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { FormControl, FormItem, FormMessage } from '@/components/ui/form';
 
@@ -26,6 +27,7 @@ export function AudioSampleUpload({
   isDisabled = false,
   fieldName,
 }: AudioSampleUploadProps) {
+  const { t } = useTranslation();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,19 +92,21 @@ export function AudioSampleUpload({
                   className="flex items-center gap-2"
                 >
                   <Upload className="h-5 w-5" />
-                  Choose File
+                  {t('audioSample.chooseFile')}
                 </Button>
                 <p className="text-sm text-muted-foreground text-center">
-                  Click to choose a file or drag and drop. Maximum duration: 30 seconds.
+                  {t('audioSample.uploadHint')}
                 </p>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-2">
                   <Upload className="h-5 w-5 text-primary" />
-                  <span className="font-medium">File uploaded</span>
+                  <span className="font-medium">{t('audioSample.fileUploaded')}</span>
                 </div>
-                <p className="text-sm text-muted-foreground text-center">File: {file.name}</p>
+                <p className="text-sm text-muted-foreground text-center">
+                  {t('audioSample.fileLabel', { name: file.name })}
+                </p>
                 <div className="flex gap-2">
                   <Button
                     type="button"
@@ -110,7 +114,7 @@ export function AudioSampleUpload({
                     variant="outline"
                     onClick={onPlayPause}
                     disabled={isValidating}
-                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                    aria-label={isPlaying ? t('audioSample.pause') : t('audioSample.play')}
                   >
                     {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                   </Button>
@@ -122,7 +126,7 @@ export function AudioSampleUpload({
                     className="flex items-center gap-2"
                   >
                     <Mic className="h-4 w-4" />
-                    {isTranscribing ? 'Transcribing...' : 'Transcribe'}
+                    {isTranscribing ? t('audioSample.transcribing') : t('audioSample.transcribe')}
                   </Button>
                   <Button
                     type="button"
@@ -134,7 +138,7 @@ export function AudioSampleUpload({
                       }
                     }}
                   >
-                    Remove
+                    {t('audioSample.remove')}
                   </Button>
                 </div>
               </>

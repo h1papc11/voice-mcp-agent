@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit2, Mic, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import * as z from 'zod';
 import { EffectsChainEditor } from '@/components/Effects/EffectsChainEditor';
 import { Button } from '@/components/ui/button';
@@ -38,19 +39,26 @@ import { cn } from '@/lib/utils/cn';
 import { usePlayerStore } from '@/stores/playerStore';
 import { useServerStore } from '@/stores/serverStore';
 
-const profileSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100),
-  description: z.string().max(500).optional(),
-  language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
-});
+function makeProfileSchema(t: (key: string) => string) {
+  return z.object({
+    name: z.string().min(1, t('profileForm.validation.nameRequired')).max(100),
+    description: z.string().max(500).optional(),
+    language: z.enum(LANGUAGE_CODES as [LanguageCode, ...LanguageCode[]]),
+  });
+}
 
-type ProfileFormValues = z.infer<typeof profileSchema>;
+type ProfileFormValues = {
+  name: string;
+  description?: string;
+  language: LanguageCode;
+};
 
 interface VoiceInspectorProps {
   profileId: string;
 }
 
 export function VoiceInspector({ profileId }: VoiceInspectorProps) {
+  const { t } = useTranslation();
   const { data: profile } = useProfile(profileId);
   const audioUrl = usePlayerStore((state) => state.audioUrl);
   const isPlayerVisible = !!audioUrl;
@@ -68,7 +76,7 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
   const [effectsDirty, setEffectsDirty] = useState(false);
 
   const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
+    resolver: zodResolver(makeProfileSchema(t)),
     defaultValues: {
       name: '',
       description: '',
@@ -104,32 +112,31 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       toast({
-        title: 'Invalid file type',
-        description: 'Please select PNG, JPG, or WebP',
+        title: t('profileForm.toast.invalidFile'),
+        description: t('voiceInspector.toast.invalidImageFormat'),
         variant: 'destructive',
       });
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
       toast({
-        title: 'File too large',
-        description: 'Image must be less than 5MB',
+        title: t('profileForm.toast.fileTooLarge'),
+        description: t('profileForm.toast.imageTooLargeDescription'),
         variant: 'destructive',
       });
       return;
     }
-    // Upload immediately
     uploadAvatar.mutate(
       { profileId, file },
       {
         onSuccess: () => {
           setAvatarPreview(URL.createObjectURL(file));
-          toast({ title: 'Avatar updated' });
+          toast({ title: t('voiceInspector.toast.avatarUpdated') });
         },
         onError: (err) => {
           toast({
-            title: 'Avatar upload failed',
-            description: err instanceof Error ? err.message : 'Unknown error',
+            title: t('profileForm.toast.avatarUploadFailed'),
+            description: err instanceof Error ? err.message : t('common.unknownError'),
             variant: 'destructive',
           });
         },
@@ -141,11 +148,11 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
     if (profile?.avatar_path) {
       try {
         await deleteAvatar.mutateAsync(profileId);
-        toast({ title: 'Avatar removed' });
+        toast({ title: t('profileForm.toast.avatarRemoved') });
       } catch (err) {
         toast({
-          title: 'Failed to remove avatar',
-          description: err instanceof Error ? err.message : 'Unknown error',
+          title: t('profileForm.toast.avatarRemoveFailed'),
+          description: err instanceof Error ? err.message : t('common.unknownError'),
           variant: 'destructive',
         });
       }
@@ -174,19 +181,25 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
           setEffectsDirty(false);
         } catch (fxError) {
           toast({
-            title: 'Effects update failed',
-            description: fxError instanceof Error ? fxError.message : 'Failed to save effects',
+            title: t('profileForm.toast.effectsUpdateFailed'),
+            description:
+              fxError instanceof Error
+                ? fxError.message
+                : t('profileForm.toast.effectsUpdateFailedFallback'),
             variant: 'destructive',
           });
           return;
         }
       }
 
-      toast({ title: 'Voice updated', description: `"${data.name}" saved.` });
+      toast({
+        title: t('profileForm.toast.voiceUpdated'),
+        description: t('voiceInspector.toast.savedDescription', { name: data.name }),
+      });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save profile',
+        title: t('common.error'),
+        description: error instanceof Error ? error.message : t('profileForm.toast.saveFailed'),
         variant: 'destructive',
       });
     }
@@ -195,7 +208,7 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
   if (!profile) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        Loading...
+        {t('voiceInspector.loading')}
       </div>
     );
   }
@@ -256,9 +269,9 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Name</FormLabel>
+                    <FormLabel>{t('profileForm.fields.name')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="My Voice" {...field} />
+                      <Input placeholder={t('profileForm.fields.namePlaceholder')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -270,9 +283,13 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('voiceInspector.fields.description')}</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Describe this voice..." rows={2} {...field} />
+                      <Textarea
+                        placeholder={t('profileForm.fields.descriptionPlaceholder')}
+                        rows={2}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -284,7 +301,7 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
                 name="language"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Language</FormLabel>
+                    <FormLabel>{t('profileForm.fields.language')}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -306,9 +323,9 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
 
               {/* Effects */}
               <div className="space-y-2">
-                <FormLabel>Default Effects</FormLabel>
+                <FormLabel>{t('profileForm.fields.defaultEffects')}</FormLabel>
                 <p className="text-xs text-muted-foreground">
-                  Applied automatically to new generations with this voice.
+                  {t('voiceInspector.defaultEffectsHint')}
                 </p>
                 <EffectsChainEditor
                   value={effectsChain}
@@ -323,7 +340,9 @@ export function VoiceInspector({ profileId }: VoiceInspectorProps) {
               {/* Save */}
               {isDirty && (
                 <Button type="submit" className="w-full" disabled={updateProfile.isPending}>
-                  {updateProfile.isPending ? 'Saving...' : 'Save Changes'}
+                  {updateProfile.isPending
+                    ? t('profileForm.actions.saving')
+                    : t('profileForm.actions.saveChanges')}
                 </Button>
               )}
             </div>

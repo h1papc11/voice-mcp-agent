@@ -1,6 +1,7 @@
 import { Link, useMatchRoute } from '@tanstack/react-router';
 import { AudioLines, Box, Mic, Settings, Speaker, Volume2, Wand2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import voiceboxLogo from '@/assets/voicebox-logo.png';
 import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
@@ -13,16 +14,17 @@ interface SidebarProps {
 }
 
 const tabs = [
-  { id: 'main', path: '/', icon: Volume2, label: 'Generate' },
-  { id: 'stories', path: '/stories', icon: AudioLines, label: 'Stories' },
-  { id: 'voices', path: '/voices', icon: Mic, label: 'Voices' },
-  { id: 'effects', path: '/effects', icon: Wand2, label: 'Effects' },
-  { id: 'audio', path: '/audio', icon: Speaker, label: 'Audio' },
-  { id: 'models', path: '/models', icon: Box, label: 'Models' },
-  { id: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
+  { id: 'main', path: '/', icon: Volume2, labelKey: 'nav.generate' },
+  { id: 'stories', path: '/stories', icon: AudioLines, labelKey: 'nav.stories' },
+  { id: 'voices', path: '/voices', icon: Mic, labelKey: 'nav.voices' },
+  { id: 'effects', path: '/effects', icon: Wand2, labelKey: 'nav.effects' },
+  { id: 'audio', path: '/audio', icon: Speaker, labelKey: 'nav.audio' },
+  { id: 'models', path: '/models', icon: Box, labelKey: 'nav.models' },
+  { id: 'settings', path: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
 export function Sidebar({ isMacOS }: SidebarProps) {
+  const { t } = useTranslation();
   const matchRoute = useMatchRoute();
   const isPlayerOpen = !!usePlayerStore((s) => s.audioUrl);
   const platform = usePlatform();
@@ -72,8 +74,8 @@ export function Sidebar({ isMacOS }: SidebarProps) {
                   ? 'bg-white/[0.07] text-foreground shadow-lg backdrop-blur-sm border border-white/[0.08]'
                   : 'text-muted-foreground hover:bg-muted/50',
               )}
-              title={tab.label}
-              aria-label={tab.label}
+              title={t(tab.labelKey)}
+              aria-label={t(tab.labelKey)}
             >
               {isActive && (
                 <div
@@ -102,7 +104,7 @@ export function Sidebar({ isMacOS }: SidebarProps) {
             to="/settings"
             className="text-[9px] font-semibold tracking-wide uppercase px-2 py-0.5 rounded-full bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
           >
-            Update
+            {t('nav.updateBadge')}
           </Link>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { Info, Mic, Sparkles } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useProfiles } from '@/lib/hooks/useProfiles';
@@ -11,6 +12,7 @@ import { ProfileForm } from './ProfileForm';
 const PRESET_ENGINES = new Set(['kokoro', 'qwen_custom_voice']);
 
 export function ProfileList() {
+  const { t } = useTranslation();
   const { data: profiles, isLoading, error } = useProfiles();
   const setDialogOpen = useUIStore((state) => state.setProfileDialogOpen);
   const selectedEngine = useUIStore((state) => state.selectedEngine);
@@ -45,7 +47,9 @@ export function ProfileList() {
   if (error) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-destructive">Error loading profiles: {error.message}</div>
+        <div className="text-destructive">
+          {t('profiles.list.errorLoading', { message: error.message })}
+        </div>
       </div>
     );
   }
@@ -73,12 +77,10 @@ export function ProfileList() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Mic className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-4">
-                No voice profiles yet. Create your first profile to get started.
-              </p>
+              <p className="text-muted-foreground mb-4">{t('profiles.list.empty')}</p>
               <Button onClick={() => setDialogOpen(true)}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Create Voice
+                {t('profiles.list.createVoice')}
               </Button>
             </CardContent>
           </Card>
@@ -99,7 +101,7 @@ export function ProfileList() {
             {hasUnsupported && (
               <div className="col-span-full flex items-center gap-2 text-xs text-muted-foreground py-2">
                 <Info className="h-3.5 w-3.5 shrink-0" />
-                <span>Only supported voice profiles can be selected for the current model.</span>
+                <span>{t('profiles.list.unsupportedNote')}</span>
               </div>
             )}
           </div>

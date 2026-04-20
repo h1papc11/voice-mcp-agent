@@ -1,0 +1,834 @@
+{
+  "common": {
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "close": "关闭",
+    "confirm": "确认",
+    "loading": "加载中…",
+    "error": "错误",
+    "unknown": "未知",
+    "unknownError": "未知错误"
+  },
+  "nav": {
+    "generate": "生成",
+    "stories": "故事",
+    "voices": "声音",
+    "effects": "效果",
+    "audio": "音频",
+    "models": "模型",
+    "settings": "设置",
+    "updateBadge": "更新"
+  },
+  "voicesTab": {
+    "title": "声音",
+    "loading": "加载声音中…",
+    "searchPlaceholder": "搜索声音……",
+    "newVoice": "新建声音",
+    "avatarAlt": "{{name}} 的头像",
+    "selectChannels": "选择通道……",
+    "channelDefaultLabel": "{{name}}(默认)",
+    "columns": {
+      "name": "名称",
+      "language": "语言",
+      "generations": "生成次数",
+      "samples": "样本",
+      "effects": "效果",
+      "channels": "通道"
+    }
+  },
+  "voiceInspector": {
+    "loading": "加载中…",
+    "defaultEffectsHint": "自动应用于使用此声音的新生成。",
+    "fields": {
+      "description": "描述"
+    },
+    "toast": {
+      "invalidImageFormat": "请选择 PNG、JPG 或 WebP 格式",
+      "avatarUpdated": "头像已更新",
+      "savedDescription": "\"{{name}}\" 已保存。"
+    }
+  },
+  "audioChannels": {
+    "title": "音频通道",
+    "newChannel": "新建通道",
+    "loading": "加载中…",
+    "confirmDelete": "删除此通道?",
+    "noVoicesAssigned": "未分配声音",
+    "selectDevice": "选择设备",
+    "addDevice": "添加设备",
+    "addVoice": "添加声音",
+    "defaultSuffix": "默认",
+    "empty": {
+      "message": "暂无音频通道。创建您的第一个通道,将声音路由到特定设备。",
+      "action": "创建通道"
+    },
+    "labels": {
+      "outputDevices": "输出设备",
+      "assignedVoices": "已分配声音"
+    },
+    "devices": {
+      "title": "可用设备",
+      "defaultNote": "默认通道使用系统默认设备",
+      "toggleHint": "点击设备以将其添加到或从选定通道中移除",
+      "selectHint": "选择通道以分配设备",
+      "empty": "未找到音频设备",
+      "requiresTauri": "音频设备选择需要 Tauri"
+    },
+    "fields": {
+      "name": "通道名称",
+      "namePlaceholder": "例如:虚拟线缆、广播"
+    },
+    "createDialog": {
+      "title": "创建音频通道",
+      "description": "创建新的音频通道(总线),将声音路由到特定的输出设备。",
+      "action": "创建"
+    },
+    "editDialog": {
+      "title": "编辑通道",
+      "description": "更新通道设置和声音分配。"
+    }
+  },
+  "profileForm": {
+    "createTitle": "创建声音",
+    "editTitle": "编辑声音",
+    "createDescription": "从音频样本或内置声音创建新的声音档案。",
+    "editDescription": "更新您的声音档案详情并管理样本。",
+    "draftRestored": "已恢复草稿",
+    "discard": "丢弃",
+    "source": {
+      "clone": "从音频克隆",
+      "builtin": "内置声音"
+    },
+    "builtin": {
+      "hint": "选择一个预建的声音。这些不需要音频样本。",
+      "badge": "内置声音",
+      "note": "此档案使用内置声音。创建后声音无法更改。"
+    },
+    "sampleTabs": {
+      "upload": "上传",
+      "record": "录制",
+      "system": "系统音频"
+    },
+    "fields": {
+      "engine": "引擎",
+      "voice": "声音",
+      "name": "名称",
+      "namePlaceholder": "我的声音",
+      "descriptionLabel": "描述(可选)",
+      "descriptionPlaceholder": "描述此声音……",
+      "language": "语言",
+      "referenceText": "参考文本",
+      "referenceTextPlaceholder": "输入音频中所说的准确文字……",
+      "defaultEngine": "默认引擎",
+      "noPreference": "无偏好",
+      "defaultEngineHint": "选择该档案时自动使用此引擎。",
+      "defaultEffects": "默认效果",
+      "defaultEffectsHint": "自动应用于使用此声音的所有新生成的效果。"
+    },
+    "avatar": {
+      "alt": "头像预览"
+    },
+    "actions": {
+      "saving": "保存中…",
+      "saveChanges": "保存更改",
+      "createProfile": "创建档案"
+    },
+    "validation": {
+      "nameRequired": "请输入名称",
+      "referenceRequired": "添加样本时需要参考文本",
+      "sampleRequired": "需要音频样本",
+      "referenceTextRequired": "需要参考文本",
+      "audioTooLong": "音频过长({{duration}})。最大时长为 {{max}}。",
+      "audioFailed": "音频文件验证失败。请尝试其他文件。"
+    },
+    "toast": {
+      "recordingComplete": "录制完成",
+      "recordingCompleteDescription": "音频已成功录制。",
+      "recordingError": "录制错误",
+      "systemAudioCaptured": "系统音频已捕获",
+      "systemAudioCapturedDescription": "音频已成功捕获。",
+      "systemAudioError": "系统音频捕获错误",
+      "transcribeFailed": "转录失败",
+      "transcribeFailedFallback": "无法转录音频",
+      "noFile": "未选择文件",
+      "noFileDescription": "请先选择一个音频文件。",
+      "invalidFile": "文件类型无效",
+      "invalidImageFormat": "请选择图片文件(PNG、JPG 或 WebP)",
+      "fileTooLarge": "文件过大",
+      "imageTooLargeDescription": "图片必须小于 5MB",
+      "avatarRemoved": "头像已移除",
+      "avatarRemovedDescription": "头像图片已成功移除。",
+      "avatarRemoveFailed": "移除头像失败",
+      "avatarUploadFailed": "头像上传失败",
+      "avatarUploadFailedFallback": "无法上传头像",
+      "effectsUpdateFailed": "效果更新失败",
+      "effectsUpdateFailedFallback": "无法保存效果链",
+      "voiceUpdated": "声音已更新",
+      "voiceUpdatedDescription": "\"{{name}}\" 已成功更新。",
+      "noVoiceSelected": "未选择声音",
+      "noVoiceSelectedDescription": "请选择内置声音。",
+      "profileCreated": "档案已创建",
+      "profileCreatedBuiltin": "\"{{name}}\" 已使用内置声音创建。",
+      "profileCreatedSample": "\"{{name}}\" 已使用样本创建。",
+      "sampleRequired": "需要音频样本",
+      "sampleRequiredDescription": "请提供音频样本以创建声音档案。",
+      "referenceTextRequired": "需要参考文本",
+      "referenceTextRequiredDescription": "请提供音频样本的参考文本。",
+      "invalidAudio": "音频文件无效",
+      "invalidAudioDescription": "音频时长为 {{duration}},但最大为 {{max}}。",
+      "validationError": "验证错误",
+      "rollbackFailed": "回滚失败",
+      "rollbackFailedDescription": "样本上传失败后无法移除已创建的档案。",
+      "profileRolledBack": "档案已回滚。",
+      "sampleFailed": "添加样本失败",
+      "sampleFailedDescription": "添加样本失败。",
+      "sampleFailedRolledBack": "添加样本失败。档案已回滚。",
+      "saveFailed": "保存档案失败"
+    }
+  },
+  "audioSample": {
+    "chooseFile": "选择文件",
+    "uploadHint": "点击选择文件或拖放。最大时长:30 秒。",
+    "fileUploaded": "文件已上传",
+    "fileLabel": "文件:{{name}}",
+    "play": "播放",
+    "pause": "暂停",
+    "transcribe": "转录",
+    "transcribing": "转录中…",
+    "remove": "移除",
+    "startRecording": "开始录制",
+    "recordHint": "点击开始录制。最大时长:30 秒。",
+    "stopRecording": "停止录制",
+    "remaining": "剩余 {{time}}",
+    "recordingComplete": "录制完成",
+    "recordAgain": "重新录制",
+    "startCapture": "开始捕获",
+    "systemHint": "从您的系统捕获音频。最大时长:30 秒。",
+    "stopCapture": "停止捕获",
+    "captureComplete": "捕获完成",
+    "captureAgain": "重新捕获"
+  },
+  "sampleList": {
+    "loading": "加载样本中…",
+    "empty": {
+      "title": "暂无样本",
+      "hint": "添加第一个音频样本以开始"
+    },
+    "editing": "正在编辑转录",
+    "placeholder": "输入参考文本……",
+    "saving": "保存中…",
+    "editTranscription": "编辑转录",
+    "deleteSample": "删除样本",
+    "addSample": "添加样本",
+    "note": "注意:单个 30 秒的样本效果最佳。多个样本可能会降低质量。未来版本中样本可能会变得可互换,并为同一声音的不同风格打标签。",
+    "deleteDialog": {
+      "title": "删除样本",
+      "description": "确定要删除此音频样本吗?此操作不可撤销。",
+      "deleting": "删除中…"
+    },
+    "player": {
+      "play": "播放样本",
+      "pause": "暂停样本",
+      "stop": "停止",
+      "stopAria": "停止播放",
+      "position": "样本播放位置",
+      "positionValue": "{{current}} / {{total}}"
+    },
+    "toast": {
+      "invalidText": "文本无效",
+      "invalidTextDescription": "参考文本不能为空。",
+      "updated": "样本已更新",
+      "updatedDescription": "参考文本已成功更新。",
+      "updateFailed": "更新失败",
+      "updateFailedFallback": "更新样本失败"
+    }
+  },
+  "profiles": {
+    "card": {
+      "noDescription": "无描述",
+      "designed": "设计",
+      "export": "导出声音档案",
+      "edit": "编辑声音档案",
+      "delete": "删除声音档案",
+      "selectLabel": "{{name}},{{language}}。选择用于生成的声音。",
+      "selectLabelSelected": "{{name}},{{language}}。已选为用于生成的声音。"
+    },
+    "list": {
+      "errorLoading": "加载声音档案时出错:{{message}}",
+      "empty": "还没有声音档案。创建您的第一个档案以开始使用。",
+      "createVoice": "创建声音",
+      "unsupportedNote": "当前模型仅可选择支持的声音档案。"
+    },
+    "deleteDialog": {
+      "title": "删除声音档案",
+      "body": "确定要删除 \"{{name}}\" 吗?此操作不可撤销。",
+      "deleting": "删除中…"
+    }
+  },
+  "effects": {
+    "title": "效果",
+    "newPreset": "新建预设",
+    "noDescription": "无描述",
+    "placeholder": "选择一个预设或创建新的",
+    "effectCount_one": "{{count}} 个效果",
+    "effectCount_other": "{{count}} 个效果",
+    "sections": {
+      "builtin": "内置",
+      "custom": "自定义",
+      "new": "新建"
+    },
+    "badge": {
+      "builtin": "内置"
+    },
+    "unsaved": {
+      "title": "未保存的预设",
+      "hint": "在右侧面板配置效果。"
+    },
+    "detail": {
+      "newTitle": "新建预设",
+      "editTitle": "编辑预设",
+      "savePreset": "保存预设",
+      "saveAsCustom": "另存为自定义",
+      "saving": "保存中…",
+      "deleting": "删除中…"
+    },
+    "fields": {
+      "name": "名称",
+      "namePlaceholder": "我的预设……",
+      "description": "描述",
+      "descriptionPlaceholder": "描述此预设的作用……"
+    },
+    "preview": {
+      "label": "预览",
+      "button": "预览",
+      "processing": "处理中…",
+      "hint": "预览仅将效果应用于干净版本,不会保存。"
+    },
+    "saveAs": {
+      "title": "另存为自定义预设",
+      "description": "基于当前效果链创建一个新的自定义预设。",
+      "suggestedName": "{{name}}(副本)"
+    },
+    "toast": {
+      "saved": "预设已保存",
+      "createdDescription": "\"{{name}}\" 已创建。",
+      "updated": "预设已更新",
+      "deleted": "预设已删除",
+      "saveFailed": "保存失败",
+      "deleteFailed": "删除失败",
+      "previewFailed": "预览失败",
+      "nameRequired": "请输入名称"
+    },
+    "chain": {
+      "loadPreset": "加载预设……",
+      "addEffect": "添加效果……",
+      "clear": "清空",
+      "enable": "启用",
+      "disable": "禁用",
+      "remove": "移除"
+    },
+    "types": {
+      "chorus": {
+        "label": "合唱 / 镶边",
+        "params": {
+          "rate_hz": "LFO 速度(Hz)",
+          "depth": "调制深度",
+          "feedback": "反馈量",
+          "centre_delay_ms": "中心延迟(毫秒)",
+          "mix": "干湿混合"
+        }
+      },
+      "reverb": {
+        "label": "混响",
+        "params": {
+          "room_size": "房间大小",
+          "damping": "高频阻尼",
+          "wet_level": "湿声电平",
+          "dry_level": "干声电平",
+          "width": "立体声宽度"
+        }
+      },
+      "delay": {
+        "label": "延迟",
+        "params": {
+          "delay_seconds": "延迟时间(秒)",
+          "feedback": "反馈量",
+          "mix": "干湿混合"
+        }
+      },
+      "compressor": {
+        "label": "压缩器",
+        "params": {
+          "threshold_db": "阈值(dB)",
+          "ratio": "压缩比",
+          "attack_ms": "起音时间(毫秒)",
+          "release_ms": "释放时间(毫秒)"
+        }
+      },
+      "gain": {
+        "label": "增益",
+        "params": {
+          "gain_db": "增益(dB)"
+        }
+      },
+      "highpass": {
+        "label": "高通滤波器",
+        "params": {
+          "cutoff_frequency_hz": "截止频率(Hz)"
+        }
+      },
+      "lowpass": {
+        "label": "低通滤波器",
+        "params": {
+          "cutoff_frequency_hz": "截止频率(Hz)"
+        }
+      },
+      "pitch_shift": {
+        "label": "音高变换",
+        "params": {
+          "semitones": "半音移动"
+        }
+      }
+    },
+    "builtinPresets": {
+      "Robotic": {
+        "name": "机器人",
+        "description": "金属机器人嗓音(慢速 LFO 加高反馈的镶边效果)"
+      },
+      "Radio": {
+        "name": "收音机",
+        "description": "带通滤波加轻度压缩的 AM 收音机薄嗓音"
+      },
+      "Echo Chamber": {
+        "name": "回声室",
+        "description": "宽广的混响加尾随回声"
+      },
+      "Deep Voice": {
+        "name": "低沉嗓音",
+        "description": "降低音高并增添温暖"
+      }
+    }
+  },
+  "stories": {
+    "title": "故事",
+    "newStory": "新建故事",
+    "loading": "加载故事中…",
+    "empty": {
+      "title": "暂无故事",
+      "hint": "创建您的第一个故事以开始"
+    },
+    "row": {
+      "itemCount_one": "{{count}} 项",
+      "itemCount_other": "{{count}} 项",
+      "ariaLabel": "故事 {{name}},{{count}} 项,{{updated}}",
+      "actionsLabel": "{{name}} 的操作"
+    },
+    "createDialog": {
+      "title": "新建故事",
+      "description": "创建新故事以将您的语音生成整理成对话。",
+      "action": "创建",
+      "creating": "创建中…"
+    },
+    "editDialog": {
+      "title": "编辑故事",
+      "description": "更新故事名称和描述。",
+      "saving": "保存中…"
+    },
+    "deleteDialog": {
+      "title": "确定吗?",
+      "description": "这将永久删除该故事及其所有项目。此操作不可撤销。",
+      "deleting": "删除中…"
+    },
+    "fields": {
+      "name": "名称",
+      "namePlaceholder": "我的故事",
+      "descriptionLabel": "描述(可选)",
+      "descriptionPlaceholder": "一段对话……"
+    },
+    "toast": {
+      "nameRequired": "请输入名称",
+      "nameRequiredDescription": "请输入故事名称",
+      "created": "故事已创建",
+      "createdDescription": "\"{{name}}\" 已创建",
+      "createFailed": "创建故事失败",
+      "updateFailed": "更新故事失败",
+      "deleteFailed": "删除故事失败"
+    }
+  },
+  "storyContent": {
+    "selectStory": {
+      "title": "选择一个故事",
+      "hint": "从列表中选择一个故事以查看其内容"
+    },
+    "loading": "加载故事中…",
+    "notFound": {
+      "title": "未找到故事",
+      "hint": "无法加载所选故事"
+    },
+    "generatingCount_one": "生成 {{count}} 个音频中",
+    "generatingCount_other": "生成 {{count}} 个音频中",
+    "add": "添加",
+    "searchPlaceholder": "按名称或文字内容搜索……",
+    "searchNoMatches": "未找到匹配的生成",
+    "searchNoAvailable": "暂无可用的生成",
+    "exportAudio": "导出音频",
+    "empty": {
+      "title": "此故事暂无项目",
+      "hint": "使用下方输入框生成语音以添加项目"
+    },
+    "itemActions": {
+      "playFromHere": "从此处播放",
+      "removeFromStory": "从故事中移除"
+    },
+    "toast": {
+      "removeFailed": "移除项目失败",
+      "reorderFailed": "重新排序项目失败",
+      "exportFailed": "导出音频失败",
+      "addFailed": "添加生成失败"
+    }
+  },
+  "history": {
+    "actions": {
+      "menu": "操作",
+      "play": "播放",
+      "exportAudio": "导出音频",
+      "exportPackage": "导出包",
+      "applyEffects": "应用效果",
+      "regenerate": "重新生成"
+    },
+    "deleteDialog": {
+      "title": "删除生成",
+      "body": "确定要删除来自 \"{{name}}\" 的这次生成吗?此操作不可撤销。",
+      "deleting": "删除中…"
+    },
+    "clearFailedDialog": {
+      "title": "清除失败的生成",
+      "body_one": "这将从历史记录中永久删除 {{count}} 条失败的生成。此操作不可撤销。",
+      "body_other": "这将从历史记录中永久删除 {{count}} 条失败的生成。此操作不可撤销。",
+      "clearing": "清除中…",
+      "clearAll": "全部清除"
+    },
+    "importDialog": {
+      "title": "导入生成",
+      "body": "从 \"{{name}}\" 导入生成。这将添加到您的历史记录中。",
+      "importing": "导入中…",
+      "action": "导入"
+    },
+    "effectsDialog": {
+      "title": "应用效果",
+      "body": "配置应用于此次生成的后处理效果。将会创建一个新版本。",
+      "sourceLabel": "来源",
+      "sourcePlaceholder": "选择来源版本",
+      "apply": "应用",
+      "applying": "应用中…"
+    }
+  },
+  "generation": {
+    "placeholder": {
+      "storyWithEffects": "为 \"{{name}}\" 生成语音… (输入 / 使用效果)",
+      "story": "为 \"{{name}}\" 生成语音…",
+      "profile": "使用 {{name}} 生成语音…",
+      "effectsHint": "输入 / 使用效果,如 [笑声]、[叹息]…",
+      "selectVoice": "请在上方选择一个声音档案…"
+    },
+    "button": {
+      "generate": "生成语音",
+      "generating": "生成中…",
+      "selectFirst": "请先选择声音档案"
+    },
+    "instruct": {
+      "show": "显示传达说明",
+      "hide": "隐藏传达说明",
+      "tooltip": "传达说明 (语气、情感、节奏)",
+      "placeholder": "传达说明——例如:温柔缓慢地说、威严清晰…"
+    },
+    "voiceSelector": {
+      "placeholder": "选择声音…"
+    },
+    "effects": {
+      "none": "无效果",
+      "profileDefault": "档案默认"
+    }
+  },
+  "main": {
+    "importVoice": "导入声音",
+    "createVoice": "创建声音",
+    "import": {
+      "invalidTitle": "文件类型无效",
+      "invalidDescription": "请选择有效的 .voicebox.zip 文件",
+      "successTitle": "声音已导入",
+      "successDescription": "成功导入声音档案",
+      "failedTitle": "导入声音档案失败",
+      "dialogTitle": "导入声音档案",
+      "dialogDescription": "从 \"{{name}}\" 导入声音档案。这将创建一个新的声音档案,包含所有样本。",
+      "importing": "导入中…",
+      "action": "导入"
+    }
+  },
+  "settings": {
+    "tabs": {
+      "general": "常规",
+      "generation": "生成",
+      "gpu": "GPU",
+      "logs": "日志",
+      "changelog": "更新日志",
+      "about": "关于"
+    },
+    "language": {
+      "label": "语言",
+      "description": "选择 Voicebox 的显示语言。"
+    },
+    "general": {
+      "docs": { "title": "阅读文档" },
+      "discord": { "title": "加入 Discord", "subtitle": "获取帮助 & 分享声音" },
+      "serverUrl": {
+        "title": "服务器 URL",
+        "description": "Voicebox 后端服务器的地址。",
+        "invalidUrl": "请输入有效的 URL",
+        "updatedTitle": "服务器 URL 已更新",
+        "updatedDescription": "已连接到 {{url}}"
+      },
+      "keepServerRunning": {
+        "title": "关闭应用时保持服务器运行",
+        "description": "关闭应用后,服务器将继续在后台运行。",
+        "failedTitle": "更新设置失败",
+        "failedDescription": "无法将设置同步到后端。",
+        "updatedTitle": "设置已更新",
+        "runningDescription": "关闭应用时服务器将继续运行",
+        "stoppedDescription": "关闭应用时服务器将停止"
+      },
+      "networkAccess": {
+        "title": "允许网络访问",
+        "description": "使网络上的其他设备可以访问服务器。更改后请重启应用。",
+        "updatedTitle": "设置已更新",
+        "enabled": "已启用网络访问。重启应用以应用更改。",
+        "disabled": "已禁用网络访问。重启应用以应用更改。"
+      },
+      "connection": {
+        "connecting": "连接中",
+        "offline": "离线",
+        "online": "在线"
+      },
+      "updates": {
+        "title": "应用更新",
+        "devSuffix": " (开发版)",
+        "devMode": {
+          "title": "开发模式",
+          "description": "开发模式下已禁用自动更新。"
+        },
+        "check": {
+          "title": "检查更新",
+          "available": "版本 {{version}} 可用",
+          "checking": "检查中…",
+          "upToDate": "已是最新版本",
+          "button": "检查"
+        },
+        "error": "更新错误",
+        "download": {
+          "title": "更新到 {{version}}",
+          "description": "下载并安装最新版本。",
+          "button": "下载"
+        },
+        "downloading": "下载更新中…",
+        "ready": {
+          "title": "更新已准备就绪",
+          "description": "版本 {{version}} 已下载。重启以完成。",
+          "button": "立即重启"
+        }
+      },
+      "api": {
+        "title": "API 访问",
+        "description": "通过 <code>{{url}}</code> 的 REST API 将 Voicebox 集成到您的工作流程中",
+        "viewReference": "查看完整的 API 参考",
+        "endpoints": {
+          "generate": "生成语音",
+          "health": "服务器状态",
+          "profiles": "声音列表",
+          "history": "历史生成"
+        }
+      }
+    },
+    "generation": {
+      "title": "生成",
+      "description": "长文本生成的控件。这些设置适用于所有引擎。",
+      "chunkLimit": {
+        "title": "自动分块上限",
+        "description": "长文本在句子边界处分块。较低的值可以提高长输出的质量。",
+        "value": "{{chars}} 字符"
+      },
+      "crossfade": {
+        "title": "块间淡入淡出",
+        "description": "在块之间混合音频以平滑过渡。设为 0 表示硬切换。",
+        "cut": "切换",
+        "ms": "{{ms}}毫秒"
+      },
+      "normalize": {
+        "title": "音频归一化",
+        "description": "将输出音量调整到所有生成结果一致的水平。"
+      },
+      "autoplay": {
+        "title": "生成后自动播放",
+        "description": "生成完成后自动播放音频。"
+      },
+      "folder": {
+        "title": "生成文件夹",
+        "description": "生成的音频文件在磁盘上的存储位置。",
+        "open": "打开"
+      }
+    },
+    "gpu": {
+      "cpuOnly": "仅 CPU",
+      "vramUsed": "{{mb}} MB 显存",
+      "noAcceleration": "未检测到 GPU 加速",
+      "active": "活动",
+      "cuda": {
+        "title": "CUDA 后端",
+        "description": "通过可下载的 CUDA 后端实现 NVIDIA GPU 加速。",
+        "downloading": "下载 CUDA 后端中…",
+        "downloadingShort": "下载中…",
+        "updating": "更新中…"
+      },
+      "restart": {
+        "ready": "服务器重启成功",
+        "waiting": "重启服务器中…",
+        "stopping": "停止服务器中…"
+      },
+      "download": {
+        "title": "下载 CUDA 后端",
+        "description": "约 2.4 GB 下载。需要支持 CUDA 的 NVIDIA GPU。",
+        "button": "下载"
+      },
+      "switchToCuda": {
+        "title": "切换到 CUDA 后端",
+        "description": "CUDA 后端已下载完成。重启以启用。",
+        "button": "重启"
+      },
+      "switchToCpu": {
+        "title": "切换到 CPU 后端",
+        "description": "禁用 GPU 加速。您之后可以重新下载 CUDA。",
+        "button": "切换"
+      },
+      "remove": {
+        "title": "移除 CUDA 后端",
+        "description": "删除已下载的 CUDA 二进制文件以释放磁盘空间。",
+        "button": "移除"
+      },
+      "errors": {
+        "downloadFailed": "下载失败",
+        "downloadStart": "启动下载失败",
+        "restartFailed": "重启失败",
+        "switchCpu": "切换到 CPU 失败",
+        "deleteCuda": "删除 CUDA 后端失败"
+      },
+      "footer": "Voicebox 会自动检测并使用系统上可用的最佳 GPU。在 Apple Silicon Mac 上,MLX 后端通过 Metal Performance Shaders (MPS) 在神经引擎和 GPU 上原生运行,无需额外设置。在配备 NVIDIA GPU 的 Windows 和 Linux 上,您可以下载可选的 CUDA 后端以获得硬件加速推理。AMD ROCm、Intel XPU 和 DirectML 也通过 PyTorch 获得支持。未检测到 GPU 时,Voicebox 会退回到 CPU——所有引擎仍可工作,只是速度较慢。"
+    },
+    "logs": {
+      "title": "服务器日志",
+      "lineCount_one": "{{count}} 行",
+      "lineCount_other": "{{count}} 行",
+      "scrollToBottom": "滚动到底部",
+      "clear": "清除",
+      "empty": "暂无日志输出。",
+      "devHint": "仅当应用管理服务器进程(生产构建)时才会捕获服务器日志。"
+    },
+    "changelog": {
+      "devBadge": "开发版",
+      "showLess": "收起",
+      "showMore": "展开"
+    },
+    "about": {
+      "tagline": "开源语音合成工作室。克隆声音、生成语音、应用效果、构建语音驱动的应用——全部在您的本地机器上运行。",
+      "createdBy": "创建者",
+      "buyCoffee": "请我喝杯咖啡",
+      "license": "采用 <link>MIT</link> 协议"
+    }
+  },
+  "models": {
+    "title": "模型",
+    "subtitle": "下载和管理用于语音生成和转录的 AI 模型",
+    "defaultName": "模型",
+    "unknownSize": "未知大小",
+    "sections": {
+      "voiceGeneration": "语音生成",
+      "transcription": "语音转录"
+    },
+    "status": {
+      "loaded": "已加载"
+    },
+    "storage": {
+      "location": "存储位置",
+      "open": "打开",
+      "change": "更改",
+      "migrating": "迁移中…",
+      "reset": "重置",
+      "pickerTitle": "选择模型存储文件夹"
+    },
+    "progress": {
+      "connecting": "连接中…",
+      "connectingHf": "连接到 HuggingFace 中…"
+    },
+    "problems": {
+      "title": "问题",
+      "clearAll": "全部清除",
+      "noDetails": "没有可用的错误详情。请重试下载。",
+      "startedAt": "开始于 {{time}}"
+    },
+    "detail": {
+      "loadingInfo": "加载模型信息中…",
+      "byAuthor": "由 {{author}}",
+      "downloads": "下载量",
+      "likes": "点赞数",
+      "license": "许可",
+      "languagesCount": "支持 {{count}} 种语言",
+      "languagesList": "语言:{{list}}",
+      "onDisk": "磁盘占用 {{size}}"
+    },
+    "actions": {
+      "download": "下载",
+      "retry": "重试下载",
+      "unload": "卸载",
+      "unloading": "卸载中…",
+      "unloadFirst": "删除前请先卸载模型",
+      "deleteModel": "删除模型"
+    },
+    "deleteDialog": {
+      "title": "删除模型",
+      "body": "确定要删除 <strong>{{name}}</strong> 吗?",
+      "sizeNote": "这将释放 {{size}} 磁盘空间。如果您想再次使用该模型,需要重新下载。",
+      "deleting": "删除中…"
+    },
+    "migrateDialog": {
+      "title": "移动模型到新位置?",
+      "description": "在模型迁移到新文件夹期间,服务器将关闭。迁移完成后会自动重启。",
+      "action": "移动模型",
+      "preparing": "准备中…",
+      "restartingServer": "重启服务器中…"
+    },
+    "migrate": {
+      "title": "移动模型中",
+      "offline": "模型迁移期间服务器处于离线状态。"
+    },
+    "toast": {
+      "downloadFailed": "下载失败",
+      "cancelFailed": "取消失败",
+      "cancelFailedDescription": "无法取消下载任务。",
+      "deleted": "模型已删除",
+      "deletedDescription": "{{name}} 已成功删除。",
+      "deleteFailed": "删除失败",
+      "unloaded": "模型已卸载",
+      "unloadedDescription": "{{name}} 已从内存中卸载。",
+      "unloadFailed": "卸载失败",
+      "openFolderFailed": "打开模型文件夹失败",
+      "pickerFailed": "打开文件夹选择器失败",
+      "resetToDefault": "已重置到默认位置。重启服务器中…",
+      "noModelsToMigrate": "没有可迁移的模型",
+      "noModelsToMigrateDescription": "更改存储位置前请先下载至少一个模型。",
+      "migrated": "模型已成功移动",
+      "migrationFailed": "迁移失败",
+      "migrationFailedGeneric": "迁移模型失败",
+      "migrationConnectionLost": "迁移期间丢失连接"
+    }
+  }
+}

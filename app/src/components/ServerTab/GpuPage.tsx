@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Cpu, Download, Loader2, RotateCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { apiClient } from '@/lib/api/client';
@@ -40,9 +41,9 @@ function GpuIcon({ className }: { className?: string }) {
 }
 
 function GpuInfoCard({ health }: { health: HealthResponse }) {
+  const { t } = useTranslation();
   const hasGpu = health.gpu_available && health.gpu_type;
 
-  // Parse GPU name from type string like "CUDA (NVIDIA RTX 4090)" or "MPS (Apple M2 Pro)"
   const gpuName = hasGpu
     ? health.gpu_type!.replace(/^(CUDA|ROCm|MPS|Metal|XPU|DirectML)\s*\((.+)\)$/, '$2') ||
       health.gpu_type!
@@ -64,7 +65,7 @@ function GpuInfoCard({ health }: { health: HealthResponse }) {
           <Cpu className="h-5 w-5 shrink-0 text-muted-foreground" />
         )}
         <div className="flex-1 min-w-0 space-y-0.5">
-          <div className="text-sm font-medium">{hasGpu ? gpuName : 'CPU Only'}</div>
+          <div className="text-sm font-medium">{hasGpu ? gpuName : t('settings.gpu.cpuOnly')}</div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {hasGpu ? (
               <>
@@ -78,12 +79,14 @@ function GpuInfoCard({ health }: { health: HealthResponse }) {
                 {health.vram_used_mb != null && health.vram_used_mb > 0 && (
                   <>
                     <span className="text-border">|</span>
-                    <span>{health.vram_used_mb.toFixed(0)} MB VRAM</span>
+                    <span>
+                      {t('settings.gpu.vramUsed', { mb: health.vram_used_mb.toFixed(0) })}
+                    </span>
                   </>
                 )}
               </>
             ) : (
-              <span>No GPU acceleration detected</span>
+              <span>{t('settings.gpu.noAcceleration')}</span>
             )}
           </div>
         </div>
@@ -93,7 +96,9 @@ function GpuInfoCard({ health }: { health: HealthResponse }) {
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent/60" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_4px_1px_hsl(var(--accent)/0.4)]" />
             </span>
-            <span className="text-[10px] font-medium text-muted-foreground">Active</span>
+            <span className="text-[10px] font-medium text-muted-foreground">
+              {t('settings.gpu.active')}
+            </span>
           </div>
         )}
       </div>
@@ -102,6 +107,7 @@ function GpuInfoCard({ health }: { health: HealthResponse }) {
 }
 
 export function GpuPage() {
+  const { t } = useTranslation();
   const platform = usePlatform();
   const queryClient = useQueryClient();
   const serverUrl = useServerStore((state) => state.serverUrl);
@@ -111,6 +117,12 @@ export function GpuPage() {
   const [error, setError] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<CudaDownloadProgress | null>(null);
   const healthPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Hold the latest `t` in a ref so the CUDA progress SSE effect below doesn't
+  // tear down and reconnect the EventSource every time the language changes.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const {
     data: cudaStatus,
@@ -153,7 +165,7 @@ export function GpuPage() {
           refetchCudaStatus();
         } else if (data.status === 'error') {
           eventSource.close();
-          setError(data.error || 'Download failed');
+          setError(data.error || tRef.current('settings.gpu.errors.downloadFailed'));
           setDownloadProgress(null);
           refetchCudaStatus();
         }
@@ -218,7 +230,7 @@ export function GpuPage() {
       await apiClient.downloadCudaBackend();
       refetchCudaStatus();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to start download';
+      const msg = e instanceof Error ? e.message : t('settings.gpu.errors.downloadStart');
       if (msg.includes('already downloaded')) {
         refetchCudaStatus();
       } else {
@@ -230,9 +242,9 @@ export function GpuPage() {
   const handleRestart = async () => {
     setError(null);
     try {
-      await restartServerWithPolling('Restart failed');
+      await restartServerWithPolling(t('settings.gpu.errors.restartFailed'));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Restart failed');
+      setError(e instanceof Error ? e.message : t('settings.gpu.errors.restartFailed'));
     }
   };
 
@@ -241,9 +253,9 @@ export function GpuPage() {
     setRestartPhase('stopping');
     try {
       await apiClient.deleteCudaBackend();
-      await restartServerWithPolling('Failed to switch to CPU');
+      await restartServerWithPolling(t('settings.gpu.errors.switchCpu'));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to switch to CPU');
+      setError(e instanceof Error ? e.message : t('settings.gpu.errors.switchCpu'));
       refetchCudaStatus();
     }
   };
@@ -254,7 +266,7 @@ export function GpuPage() {
       await apiClient.deleteCudaBackend();
       refetchCudaStatus();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to delete CUDA backend');
+      setError(e instanceof Error ? e.message : t('settings.gpu.errors.deleteCuda'));
     }
   };
 
@@ -278,21 +290,21 @@ export function GpuPage() {
     <div className="space-y-8 max-w-2xl">
       <GpuInfoCard health={health} />
 
-      {/* CUDA section — only when no native GPU and not already on CUDA */}
       {!hasNativeGpu && !isCurrentlyCuda && (
         <SettingSection
-          title="CUDA Backend"
-          description="NVIDIA GPU acceleration via a downloadable CUDA backend."
+          title={t('settings.gpu.cuda.title')}
+          description={t('settings.gpu.cuda.description')}
         >
-          {/* Download progress */}
           {cudaDownloading && downloadProgress && (
-            <SettingRow title="Downloading CUDA backend...">
+            <SettingRow title={t('settings.gpu.cuda.downloading')}>
               <div className="space-y-1.5">
                 <Progress value={downloadProgress.progress} className="h-2" />
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
                     {downloadProgress.filename ||
-                      (cudaAvailable ? 'Updating...' : 'Downloading...')}
+                      (cudaAvailable
+                        ? t('settings.gpu.cuda.updating')
+                        : t('settings.gpu.cuda.downloadingShort'))}
                   </span>
                   <span>
                     {downloadProgress.total > 0
@@ -304,23 +316,21 @@ export function GpuPage() {
             </SettingRow>
           )}
 
-          {/* Restart in progress */}
           {restartPhase !== 'idle' && (
             <SettingRow
               title={
                 restartPhase === 'ready'
-                  ? 'Server restarted successfully'
+                  ? t('settings.gpu.restart.ready')
                   : restartPhase === 'waiting'
-                    ? 'Restarting server...'
-                    : 'Stopping server...'
+                    ? t('settings.gpu.restart.waiting')
+                    : t('settings.gpu.restart.stopping')
               }
               action={<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             />
           )}
 
-          {/* Error */}
           {error && (
-            <SettingRow title="Error">
+            <SettingRow title={t('common.error')}>
               <div className="flex items-center gap-2 text-sm text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
@@ -328,17 +338,16 @@ export function GpuPage() {
             </SettingRow>
           )}
 
-          {/* Actions */}
           {restartPhase === 'idle' && !cudaDownloading && (
             <>
               {!cudaAvailable && !isCurrentlyCuda && (
                 <SettingRow
-                  title="Download CUDA backend"
-                  description="~2.4 GB download. Requires an NVIDIA GPU with CUDA support."
+                  title={t('settings.gpu.download.title')}
+                  description={t('settings.gpu.download.description')}
                   action={
                     <Button onClick={handleDownload} size="sm">
                       <Download className="h-3.5 w-3.5 mr-1.5" />
-                      Download
+                      {t('settings.gpu.download.button')}
                     </Button>
                   }
                 />
@@ -346,12 +355,12 @@ export function GpuPage() {
 
               {cudaAvailable && !isCurrentlyCuda && platform.metadata.isTauri && (
                 <SettingRow
-                  title="Switch to CUDA backend"
-                  description="CUDA backend is downloaded and ready. Restart to enable."
+                  title={t('settings.gpu.switchToCuda.title')}
+                  description={t('settings.gpu.switchToCuda.description')}
                   action={
                     <Button onClick={handleRestart} size="sm">
                       <RotateCw className="h-3.5 w-3.5 mr-1.5" />
-                      Restart
+                      {t('settings.gpu.switchToCuda.button')}
                     </Button>
                   }
                 />
@@ -359,12 +368,12 @@ export function GpuPage() {
 
               {isCurrentlyCuda && platform.metadata.isTauri && (
                 <SettingRow
-                  title="Switch to CPU backend"
-                  description="Disable GPU acceleration. You can re-download CUDA later."
+                  title={t('settings.gpu.switchToCpu.title')}
+                  description={t('settings.gpu.switchToCpu.description')}
                   action={
                     <Button onClick={handleSwitchToCpu} variant="outline" size="sm">
                       <RotateCw className="h-3.5 w-3.5 mr-1.5" />
-                      Switch
+                      {t('settings.gpu.switchToCpu.button')}
                     </Button>
                   }
                 />
@@ -372,8 +381,8 @@ export function GpuPage() {
 
               {cudaAvailable && !isCurrentlyCuda && (
                 <SettingRow
-                  title="Remove CUDA backend"
-                  description="Delete the downloaded CUDA binary to free disk space."
+                  title={t('settings.gpu.remove.title')}
+                  description={t('settings.gpu.remove.description')}
                   action={
                     <Button
                       onClick={handleDelete}
@@ -382,7 +391,7 @@ export function GpuPage() {
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                      Remove
+                      {t('settings.gpu.remove.button')}
                     </Button>
                   }
                 />
@@ -392,14 +401,7 @@ export function GpuPage() {
         </SettingSection>
       )}
 
-      <p className="text-xs text-muted-foreground/60 leading-relaxed">
-        Voicebox automatically detects and uses the best available GPU on your system. On Apple
-        Silicon Macs, the MLX backend runs natively on the Neural Engine and GPU via Metal
-        Performance Shaders (MPS), with no additional setup required. On Windows and Linux with
-        NVIDIA GPUs, you can download an optional CUDA backend for hardware-accelerated inference.
-        AMD ROCm, Intel XPU, and DirectML are also supported where available through PyTorch. When
-        no GPU is detected, Voicebox falls back to CPU — all engines still work, just slower.
-      </p>
+      <p className="text-xs text-muted-foreground/60 leading-relaxed">{t('settings.gpu.footer')}</p>
     </div>
   );
 }

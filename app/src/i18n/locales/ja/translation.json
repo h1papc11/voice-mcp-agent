@@ -1,0 +1,834 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集",
+    "close": "閉じる",
+    "confirm": "確認",
+    "loading": "読み込み中…",
+    "error": "エラー",
+    "unknown": "不明",
+    "unknownError": "不明なエラー"
+  },
+  "nav": {
+    "generate": "生成",
+    "stories": "ストーリー",
+    "voices": "ボイス",
+    "effects": "エフェクト",
+    "audio": "オーディオ",
+    "models": "モデル",
+    "settings": "設定",
+    "updateBadge": "更新"
+  },
+  "voicesTab": {
+    "title": "ボイス",
+    "loading": "ボイスを読み込み中…",
+    "searchPlaceholder": "ボイスを検索…",
+    "newVoice": "新しいボイス",
+    "avatarAlt": "{{name}} のアバター",
+    "selectChannels": "チャンネルを選択…",
+    "channelDefaultLabel": "{{name}}(デフォルト)",
+    "columns": {
+      "name": "名前",
+      "language": "言語",
+      "generations": "生成",
+      "samples": "サンプル",
+      "effects": "エフェクト",
+      "channels": "チャンネル"
+    }
+  },
+  "voiceInspector": {
+    "loading": "読み込み中…",
+    "defaultEffectsHint": "このボイスで新しく生成する際に自動的に適用されます。",
+    "fields": {
+      "description": "説明"
+    },
+    "toast": {
+      "invalidImageFormat": "PNG、JPG、または WebP を選択してください",
+      "avatarUpdated": "アバターを更新しました",
+      "savedDescription": "「{{name}}」を保存しました。"
+    }
+  },
+  "audioChannels": {
+    "title": "オーディオチャンネル",
+    "newChannel": "新しいチャンネル",
+    "loading": "読み込み中…",
+    "confirmDelete": "このチャンネルを削除しますか?",
+    "noVoicesAssigned": "割り当てられたボイスはありません",
+    "selectDevice": "デバイスを選択",
+    "addDevice": "デバイスを追加",
+    "addVoice": "ボイスを追加",
+    "defaultSuffix": "デフォルト",
+    "empty": {
+      "message": "オーディオチャンネルがまだありません。最初のチャンネルを作成して、ボイスを特定のデバイスにルーティングしましょう。",
+      "action": "チャンネルを作成"
+    },
+    "labels": {
+      "outputDevices": "出力デバイス",
+      "assignedVoices": "割り当てられたボイス"
+    },
+    "devices": {
+      "title": "利用可能なデバイス",
+      "defaultNote": "デフォルトチャンネルはシステムのデフォルトデバイスを使用します",
+      "toggleHint": "デバイスをクリックして、選択中のチャンネルに追加または削除します",
+      "selectHint": "デバイスを割り当てるチャンネルを選択してください",
+      "empty": "オーディオデバイスが見つかりません",
+      "requiresTauri": "オーディオデバイスの選択には Tauri が必要です"
+    },
+    "fields": {
+      "name": "チャンネル名",
+      "namePlaceholder": "例:仮想ケーブル、放送"
+    },
+    "createDialog": {
+      "title": "オーディオチャンネルを作成",
+      "description": "新しいオーディオチャンネル(バス)を作成して、ボイスを特定の出力デバイスにルーティングします。",
+      "action": "作成"
+    },
+    "editDialog": {
+      "title": "チャンネルを編集",
+      "description": "チャンネルの設定とボイスの割り当てを更新します。"
+    }
+  },
+  "profileForm": {
+    "createTitle": "ボイスを作成",
+    "editTitle": "ボイスを編集",
+    "createDescription": "オーディオサンプルまたはビルトインボイスから新しいボイスプロファイルを作成します。",
+    "editDescription": "ボイスプロファイルの詳細を更新し、サンプルを管理します。",
+    "draftRestored": "下書きを復元しました",
+    "discard": "破棄",
+    "source": {
+      "clone": "オーディオから複製",
+      "builtin": "ビルトインボイス"
+    },
+    "builtin": {
+      "hint": "あらかじめ用意されたボイスを選択してください。オーディオサンプルは不要です。",
+      "badge": "ビルトインボイス",
+      "note": "このプロファイルはビルトインボイスを使用しています。作成後はボイスを変更できません。"
+    },
+    "sampleTabs": {
+      "upload": "アップロード",
+      "record": "録音",
+      "system": "システムオーディオ"
+    },
+    "fields": {
+      "engine": "エンジン",
+      "voice": "ボイス",
+      "name": "名前",
+      "namePlaceholder": "マイボイス",
+      "descriptionLabel": "説明(任意)",
+      "descriptionPlaceholder": "このボイスを説明してください…",
+      "language": "言語",
+      "referenceText": "リファレンステキスト",
+      "referenceTextPlaceholder": "オーディオで話されている正確なテキストを入力してください…",
+      "defaultEngine": "デフォルトエンジン",
+      "noPreference": "指定なし",
+      "defaultEngineHint": "このプロファイルが選ばれたとき、このエンジンを自動で選択します。",
+      "defaultEffects": "デフォルトエフェクト",
+      "defaultEffectsHint": "このボイスで新しく生成するすべてのものに自動適用されるエフェクトです。"
+    },
+    "avatar": {
+      "alt": "アバタープレビュー"
+    },
+    "actions": {
+      "saving": "保存中…",
+      "saveChanges": "変更を保存",
+      "createProfile": "プロファイルを作成"
+    },
+    "validation": {
+      "nameRequired": "名前は必須です",
+      "referenceRequired": "サンプルを追加する際はリファレンステキストが必須です",
+      "sampleRequired": "オーディオサンプルが必要です",
+      "referenceTextRequired": "リファレンステキストは必須です",
+      "audioTooLong": "オーディオが長すぎます({{duration}})。最大時間は {{max}} です。",
+      "audioFailed": "オーディオファイルを検証できませんでした。別のファイルをお試しください。"
+    },
+    "toast": {
+      "recordingComplete": "録音完了",
+      "recordingCompleteDescription": "オーディオを正常に録音しました。",
+      "recordingError": "録音エラー",
+      "systemAudioCaptured": "システムオーディオをキャプチャしました",
+      "systemAudioCapturedDescription": "オーディオを正常にキャプチャしました。",
+      "systemAudioError": "システムオーディオのキャプチャエラー",
+      "transcribeFailed": "文字起こしに失敗しました",
+      "transcribeFailedFallback": "オーディオの文字起こしに失敗しました",
+      "noFile": "ファイルが選択されていません",
+      "noFileDescription": "まずオーディオファイルを選択してください。",
+      "invalidFile": "無効なファイル形式",
+      "invalidImageFormat": "画像ファイル(PNG、JPG、または WebP)を選択してください",
+      "fileTooLarge": "ファイルが大きすぎます",
+      "imageTooLargeDescription": "画像は 5MB 未満である必要があります",
+      "avatarRemoved": "アバターを削除しました",
+      "avatarRemovedDescription": "アバター画像を正常に削除しました。",
+      "avatarRemoveFailed": "アバターの削除に失敗しました",
+      "avatarUploadFailed": "アバターのアップロードに失敗しました",
+      "avatarUploadFailedFallback": "アバターのアップロードに失敗しました",
+      "effectsUpdateFailed": "エフェクトの更新に失敗しました",
+      "effectsUpdateFailedFallback": "エフェクトチェーンの保存に失敗しました",
+      "voiceUpdated": "ボイスを更新しました",
+      "voiceUpdatedDescription": "「{{name}}」を正常に更新しました。",
+      "noVoiceSelected": "ボイスが選択されていません",
+      "noVoiceSelectedDescription": "ビルトインボイスを選択してください。",
+      "profileCreated": "プロファイルを作成しました",
+      "profileCreatedBuiltin": "「{{name}}」をビルトインボイスで作成しました。",
+      "profileCreatedSample": "「{{name}}」をサンプルで作成しました。",
+      "sampleRequired": "オーディオサンプルが必要です",
+      "sampleRequiredDescription": "ボイスプロファイルを作成するには、オーディオサンプルを用意してください。",
+      "referenceTextRequired": "リファレンステキストが必要です",
+      "referenceTextRequiredDescription": "オーディオサンプルのリファレンステキストを入力してください。",
+      "invalidAudio": "無効なオーディオファイル",
+      "invalidAudioDescription": "オーディオの長さは {{duration}} ですが、最大は {{max}} です。",
+      "validationError": "検証エラー",
+      "rollbackFailed": "ロールバックに失敗しました",
+      "rollbackFailedDescription": "サンプルのアップロード失敗後、作成されたプロファイルを削除できませんでした。",
+      "profileRolledBack": "プロファイルはロールバックされました。",
+      "sampleFailed": "サンプルの追加に失敗しました",
+      "sampleFailedDescription": "サンプルの追加に失敗しました。",
+      "sampleFailedRolledBack": "サンプルの追加に失敗しました。プロファイルはロールバックされました。",
+      "saveFailed": "プロファイルの保存に失敗しました"
+    }
+  },
+  "audioSample": {
+    "chooseFile": "ファイルを選択",
+    "uploadHint": "クリックしてファイルを選択するか、ドラッグ&ドロップしてください。最大時間:30 秒。",
+    "fileUploaded": "ファイルをアップロードしました",
+    "fileLabel": "ファイル:{{name}}",
+    "play": "再生",
+    "pause": "一時停止",
+    "transcribe": "文字起こし",
+    "transcribing": "文字起こし中…",
+    "remove": "削除",
+    "startRecording": "録音開始",
+    "recordHint": "クリックして録音を開始します。最大時間:30 秒。",
+    "stopRecording": "録音停止",
+    "remaining": "残り {{time}}",
+    "recordingComplete": "録音完了",
+    "recordAgain": "もう一度録音",
+    "startCapture": "キャプチャ開始",
+    "systemHint": "システムからオーディオをキャプチャします。最大時間:30 秒。",
+    "stopCapture": "キャプチャ停止",
+    "captureComplete": "キャプチャ完了",
+    "captureAgain": "もう一度キャプチャ"
+  },
+  "sampleList": {
+    "loading": "サンプルを読み込み中…",
+    "empty": {
+      "title": "サンプルがまだありません",
+      "hint": "最初のオーディオサンプルを追加して始めましょう"
+    },
+    "editing": "文字起こしを編集中",
+    "placeholder": "リファレンステキストを入力…",
+    "saving": "保存中…",
+    "editTranscription": "文字起こしを編集",
+    "deleteSample": "サンプルを削除",
+    "addSample": "サンプルを追加",
+    "note": "メモ:30 秒のサンプル 1 本が最適です。サンプルを複数追加すると品質が低下することがあります。今後のアップデートで、同じボイスの異なるスタイル向けにサンプルを切り替え可能にし、タグ付けできるようにするかもしれません。",
+    "deleteDialog": {
+      "title": "サンプルを削除",
+      "description": "このオーディオサンプルを本当に削除しますか? この操作は元に戻せません。",
+      "deleting": "削除中…"
+    },
+    "player": {
+      "play": "サンプルを再生",
+      "pause": "サンプルを一時停止",
+      "stop": "停止",
+      "stopAria": "再生を停止",
+      "position": "サンプルの再生位置",
+      "positionValue": "{{current}} / {{total}}"
+    },
+    "toast": {
+      "invalidText": "無効なテキスト",
+      "invalidTextDescription": "リファレンステキストは空にできません。",
+      "updated": "サンプルを更新しました",
+      "updatedDescription": "リファレンステキストを正常に更新しました。",
+      "updateFailed": "更新に失敗しました",
+      "updateFailedFallback": "サンプルの更新に失敗しました"
+    }
+  },
+  "profiles": {
+    "card": {
+      "noDescription": "説明なし",
+      "designed": "designed",
+      "export": "プロファイルをエクスポート",
+      "edit": "プロファイルを編集",
+      "delete": "プロファイルを削除",
+      "selectLabel": "{{name}}、{{language}}。生成のボイスとして選択。",
+      "selectLabelSelected": "{{name}}、{{language}}。生成のボイスとして選択済み。"
+    },
+    "list": {
+      "errorLoading": "プロファイルの読み込みエラー:{{message}}",
+      "empty": "ボイスプロファイルがまだありません。最初のプロファイルを作成して始めましょう。",
+      "createVoice": "ボイスを作成",
+      "unsupportedNote": "現在のモデルでは、対応しているボイスプロファイルのみ選択できます。"
+    },
+    "deleteDialog": {
+      "title": "プロファイルを削除",
+      "body": "「{{name}}」を本当に削除しますか? この操作は元に戻せません。",
+      "deleting": "削除中…"
+    }
+  },
+  "effects": {
+    "title": "エフェクト",
+    "newPreset": "新しいプリセット",
+    "noDescription": "説明なし",
+    "placeholder": "プリセットを選択するか、新しく作成します",
+    "effectCount_one": "エフェクト {{count}} 件",
+    "effectCount_other": "エフェクト {{count}} 件",
+    "sections": {
+      "builtin": "ビルトイン",
+      "custom": "カスタム",
+      "new": "新規"
+    },
+    "badge": {
+      "builtin": "ビルトイン"
+    },
+    "unsaved": {
+      "title": "未保存のプリセット",
+      "hint": "右側のパネルでエフェクトを設定します。"
+    },
+    "detail": {
+      "newTitle": "新しいプリセット",
+      "editTitle": "プリセットを編集",
+      "savePreset": "プリセットを保存",
+      "saveAsCustom": "カスタムとして保存",
+      "saving": "保存中…",
+      "deleting": "削除中…"
+    },
+    "fields": {
+      "name": "名前",
+      "namePlaceholder": "マイプリセット…",
+      "description": "説明",
+      "descriptionPlaceholder": "このプリセットの内容を説明…"
+    },
+    "preview": {
+      "label": "プレビュー",
+      "button": "プレビュー",
+      "processing": "処理中…",
+      "hint": "プレビューでは保存せずにクリーン版へエフェクトを適用します。"
+    },
+    "saveAs": {
+      "title": "カスタムプリセットとして保存",
+      "description": "現在のエフェクトチェーンをもとに新しいカスタムプリセットを作成します。",
+      "suggestedName": "{{name}}(コピー)"
+    },
+    "toast": {
+      "saved": "プリセットを保存しました",
+      "createdDescription": "「{{name}}」を作成しました。",
+      "updated": "プリセットを更新しました",
+      "deleted": "プリセットを削除しました",
+      "saveFailed": "保存に失敗しました",
+      "deleteFailed": "削除に失敗しました",
+      "previewFailed": "プレビューに失敗しました",
+      "nameRequired": "名前が必要です"
+    },
+    "chain": {
+      "loadPreset": "プリセットを読み込む…",
+      "addEffect": "エフェクトを追加…",
+      "clear": "クリア",
+      "enable": "有効化",
+      "disable": "無効化",
+      "remove": "削除"
+    },
+    "types": {
+      "chorus": {
+        "label": "コーラス / フランジャー",
+        "params": {
+          "rate_hz": "LFO 速度(Hz)",
+          "depth": "モジュレーション深度",
+          "feedback": "フィードバック量",
+          "centre_delay_ms": "センターディレイ(ms)",
+          "mix": "ウェット/ドライミックス"
+        }
+      },
+      "reverb": {
+        "label": "リバーブ",
+        "params": {
+          "room_size": "ルームサイズ",
+          "damping": "高域ダンピング",
+          "wet_level": "ウェットレベル",
+          "dry_level": "ドライレベル",
+          "width": "ステレオ幅"
+        }
+      },
+      "delay": {
+        "label": "ディレイ",
+        "params": {
+          "delay_seconds": "ディレイタイム(秒)",
+          "feedback": "フィードバック量",
+          "mix": "ウェット/ドライミックス"
+        }
+      },
+      "compressor": {
+        "label": "コンプレッサー",
+        "params": {
+          "threshold_db": "スレッショルド(dB)",
+          "ratio": "コンプレッションレシオ",
+          "attack_ms": "アタックタイム(ms)",
+          "release_ms": "リリースタイム(ms)"
+        }
+      },
+      "gain": {
+        "label": "ゲイン",
+        "params": {
+          "gain_db": "ゲイン(dB)"
+        }
+      },
+      "highpass": {
+        "label": "ハイパスフィルター",
+        "params": {
+          "cutoff_frequency_hz": "カットオフ周波数(Hz)"
+        }
+      },
+      "lowpass": {
+        "label": "ローパスフィルター",
+        "params": {
+          "cutoff_frequency_hz": "カットオフ周波数(Hz)"
+        }
+      },
+      "pitch_shift": {
+        "label": "ピッチシフト",
+        "params": {
+          "semitones": "シフトする半音数"
+        }
+      }
+    },
+    "builtinPresets": {
+      "Robotic": {
+        "name": "ロボット",
+        "description": "メタリックなロボット音声(遅い LFO と高フィードバックのフランジャー)"
+      },
+      "Radio": {
+        "name": "ラジオ",
+        "description": "バンドパスフィルタリングと軽いコンプレッションによる AM ラジオ風の細い音声"
+      },
+      "Echo Chamber": {
+        "name": "エコーチェンバー",
+        "description": "広がりのあるリバーブと尾を引くエコー"
+      },
+      "Deep Voice": {
+        "name": "ディープボイス",
+        "description": "低いピッチに暖かみを加えた音声"
+      }
+    }
+  },
+  "stories": {
+    "title": "ストーリー",
+    "newStory": "新しいストーリー",
+    "loading": "ストーリーを読み込み中…",
+    "empty": {
+      "title": "ストーリーがまだありません",
+      "hint": "最初のストーリーを作成して始めましょう"
+    },
+    "row": {
+      "itemCount_one": "{{count}} 項目",
+      "itemCount_other": "{{count}} 項目",
+      "ariaLabel": "ストーリー {{name}}、{{count}} 項目、{{updated}}",
+      "actionsLabel": "{{name}} の操作"
+    },
+    "createDialog": {
+      "title": "新しいストーリーを作成",
+      "description": "新しいストーリーを作成して、ボイス生成を会話としてまとめます。",
+      "action": "作成",
+      "creating": "作成中…"
+    },
+    "editDialog": {
+      "title": "ストーリーを編集",
+      "description": "ストーリーの名前と説明を更新します。",
+      "saving": "保存中…"
+    },
+    "deleteDialog": {
+      "title": "本当に削除しますか?",
+      "description": "このストーリーとすべての項目が完全に削除されます。この操作は元に戻せません。",
+      "deleting": "削除中…"
+    },
+    "fields": {
+      "name": "名前",
+      "namePlaceholder": "マイストーリー",
+      "descriptionLabel": "説明(任意)",
+      "descriptionPlaceholder": "例:○○と△△の会話…"
+    },
+    "toast": {
+      "nameRequired": "名前が必要です",
+      "nameRequiredDescription": "ストーリー名を入力してください",
+      "created": "ストーリーを作成しました",
+      "createdDescription": "「{{name}}」を作成しました",
+      "createFailed": "ストーリーの作成に失敗しました",
+      "updateFailed": "ストーリーの更新に失敗しました",
+      "deleteFailed": "ストーリーの削除に失敗しました"
+    }
+  },
+  "storyContent": {
+    "selectStory": {
+      "title": "ストーリーを選択",
+      "hint": "リストからストーリーを選んで内容を表示します"
+    },
+    "loading": "ストーリーを読み込み中…",
+    "notFound": {
+      "title": "ストーリーが見つかりません",
+      "hint": "選択したストーリーを読み込めませんでした"
+    },
+    "generatingCount_one": "オーディオ {{count}} 件を生成中",
+    "generatingCount_other": "オーディオ {{count}} 件を生成中",
+    "add": "追加",
+    "searchPlaceholder": "名前または文字起こしで検索…",
+    "searchNoMatches": "一致する生成が見つかりません",
+    "searchNoAvailable": "利用可能な生成がありません",
+    "exportAudio": "オーディオをエクスポート",
+    "empty": {
+      "title": "このストーリーには項目がありません",
+      "hint": "下のボックスで音声を生成して項目を追加します"
+    },
+    "itemActions": {
+      "playFromHere": "ここから再生",
+      "removeFromStory": "ストーリーから削除"
+    },
+    "toast": {
+      "removeFailed": "項目の削除に失敗しました",
+      "reorderFailed": "項目の並び替えに失敗しました",
+      "exportFailed": "オーディオのエクスポートに失敗しました",
+      "addFailed": "生成の追加に失敗しました"
+    }
+  },
+  "history": {
+    "actions": {
+      "menu": "操作",
+      "play": "再生",
+      "exportAudio": "オーディオをエクスポート",
+      "exportPackage": "パッケージをエクスポート",
+      "applyEffects": "エフェクトを適用",
+      "regenerate": "再生成"
+    },
+    "deleteDialog": {
+      "title": "生成を削除",
+      "body": "「{{name}}」のこの生成を本当に削除しますか? この操作は元に戻せません。",
+      "deleting": "削除中…"
+    },
+    "clearFailedDialog": {
+      "title": "失敗した生成をクリア",
+      "body_one": "失敗した生成 {{count}} 件を履歴から完全に削除します。この操作は元に戻せません。",
+      "body_other": "失敗した生成 {{count}} 件を履歴から完全に削除します。この操作は元に戻せません。",
+      "clearing": "クリア中…",
+      "clearAll": "すべてクリア"
+    },
+    "importDialog": {
+      "title": "生成をインポート",
+      "body": "「{{name}}」から生成をインポートします。履歴に追加されます。",
+      "importing": "インポート中…",
+      "action": "インポート"
+    },
+    "effectsDialog": {
+      "title": "エフェクトを適用",
+      "body": "この生成に適用するポストプロセッシングのエフェクトを設定します。新しいバージョンが作成されます。",
+      "sourceLabel": "ソース",
+      "sourcePlaceholder": "ソースバージョンを選択",
+      "apply": "適用",
+      "applying": "適用中…"
+    }
+  },
+  "generation": {
+    "placeholder": {
+      "storyWithEffects": "「{{name}}」用の音声を生成…(エフェクトは / を入力)",
+      "story": "「{{name}}」用の音声を生成…",
+      "profile": "{{name}} を使って音声を生成…",
+      "effectsHint": "/ を入力して [laugh]、[sigh] などのエフェクトを使う",
+      "selectVoice": "上でボイスプロファイルを選択してください…"
+    },
+    "button": {
+      "generate": "音声を生成",
+      "generating": "生成中…",
+      "selectFirst": "まずボイスプロファイルを選択してください"
+    },
+    "instruct": {
+      "show": "デリバリー指示を表示",
+      "hide": "デリバリー指示を非表示",
+      "tooltip": "デリバリー指示(トーン、感情、ペース)",
+      "placeholder": "デリバリー指示 — 例:暖かくゆっくり話す、はっきりと威厳をもって…"
+    },
+    "voiceSelector": {
+      "placeholder": "ボイスを選択…"
+    },
+    "effects": {
+      "none": "エフェクトなし",
+      "profileDefault": "プロファイルのデフォルト"
+    }
+  },
+  "main": {
+    "importVoice": "ボイスをインポート",
+    "createVoice": "ボイスを作成",
+    "import": {
+      "invalidTitle": "無効なファイル形式",
+      "invalidDescription": "有効な .voicebox.zip ファイルを選択してください",
+      "successTitle": "プロファイルをインポートしました",
+      "successDescription": "ボイスプロファイルを正常にインポートしました",
+      "failedTitle": "プロファイルのインポートに失敗しました",
+      "dialogTitle": "プロファイルをインポート",
+      "dialogDescription": "「{{name}}」からプロファイルをインポートします。すべてのサンプルを含む新しいプロファイルが作成されます。",
+      "importing": "インポート中…",
+      "action": "インポート"
+    }
+  },
+  "settings": {
+    "tabs": {
+      "general": "一般",
+      "generation": "生成",
+      "gpu": "GPU",
+      "logs": "ログ",
+      "changelog": "変更履歴",
+      "about": "このアプリについて"
+    },
+    "language": {
+      "label": "言語",
+      "description": "Voicebox の表示言語を選択します。"
+    },
+    "general": {
+      "docs": { "title": "ドキュメントを読む" },
+      "discord": { "title": "Discord に参加", "subtitle": "ヘルプやボイスの共有" },
+      "serverUrl": {
+        "title": "サーバー URL",
+        "description": "Voicebox バックエンドサーバーのアドレス。",
+        "invalidUrl": "有効な URL を入力してください",
+        "updatedTitle": "サーバー URL を更新しました",
+        "updatedDescription": "{{url}} に接続しました"
+      },
+      "keepServerRunning": {
+        "title": "アプリ終了後もサーバーを起動したままにする",
+        "description": "アプリを閉じた後もサーバーがバックグラウンドで動作し続けます。",
+        "failedTitle": "設定の更新に失敗しました",
+        "failedDescription": "バックエンドに設定を同期できませんでした。",
+        "updatedTitle": "設定を更新しました",
+        "runningDescription": "アプリ終了後もサーバーは動作し続けます",
+        "stoppedDescription": "アプリ終了時にサーバーは停止します"
+      },
+      "networkAccess": {
+        "title": "ネットワークアクセスを許可",
+        "description": "ネットワーク上の他のデバイスからサーバーにアクセスできるようにします。変更後はアプリを再起動してください。",
+        "updatedTitle": "設定を更新しました",
+        "enabled": "ネットワークアクセスが有効になりました。適用するにはアプリを再起動してください。",
+        "disabled": "ネットワークアクセスが無効になりました。適用するにはアプリを再起動してください。"
+      },
+      "connection": {
+        "connecting": "接続中",
+        "offline": "オフライン",
+        "online": "オンライン"
+      },
+      "updates": {
+        "title": "アプリの更新",
+        "devSuffix": " (開発版)",
+        "devMode": {
+          "title": "開発モード",
+          "description": "開発モードでは自動更新が無効になっています。"
+        },
+        "check": {
+          "title": "更新を確認",
+          "available": "バージョン {{version}} が利用可能",
+          "checking": "確認中…",
+          "upToDate": "最新の状態です",
+          "button": "確認"
+        },
+        "error": "更新エラー",
+        "download": {
+          "title": "バージョン {{version}} に更新",
+          "description": "最新バージョンをダウンロードしてインストールします。",
+          "button": "ダウンロード"
+        },
+        "downloading": "更新をダウンロード中…",
+        "ready": {
+          "title": "更新をインストールする準備ができました",
+          "description": "バージョン {{version}} をダウンロードしました。再起動して完了します。",
+          "button": "今すぐ再起動"
+        }
+      },
+      "api": {
+        "title": "API アクセス",
+        "description": "<code>{{url}}</code> の REST API を通じて Voicebox をワークフローに統合できます",
+        "viewReference": "API リファレンス全文を表示",
+        "endpoints": {
+          "generate": "音声を生成",
+          "health": "サーバーステータス",
+          "profiles": "ボイス一覧",
+          "history": "過去の生成"
+        }
+      }
+    },
+    "generation": {
+      "title": "生成",
+      "description": "長文生成の制御。これらの設定はすべてのエンジンに適用されます。",
+      "chunkLimit": {
+        "title": "自動チャンク分割の上限",
+        "description": "長文は文境界でチャンクに分割されます。値を小さくすると長い出力の品質が向上することがあります。",
+        "value": "{{chars}} 文字"
+      },
+      "crossfade": {
+        "title": "チャンク間のクロスフェード",
+        "description": "チャンク間のオーディオをブレンドして遷移を滑らかにします。0 にするとハードカットになります。",
+        "cut": "カット",
+        "ms": "{{ms}}ms"
+      },
+      "normalize": {
+        "title": "オーディオを正規化",
+        "description": "生成間で一貫した音量になるよう出力を調整します。"
+      },
+      "autoplay": {
+        "title": "生成時に自動再生",
+        "description": "生成が完了したら自動的にオーディオを再生します。"
+      },
+      "folder": {
+        "title": "生成物の保存先フォルダ",
+        "description": "生成されたオーディオファイルをディスク上に保存する場所。",
+        "open": "開く"
+      }
+    },
+    "gpu": {
+      "cpuOnly": "CPU のみ",
+      "vramUsed": "VRAM 使用量 {{mb}} MB",
+      "noAcceleration": "GPU アクセラレーションは検出されていません",
+      "active": "有効",
+      "cuda": {
+        "title": "CUDA バックエンド",
+        "description": "ダウンロード可能な CUDA バックエンドによる NVIDIA GPU アクセラレーション。",
+        "downloading": "CUDA バックエンドをダウンロード中…",
+        "downloadingShort": "ダウンロード中…",
+        "updating": "更新中…"
+      },
+      "restart": {
+        "ready": "サーバーを正常に再起動しました",
+        "waiting": "サーバーを再起動中…",
+        "stopping": "サーバーを停止中…"
+      },
+      "download": {
+        "title": "CUDA バックエンドをダウンロード",
+        "description": "約 2.4 GB のダウンロード。CUDA 対応の NVIDIA GPU が必要です。",
+        "button": "ダウンロード"
+      },
+      "switchToCuda": {
+        "title": "CUDA バックエンドに切り替え",
+        "description": "CUDA バックエンドはダウンロード済みです。再起動して有効にします。",
+        "button": "再起動"
+      },
+      "switchToCpu": {
+        "title": "CPU バックエンドに切り替え",
+        "description": "GPU アクセラレーションを無効にします。CUDA は後で再ダウンロードできます。",
+        "button": "切り替え"
+      },
+      "remove": {
+        "title": "CUDA バックエンドを削除",
+        "description": "ダウンロードした CUDA バイナリを削除してディスク容量を空けます。",
+        "button": "削除"
+      },
+      "errors": {
+        "downloadFailed": "ダウンロードに失敗しました",
+        "downloadStart": "ダウンロードを開始できませんでした",
+        "restartFailed": "再起動に失敗しました",
+        "switchCpu": "CPU への切り替えに失敗しました",
+        "deleteCuda": "CUDA バックエンドの削除に失敗しました"
+      },
+      "footer": "Voicebox はシステムで利用可能な最適な GPU を自動で検出し使用します。Apple Silicon Mac では、MLX バックエンドが Metal Performance Shaders(MPS)を介して Neural Engine と GPU 上でネイティブに動作し、追加のセットアップは不要です。NVIDIA GPU 搭載の Windows および Linux では、オプションの CUDA バックエンドをダウンロードしてハードウェアアクセラレーションによる推論が可能です。AMD ROCm、Intel XPU、DirectML も PyTorch を通じて利用可能な環境でサポートされます。GPU が検出されない場合、Voicebox は CPU にフォールバックし、すべてのエンジンはそのまま動作しますが速度は低下します。"
+    },
+    "logs": {
+      "title": "サーバーログ",
+      "lineCount_one": "{{count}} 行",
+      "lineCount_other": "{{count}} 行",
+      "scrollToBottom": "一番下までスクロール",
+      "clear": "クリア",
+      "empty": "まだログ出力はありません。",
+      "devHint": "サーバーログはアプリがサーバープロセスを管理している場合(本番ビルド)にのみ記録されます。"
+    },
+    "changelog": {
+      "devBadge": "開発版",
+      "showLess": "折りたたむ",
+      "showMore": "もっと見る"
+    },
+    "about": {
+      "tagline": "オープンソースの音声合成スタジオ。ボイスのクローン、音声生成、エフェクトの適用、音声対応アプリの構築まで、すべてローカル環境で実行できます。",
+      "createdBy": "作者",
+      "buyCoffee": "コーヒーをおごる",
+      "license": "<link>MIT</link> ライセンス"
+    }
+  },
+  "models": {
+    "title": "モデル",
+    "subtitle": "音声生成および文字起こし用の AI モデルをダウンロードして管理します",
+    "defaultName": "モデル",
+    "unknownSize": "サイズ不明",
+    "sections": {
+      "voiceGeneration": "音声生成",
+      "transcription": "文字起こし"
+    },
+    "status": {
+      "loaded": "読み込み済み"
+    },
+    "storage": {
+      "location": "保存場所",
+      "open": "開く",
+      "change": "変更",
+      "migrating": "移行中…",
+      "reset": "リセット",
+      "pickerTitle": "モデル保存フォルダを選択"
+    },
+    "progress": {
+      "connecting": "接続中…",
+      "connectingHf": "HuggingFace に接続中…"
+    },
+    "problems": {
+      "title": "問題",
+      "clearAll": "すべてクリア",
+      "noDetails": "エラーの詳細はありません。もう一度ダウンロードしてください。",
+      "startedAt": "{{time}} に開始"
+    },
+    "detail": {
+      "loadingInfo": "モデル情報を読み込み中…",
+      "byAuthor": "{{author}} 作",
+      "downloads": "ダウンロード数",
+      "likes": "いいね",
+      "license": "ライセンス",
+      "languagesCount": "{{count}} 言語に対応",
+      "languagesList": "対応言語:{{list}}",
+      "onDisk": "ディスク使用量 {{size}}"
+    },
+    "actions": {
+      "download": "ダウンロード",
+      "retry": "ダウンロードを再試行",
+      "unload": "アンロード",
+      "unloading": "アンロード中…",
+      "unloadFirst": "削除する前にモデルをアンロードしてください",
+      "deleteModel": "モデルを削除"
+    },
+    "deleteDialog": {
+      "title": "モデルを削除",
+      "body": "<strong>{{name}}</strong> を本当に削除しますか?",
+      "sizeNote": "これにより {{size}} のディスク容量が解放されます。再度使用する場合は再ダウンロードが必要です。",
+      "deleting": "削除中…"
+    },
+    "migrateDialog": {
+      "title": "モデルを新しい場所に移動しますか?",
+      "description": "モデルを新しいフォルダに移動する間、サーバーは停止します。移行が完了すると自動的に再起動します。",
+      "action": "モデルを移動",
+      "preparing": "準備中…",
+      "restartingServer": "サーバーを再起動中…"
+    },
+    "migrate": {
+      "title": "モデルを移動中",
+      "offline": "モデルの移動中はサーバーがオフラインになります。"
+    },
+    "toast": {
+      "downloadFailed": "ダウンロードに失敗しました",
+      "cancelFailed": "キャンセルに失敗しました",
+      "cancelFailedDescription": "ダウンロードタスクをキャンセルできませんでした。",
+      "deleted": "モデルを削除しました",
+      "deletedDescription": "{{name}} を正常に削除しました。",
+      "deleteFailed": "削除に失敗しました",
+      "unloaded": "モデルをアンロードしました",
+      "unloadedDescription": "{{name}} をメモリからアンロードしました。",
+      "unloadFailed": "アンロードに失敗しました",
+      "openFolderFailed": "モデルフォルダを開けませんでした",
+      "pickerFailed": "フォルダ選択ダイアログを開けませんでした",
+      "resetToDefault": "デフォルトの場所にリセットしました。サーバーを再起動中…",
+      "noModelsToMigrate": "移行するモデルがありません",
+      "noModelsToMigrateDescription": "保存場所を変更する前に、少なくとも 1 つのモデルをダウンロードしてください。",
+      "migrated": "モデルを正常に移動しました",
+      "migrationFailed": "移行に失敗しました",
+      "migrationFailedGeneric": "モデルの移行に失敗しました",
+      "migrationConnectionLost": "移行中に接続が切断されました"
+    }
+  }
+}
