@@ -193,6 +193,8 @@ class MLXTTSBackend:
 
         logger.info("Generating audio for text: %s", text)
 
+        model_name = f"qwen-tts-{self._current_model_size}"
+
         def _generate_sync():
             """Run synchronous generation in thread pool."""
             # MLX generate() returns a generator yielding GenerationResult objects
@@ -218,36 +220,40 @@ class MLXTTSBackend:
                 logger.warning("Regenerating without voice prompt.")
                 ref_audio = None
 
-            # Check if model supports voice cloning via generate method
-            # MLX API may support ref_audio parameter directly
-            try:
-                # Try with voice cloning parameters if supported
-                if ref_audio:
-                    # Check if generate accepts ref_audio parameter
-                    import inspect
+            # Model is loaded → weights are on disk. Force offline so
+            # lazy tokenizer/config lookups inside mlx_audio don't hang
+            # when the user is disconnected (issue #462).
+            with force_offline_if_cached(True, model_name):
+                # Check if model supports voice cloning via generate method
+                # MLX API may support ref_audio parameter directly
+                try:
+                    # Try with voice cloning parameters if supported
+                    if ref_audio:
+                        # Check if generate accepts ref_audio parameter
+                        import inspect
 
-                    sig = inspect.signature(self.model.generate)
-                    if "ref_audio" in sig.parameters:
-                        # Generate with voice cloning
-                        for result in self.model.generate(text, ref_audio=ref_audio, ref_text=ref_text, lang_code=lang):
-                            audio_chunks.append(np.array(result.audio))
-                            sample_rate = result.sample_rate
+                        sig = inspect.signature(self.model.generate)
+                        if "ref_audio" in sig.parameters:
+                            # Generate with voice cloning
+                            for result in self.model.generate(text, ref_audio=ref_audio, ref_text=ref_text, lang_code=lang):
+                                audio_chunks.append(np.array(result.audio))
+                                sample_rate = result.sample_rate
+                        else:
+                            # Fallback: generate without voice cloning
+                            for result in self.model.generate(text, lang_code=lang):
+                                audio_chunks.append(np.array(result.audio))
+                                sample_rate = result.sample_rate
                     else:
-                        # Fallback: generate without voice cloning
+                        # No voice prompt, generate normally
                         for result in self.model.generate(text, lang_code=lang):
                             audio_chunks.append(np.array(result.audio))
                             sample_rate = result.sample_rate
-                else:
-                    # No voice prompt, generate normally
+                except Exception as e:
+                    # If voice cloning fails, try without it
+                    logger.warning("Voice cloning failed, generating without voice prompt: %s", e)
                     for result in self.model.generate(text, lang_code=lang):
                         audio_chunks.append(np.array(result.audio))
                         sample_rate = result.sample_rate
-            except Exception as e:
-                # If voice cloning fails, try without it
-                logger.warning("Voice cloning failed, generating without voice prompt: %s", e)
-                for result in self.model.generate(text, lang_code=lang):
-                    audio_chunks.append(np.array(result.audio))
-                    sample_rate = result.sample_rate
 
             # Concatenate all chunks
             if audio_chunks:
@@ -341,6 +347,8 @@ class MLXSTTBackend:
         """
         await self.load_model_async(model_size)
 
+        progress_model_name = f"whisper-{self.model_size}"
+
         def _transcribe_sync():
             """Run synchronous transcription in thread pool."""
             # MLX Whisper transcription using generate method
@@ -349,7 +357,11 @@ class MLXSTTBackend:
             if language:
                 decode_options["language"] = language
 
-            result = self.model.generate(str(audio_path), **decode_options)
+            # Model is loaded → weights are on disk. Force offline so
+            # lazy tokenizer/config lookups don't hang when the user is
+            # disconnected (issue #462).
+            with force_offline_if_cached(True, progress_model_name):
+                result = self.model.generate(str(audio_path), **decode_options)
 
             # Extract text from result
             if isinstance(result, str):
