@@ -29,10 +29,10 @@ const TUTORIALS: (Tutorial | null)[] = [
 		thumbnail: "/tutorials/kqxqjRsdD5E.jpg",
 	},
 	{
-		id: "yu9QHqOEqqA",
-		title: "This FREE AI Tool Just Destroyed ElevenLabs Voice Cloning (VoiceBox)",
-		author: "Danish Sofi",
-		thumbnail: "/tutorials/yu9QHqOEqqA.jpg",
+		id: "05YBqrWTLQ0",
+		title: "2026年最好的声音克隆工具？Voicebox完整测评：从下载到API调用，附速度对比",
+		author: "Tech指南",
+		thumbnail: "/tutorials/05YBqrWTLQ0.jpg",
 	},
 	{
 		id: "RRRBxNXgeKQ",
