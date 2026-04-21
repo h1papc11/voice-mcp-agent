@@ -7,6 +7,37 @@
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-04-20
+
+This release localizes the entire app. English, Simplified Chinese (zh-CN), Traditional Chinese (zh-TW), and Japanese (ja) are wired up end-to-end across every tab, modal, dialog, and toast — 559 translation keys per locale, parity verified. Plus a batch of reliability fixes: offline-mode now actually stays offline, Chatterbox accepts reference samples it used to reject, MLX Qwen 0.6B points at the right repo, and macOS system audio survives backgrounding.
+
+### Internationalization ([#508](https://github.com/jamiepine/voicebox/pull/508))
+- **i18next foundation** with an in-app language switcher that re-renders the tree on change — lazy-loaded components were holding stale strings without an explicit key-bump on the React root.
+- **Four locales** at full coverage: English, Simplified Chinese, Traditional Chinese, Japanese. No partial/English-fallback surfaces.
+- **Every user-visible surface translated**: Stories (list, content editor, dialogs, toasts), Effects (list, detail, chain editor, built-in preset names), Voices (table, search, inspector, Create/Edit modal, audio sample panels), Audio Channels (list, dialogs, device picker), history + story dropdown menus, ProfileCard / ProfileList / HistoryTable, and the unsupported-model note.
+- **Relative dates** localize via `date-fns` locale objects (`3 days ago` → `3 天前` / `3 日前`) — `Intl.RelativeTimeFormat` doesn't produce the phrasing we use in the history table.
+- **Dev-build version suffix** (`v0.4.2 (dev)` / `(开发版)` / `(開發版)` / `(開発版)`) is now locale-aware.
+- **559 translation keys** across all four locales.
+
+### Reliability
+- **`HF_HUB_OFFLINE` now guards every inference path** ([#503](https://github.com/jamiepine/voicebox/pull/503)) — some engines were still attempting a HuggingFace metadata roundtrip on first load when offline mode was enabled, causing hangs on airgapped or flaky networks.
+- **Chatterbox reference samples are preprocessed instead of rejected** ([#502](https://github.com/jamiepine/voicebox/pull/502)) — samples outside the expected sample rate or channel layout are resampled to match, rather than failing with an opaque error.
+- **MLX Qwen 0.6B repo path fixed** ([#501](https://github.com/jamiepine/voicebox/pull/501)) — now points at the published `mlx-community` repo so the model actually downloads on Apple Silicon.
+- **macOS system audio survives backgrounding** ([#486](https://github.com/jamiepine/voicebox/pull/486), closes [#41](https://github.com/jamiepine/voicebox/issues/41)) — WKWebView was tearing down the audio session when the app lost focus, silently killing system-audio capture.
+- **MLX backend `miniaudio` dependency pinned** ([#506](https://github.com/jamiepine/voicebox/pull/506)) — `mlx_audio.stt` needs it at runtime and nothing else transitively pulled it in, so `--no-deps` installs were breaking on first use.
+
+### Landing / Docs
+- **New `/download` page** ([#487](https://github.com/jamiepine/voicebox/pull/487)) — no more dumping first-time visitors onto the GitHub releases list. The API example snippet on the landing page also got an accuracy pass.
+- **Download redirects work behind reverse proxies** ([#498](https://github.com/jamiepine/voicebox/pull/498)) — uses the public origin instead of `localhost` when resolving platform-specific installer URLs.
+- **MDX docs audited against the multi-engine backend** ([#484](https://github.com/jamiepine/voicebox/pull/484)) — stale single-engine assumptions removed.
+- **Three more tutorials + mobile navbar / hero CTA fixes** ([#483](https://github.com/jamiepine/voicebox/pull/483)).
+
+### Linux
+- **Still not shipping.** The re-enable attempt ([#488](https://github.com/jamiepine/voicebox/pull/488)) landed on `main` but CI still hangs in the `tauri-action` bundler step on `ubuntu-22.04` — no output for 25+ minutes after `rpm` bundling, even with `createUpdaterArtifacts: false` and `--bundles deb,rpm`. The matrix entry is disabled again for 0.4.2; the ubuntu-specific setup steps stay in the workflow so re-enabling is a one-line change once we identify the hang. Next release will take another pass.
+
+### New Contributors
+- [@shekharyv](https://github.com/shekharyv) — download redirects behind reverse proxies ([#498](https://github.com/jamiepine/voicebox/pull/498))
+
 ## [0.4.1] - 2026-04-18
 
 A fast follow-up to 0.4.0 focused on making the new engines actually load in the production binary — plus generation cancellation, Linux system-audio capture, and the repo's first PR-time type check. Five first-time contributors shipped in this release.
@@ -595,7 +626,8 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/jamiepine/voicebox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jamiepine/voicebox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jamiepine/voicebox/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jamiepine/voicebox/compare/v0.2.3...v0.3.0
