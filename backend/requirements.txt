@@ -46,6 +46,11 @@ misaki[en,ja,zh]>=0.9.4
 # spacy model for misaki English G2P — must be pre-installed or misaki
 # tries spacy.cli.download() at runtime which crashes frozen builds
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+# fugashi (pulled in by misaki[ja]) needs a MeCab dictionary on disk.
+# unidic-lite ships one inside the wheel (~50MB); the full `unidic` package
+# requires `python -m unidic download` (~526MB) which breaks frozen builds
+# for the same reason en_core_web_sm does.
+unidic-lite>=1.0.8
 
 # Audio processing
 librosa>=0.10.0

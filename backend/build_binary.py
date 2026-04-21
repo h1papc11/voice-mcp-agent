@@ -287,6 +287,12 @@ def build_server(cuda=False):
             "en_core_web_sm",
             "--hidden-import",
             "en_core_web_sm",
+            # unidic-lite ships the MeCab dictionary used by fugashi (pulled in
+            # by misaki[ja]). The dict lives in unidic_lite/dicdir/ and is
+            # discovered via the package's DICDIR constant, so the data files
+            # must be collected or Japanese Kokoro voices crash at runtime.
+            "--collect-all",
+            "unidic_lite",
             "--hidden-import",
             "loguru",
         ]
