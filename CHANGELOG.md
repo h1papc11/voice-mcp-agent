@@ -7,6 +7,18 @@
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-04-20
+
+A patch focused on two user-impacting reliability fixes: macOS DMG notarization (unblocks `brew install voicebox` on macOS 15 Sequoia and fixes spurious "app isn't signed" Gatekeeper dialogs on older Intel Macs) and Kokoro Japanese voice initialization on fresh installs.
+
+### macOS
+
+- **DMGs are now notarized and stapled** ([#523](https://github.com/jamiepine/voicebox/pull/523)). Tauri's bundler notarizes the `.app` inside the DMG but ships the DMG wrapper itself unnotarized. Gatekeeper rejects that on macOS 15 Sequoia (confirmed by Homebrew Cask CI failing on both arm and intel Sequoia runners) and causes the "the app is not signed" dialog on older Intel Macs when Apple's notarization servers are slow or unreachable ([#509](https://github.com/jamiepine/voicebox/issues/509)). The release workflow now submits each DMG to `notarytool`, staples the ticket, verifies with `spctl`, and overwrites the draft-release asset `tauri-action` uploaded. Adds ~5-10 min per macOS job.
+
+### Backend
+
+- **Kokoro Japanese voices no longer crash on fresh installs** ([#521](https://github.com/jamiepine/voicebox/pull/521), fixes [#514](https://github.com/jamiepine/voicebox/issues/514)). `misaki[ja]` pulls in `fugashi`, which needs a MeCab dictionary on disk. The `unidic` package that was being installed ships no data and expects a ~526MB runtime download that `just setup` doesn't run (and which wouldn't survive PyInstaller anyway). Swapped to `unidic-lite`, which bundles a MeCab-compatible dict inside the wheel (~50MB). Collected in `build_binary.py` so frozen builds pick up `unidic_lite/dicdir/`.
+
 ## [0.4.2] - 2026-04-20
 
 This release localizes the entire app. English, Simplified Chinese (zh-CN), Traditional Chinese (zh-TW), and Japanese (ja) are wired up end-to-end across every tab, modal, dialog, and toast — 559 translation keys per locale, parity verified. Plus a batch of reliability fixes: offline-mode now actually stays offline, Chatterbox accepts reference samples it used to reject, MLX Qwen 0.6B points at the right repo, and macOS system audio survives backgrounding.
@@ -626,7 +638,8 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/jamiepine/voicebox/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jamiepine/voicebox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jamiepine/voicebox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/jamiepine/voicebox/compare/v0.3.0...v0.4.0
