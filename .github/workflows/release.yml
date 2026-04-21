@@ -226,6 +226,46 @@ jobs:
           args: ${{ matrix.args }}
           includeUpdaterJson: true
 
+      # Tauri's bundler signs the .app and notarizes it, but the .dmg wrapper
+      # ships unnotarized. Gatekeeper rejects that on macOS 15 Sequoia (caught
+      # by Homebrew Cask CI) and causes "app isn't signed" dialogs on older
+      # Intel Macs when Apple's notarization servers are slow (see issue #509).
+      # Submit the .dmg to notarytool, staple the ticket, and overwrite the
+      # release asset uploaded by tauri-action.
+      - name: Notarize and staple DMG (macOS)
+        if: matrix.platform == 'macos-latest' || matrix.platform == 'macos-15-intel'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+          TARGET=$(echo "${{ matrix.args }}" | sed -n 's/.*--target \([a-z0-9_-]*\).*/\1/p')
+          DMG_DIR="tauri/src-tauri/target/${TARGET}/release/bundle/dmg"
+          # Match the release tag tauri-action resolved from tauri.conf.json's
+          # version field; GITHUB_REF_NAME is a branch name under workflow_dispatch.
+          RELEASE_TAG="v$(jq -r '.version' tauri/src-tauri/tauri.conf.json)"
+          shopt -s nullglob
+          dmgs=("${DMG_DIR}"/*.dmg)
+          if [ ${#dmgs[@]} -eq 0 ]; then
+            echo "::error::No DMGs found in ${DMG_DIR} — tauri bundler output path may have changed"
+            exit 1
+          fi
+          for dmg in "${dmgs[@]}"; do
+            echo "::group::Notarize $(basename "$dmg")"
+            xcrun notarytool submit "$dmg" \
+              --key "$KEY_PATH" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait --timeout 20m
+            xcrun stapler staple "$dmg"
+            spctl -a -t open --context context:primary-signature -vv "$dmg"
+            gh release upload "${RELEASE_TAG}" "$dmg" --clobber \
+              --repo "${GITHUB_REPOSITORY}"
+            echo "::endgroup::"
+          done
+
   build-cuda-windows:
     runs-on: windows-latest
     permissions:
