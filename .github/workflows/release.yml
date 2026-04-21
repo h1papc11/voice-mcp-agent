@@ -26,17 +26,6 @@ jobs:
             args: ""
             python-version: "3.12"
             backend: "pytorch"
-          - platform: "ubuntu-22.04"
-            # --config override disables updater-artifact generation on Linux.
-            # tauri.conf.json has createUpdaterArtifacts: "v1Compatible" which
-            # on Linux wants to synthesize a .AppImage.tar.gz by downloading
-            # linuxdeploy at build time — this is what silently hangs CI
-            # (see v0.4.2 round 2, 25 min of no output after rpm bundling).
-            # We ship deb+rpm only; Linux users update via apt/dnf, not the
-            # Tauri in-app updater.
-            args: '--target x86_64-unknown-linux-gnu --bundles deb,rpm --verbose --config {"bundle":{"createUpdaterArtifacts":false}}'
-            python-version: "3.12"
-            backend: "pytorch"
 
     runs-on: ${{ matrix.platform }}
 
