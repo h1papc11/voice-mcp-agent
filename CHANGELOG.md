@@ -7,6 +7,16 @@
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-04-21
+
+Hotfix for a regression in 0.4.3 where generation and transcription could fail outright with "offline mode is enabled" even when the user was online.
+
+### Reliability
+
+- **Inference no longer fails with "offline mode is enabled" while online** ([#524](https://github.com/jamiepine/voicebox/pull/524), reverts the inference-path guards from [#503](https://github.com/jamiepine/voicebox/pull/503)). 0.4.3 wrapped every inference body (`generate`, `transcribe`, `create_voice_clone_prompt`) with a process-wide `HF_HUB_OFFLINE` flip to stop lazy HuggingFace lookups from hanging when the network drops mid-inference ([#462](https://github.com/jamiepine/voicebox/issues/462)). That flag also blocks legitimate metadata calls (e.g. `HfApi().model_info` for revision resolution) so online users started seeing generation fail outright. Inference now runs with the process's default HF state. Load-time offline guards — which weren't the source of the regression — stay in place.
+
+**Known caveat**: users generating without an internet connection may see brief pauses during inference while HuggingFace metadata lookups time out (typically ~30s, after which the library recovers). A proper offline-mode toggle is planned for 0.4.5.
+
 ## [0.4.3] - 2026-04-20
 
 A patch focused on two user-impacting reliability fixes: macOS DMG notarization (unblocks `brew install voicebox` on macOS 15 Sequoia and fixes spurious "app isn't signed" Gatekeeper dialogs on older Intel Macs) and Kokoro Japanese voice initialization on fresh installs.
@@ -638,7 +648,8 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/jamiepine/voicebox/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jamiepine/voicebox/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jamiepine/voicebox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/jamiepine/voicebox/compare/v0.4.0...v0.4.1
