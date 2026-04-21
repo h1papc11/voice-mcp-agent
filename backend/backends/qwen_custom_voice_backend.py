@@ -186,7 +186,6 @@ class QwenCustomVoiceBackend:
         await self.load_model_async(None)
 
         speaker = voice_prompt.get("preset_voice_id") or QWEN_CV_DEFAULT_SPEAKER
-        model_name = f"qwen-custom-voice-{self._current_model_size}"
 
         def _generate_sync():
             if seed is not None:
@@ -206,11 +205,11 @@ class QwenCustomVoiceBackend:
             if instruct:
                 kwargs["instruct"] = instruct
 
-            # Model is loaded → weights are on disk. Force offline so
-            # lazy tokenizer/config lookups inside qwen_tts don't hang
-            # when the user is disconnected (issue #462).
-            with force_offline_if_cached(True, model_name):
-                wavs, sample_rate = self.model.generate_custom_voice(**kwargs)
+            # Inference runs with the process's default HF_HUB_OFFLINE
+            # state. Forcing offline here (issue #462) regressed online
+            # users whose libraries issue legitimate metadata lookups
+            # during generation.
+            wavs, sample_rate = self.model.generate_custom_voice(**kwargs)
             return wavs[0], sample_rate
 
         audio, sample_rate = await asyncio.to_thread(_generate_sync)

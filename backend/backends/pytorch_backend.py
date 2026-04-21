@@ -172,19 +172,17 @@ class PyTorchTTSBackend:
                     # This shouldn't happen in practice, but handle it
                     return {"prompt": cached_prompt}, True
 
-        model_name = f"qwen-tts-{self._current_model_size}"
-
         def _create_prompt_sync():
             """Run synchronous voice prompt creation in thread pool."""
-            # Model is loaded → weights are on disk. Force offline so
-            # lazy tokenizer/config lookups inside qwen_tts don't hang
-            # when the user is disconnected (issue #462).
-            with force_offline_if_cached(True, model_name):
-                return self.model.create_voice_clone_prompt(
-                    ref_audio=str(audio_path),
-                    ref_text=reference_text,
-                    x_vector_only_mode=False,
-                )
+            # Inference runs with the process's default HF_HUB_OFFLINE
+            # state. Forcing offline here (issue #462) regressed online
+            # users whose libraries issue legitimate metadata lookups
+            # during voice-prompt creation.
+            return self.model.create_voice_clone_prompt(
+                ref_audio=str(audio_path),
+                ref_text=reference_text,
+                x_vector_only_mode=False,
+            )
 
         # Run blocking operation in thread pool
         voice_prompt_items = await asyncio.to_thread(_create_prompt_sync)
@@ -227,24 +225,20 @@ class PyTorchTTSBackend:
         # Load model
         await self.load_model_async(None)
 
-        model_name = f"qwen-tts-{self._current_model_size}"
-
         def _generate_sync():
             """Run synchronous generation in thread pool."""
             # Set seed if provided
             if seed is not None:
                 manual_seed(seed, self.device)
 
-            # Model is loaded → weights are on disk. Force offline so
-            # lazy tokenizer/config lookups inside qwen_tts don't hang
-            # when the user is disconnected (issue #462).
-            with force_offline_if_cached(True, model_name):
-                wavs, sample_rate = self.model.generate_voice_clone(
-                    text=text,
-                    voice_clone_prompt=voice_prompt,
-                    language=LANGUAGE_CODE_TO_NAME.get(language, "auto"),
-                    instruct=instruct,
-                )
+            # See _create_prompt_sync comment — inference runs with the
+            # process's default HF_HUB_OFFLINE state (issue #462).
+            wavs, sample_rate = self.model.generate_voice_clone(
+                text=text,
+                voice_clone_prompt=voice_prompt,
+                language=LANGUAGE_CODE_TO_NAME.get(language, "auto"),
+                instruct=instruct,
+            )
             return wavs[0], sample_rate
 
         # Run blocking inference in thread pool to avoid blocking event loop
@@ -342,46 +336,44 @@ class PyTorchSTTBackend:
         """
         await self.load_model_async(model_size)
 
-        progress_model_name = f"whisper-{self.model_size}"
-
         def _transcribe_sync():
             """Run synchronous transcription in thread pool."""
             # Load audio
             audio, _sr = load_audio(audio_path, sample_rate=16000)
 
-            # Model is loaded → weights are on disk. Force offline so
-            # `get_decoder_prompt_ids` and any lazy tokenizer lookups
-            # don't hang when the user is disconnected (issue #462).
-            with force_offline_if_cached(True, progress_model_name):
-                # Process audio
-                inputs = self.processor(
-                    audio,
-                    sampling_rate=16000,
-                    return_tensors="pt",
+            # Inference runs with the process's default HF_HUB_OFFLINE
+            # state — forcing offline here (issue #462) broke online users
+            # whose `get_decoder_prompt_ids` / tokenizer calls issue
+            # legitimate metadata lookups.
+            # Process audio
+            inputs = self.processor(
+                audio,
+                sampling_rate=16000,
+                return_tensors="pt",
+            )
+            inputs = inputs.to(self.device)
+
+            # Generate transcription
+            # If language is provided, force it; otherwise let Whisper auto-detect
+            generate_kwargs = {}
+            if language:
+                forced_decoder_ids = self.processor.get_decoder_prompt_ids(
+                    language=language,
+                    task="transcribe",
                 )
-                inputs = inputs.to(self.device)
+                generate_kwargs["forced_decoder_ids"] = forced_decoder_ids
 
-                # Generate transcription
-                # If language is provided, force it; otherwise let Whisper auto-detect
-                generate_kwargs = {}
-                if language:
-                    forced_decoder_ids = self.processor.get_decoder_prompt_ids(
-                        language=language,
-                        task="transcribe",
-                    )
-                    generate_kwargs["forced_decoder_ids"] = forced_decoder_ids
+            with torch.no_grad():
+                predicted_ids = self.model.generate(
+                    inputs["input_features"],
+                    **generate_kwargs,
+                )
 
-                with torch.no_grad():
-                    predicted_ids = self.model.generate(
-                        inputs["input_features"],
-                        **generate_kwargs,
-                    )
-
-                # Decode
-                transcription = self.processor.batch_decode(
-                    predicted_ids,
-                    skip_special_tokens=True,
-                )[0]
+            # Decode
+            transcription = self.processor.batch_decode(
+                predicted_ids,
+                skip_special_tokens=True,
+            )[0]
 
             return transcription.strip()
 
