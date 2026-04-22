@@ -7,6 +7,15 @@
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-04-22
+
+Second hotfix for the "offline mode is enabled" crash on model load. 0.4.4 reverted the inference-path offline guards but kept the same trap on the load path, so users who updated to 0.4.4 kept hitting the exact error the release was supposed to fix ([#526](https://github.com/jamiepine/voicebox/issues/526)). This release removes the load-path guards and patches the transformers tokenizer load to be robust to HuggingFace metadata failures at the source, so the class of bug can't recur.
+
+### Reliability
+
+- **Load no longer fails with "offline mode is enabled"** ([#530](https://github.com/jamiepine/voicebox/pull/530), fixes [#526](https://github.com/jamiepine/voicebox/issues/526)). transformers 4.57.x added an unconditional `huggingface_hub.model_info()` call inside `AutoTokenizer.from_pretrained` (via `_patch_mistral_regex`) that runs for every non-local repo load, regardless of cache state or whether the target model is actually a Mistral variant. The load-time `HF_HUB_OFFLINE` guard from 0.4.2 turned that into a hard crash for cached online users the moment 0.4.4 removed the inference-path guard that had been masking the problem. Fix wraps `_patch_mistral_regex` so any exception from the HF metadata check is caught and the tokenizer is returned unchanged — matching the success-path behavior for non-Mistral repos. The wrapper installs at `backend.backends` import time so it covers Qwen Base, Qwen CustomVoice, TADA, and every other transformers-backed engine on Windows, Linux, and CUDA alike. The load-time `force_offline_if_cached` guards were removed — with the wrapper in place they provide zero value and only risk re-introducing the same failure mode.
+- **No more 30s pause when generating without a network.** The HuggingFace metadata timeout called out as a known caveat in 0.4.4 is covered by the same patch; offline users no longer wait for the check to time out before load completes.
+
 ## [0.4.4] - 2026-04-21
 
 Hotfix for a regression in 0.4.3 where generation and transcription could fail outright with "offline mode is enabled" even when the user was online.
@@ -648,7 +657,8 @@ The first public release of Voicebox — an open-source voice synthesis studio p
 
 Tauri v2, React, TypeScript, Tailwind CSS, FastAPI, Qwen3-TTS, Whisper, SQLite
 
-[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/jamiepine/voicebox/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/jamiepine/voicebox/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/jamiepine/voicebox/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/jamiepine/voicebox/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/jamiepine/voicebox/compare/v0.4.1...v0.4.2
