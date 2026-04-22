@@ -20,7 +20,6 @@ ensure_original_qwen_config_cached()
 from . import TTSBackend, STTBackend, LANGUAGE_CODE_TO_NAME, WHISPER_HF_REPOS
 from .base import is_model_cached, combine_voice_prompts as _combine_voice_prompts, model_load_progress
 from ..utils.cache import get_cache_key, get_cached_voice_prompt, cache_voice_prompt
-from ..utils.hf_offline_patch import force_offline_if_cached
 
 
 class MLXTTSBackend:
@@ -99,8 +98,7 @@ class MLXTTSBackend:
 
             logger.info("Loading MLX TTS model %s...", model_size)
 
-            with force_offline_if_cached(is_cached, model_name):
-                self.model = load(model_path)
+            self.model = load(model_path)
 
         self._current_model_size = model_size
         self.model_size = model_size
@@ -311,8 +309,7 @@ class MLXSTTBackend:
             model_name = WHISPER_HF_REPOS.get(model_size, f"openai/whisper-{model_size}")
             logger.info("Loading MLX Whisper model %s...", model_size)
 
-            with force_offline_if_cached(is_cached, progress_model_name):
-                self.model = load(model_name)
+            self.model = load(model_name)
 
         self.model_size = model_size
         logger.info("MLX Whisper model %s loaded successfully", model_size)

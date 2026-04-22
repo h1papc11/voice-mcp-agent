@@ -5,6 +5,13 @@ Provides a unified interface for MLX and PyTorch backends,
 and a model config registry that eliminates per-engine dispatch maps.
 """
 
+# Install HF compatibility patches before any backend imports transformers /
+# huggingface_hub. The module runs ``patch_transformers_mistral_regex`` at
+# import time, which wraps transformers' tokenizer load against the
+# unconditional HuggingFace metadata call that otherwise raises on
+# HF_HUB_OFFLINE=1 and on network failures.
+from ..utils import hf_offline_patch  # noqa: F401
+
 import threading
 from dataclasses import dataclass, field
 from typing import Protocol, Optional, Tuple, List

@@ -28,7 +28,6 @@ from .base import (
     combine_voice_prompts as _combine_voice_prompts,
     model_load_progress,
 )
-from ..utils.hf_offline_patch import force_offline_if_cached
 
 logger = logging.getLogger(__name__)
 
@@ -105,19 +104,18 @@ class QwenCustomVoiceBackend:
             model_path = self._get_model_path(model_size)
             logger.info("Loading Qwen CustomVoice %s on %s...", model_size, self.device)
 
-            with force_offline_if_cached(is_cached, model_name):
-                if self.device == "cpu":
-                    self.model = Qwen3TTSModel.from_pretrained(
-                        model_path,
-                        torch_dtype=torch.float32,
-                        low_cpu_mem_usage=False,
-                    )
-                else:
-                    self.model = Qwen3TTSModel.from_pretrained(
-                        model_path,
-                        device_map=self.device,
-                        torch_dtype=torch.bfloat16,
-                    )
+            if self.device == "cpu":
+                self.model = Qwen3TTSModel.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.float32,
+                    low_cpu_mem_usage=False,
+                )
+            else:
+                self.model = Qwen3TTSModel.from_pretrained(
+                    model_path,
+                    device_map=self.device,
+                    torch_dtype=torch.bfloat16,
+                )
 
         self._current_model_size = model_size
         self.model_size = model_size

@@ -142,6 +142,57 @@ def force_offline_if_cached(is_cached: bool, model_label: str = ""):
                 _saved_transformers_const = None
 
 
+_mistral_regex_patched = False
+
+
+def patch_transformers_mistral_regex():
+    """Make transformers' tokenizer load robust to HuggingFace metadata failures.
+
+    transformers 4.57.x added ``PreTrainedTokenizerBase._patch_mistral_regex``
+    which unconditionally calls ``huggingface_hub.model_info(repo_id)`` during
+    every non-local tokenizer load to check whether the model is a Mistral
+    variant. That call raises on ``HF_HUB_OFFLINE=1`` and on plain network
+    failures, killing unrelated loads (Qwen TTS, TADA, etc.).
+
+    Voicebox never loads Mistral models, so the rewrite the function would
+    apply is a no-op for us anyway. Wrap the method so any exception from the
+    metadata lookup returns the tokenizer unchanged — matching the success-path
+    behavior for non-Mistral repos (transformers 4.57.3,
+    ``tokenization_utils_base.py:2503``).
+    """
+    global _mistral_regex_patched
+    if _mistral_regex_patched:
+        return
+
+    try:
+        from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+    except ImportError:
+        logger.debug("transformers not available, skipping mistral-regex patch")
+        return
+
+    original = getattr(PreTrainedTokenizerBase, "_patch_mistral_regex", None)
+    if original is None:
+        logger.debug(
+            "transformers has no _patch_mistral_regex attribute, skipping patch",
+        )
+        return
+
+    def safe_patch_mistral_regex(cls, tokenizer, pretrained_model_name_or_path, *args, **kwargs):
+        try:
+            return original(tokenizer, pretrained_model_name_or_path, *args, **kwargs)
+        except Exception as exc:
+            logger.debug(
+                "[mistral-regex-patch] suppressed %s for %r, returning tokenizer as-is",
+                type(exc).__name__,
+                pretrained_model_name_or_path,
+            )
+            return tokenizer
+
+    PreTrainedTokenizerBase._patch_mistral_regex = classmethod(safe_patch_mistral_regex)
+    _mistral_regex_patched = True
+    logger.debug("installed _patch_mistral_regex wrapper")
+
+
 def patch_huggingface_hub_offline():
     """Monkey-patch huggingface_hub to force offline mode."""
     try:
@@ -215,4 +266,5 @@ def ensure_original_qwen_config_cached():
 
 if os.environ.get("VOICEBOX_OFFLINE_PATCH", "1") != "0":
     patch_huggingface_hub_offline()
+    patch_transformers_mistral_regex()
     ensure_original_qwen_config_cached()
