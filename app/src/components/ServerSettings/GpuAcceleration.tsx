@@ -366,7 +366,7 @@ export function GpuAcceleration() {
                   <Button
                     onClick={handleDelete}
                     variant="ghost"
-                    className="w-full text-muted-foreground hover:text-destructive"
+                    className="w-full text-muted-foreground "
                     size="sm"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />

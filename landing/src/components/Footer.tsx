@@ -40,18 +40,33 @@ export function Footer() {
             <h4 className="text-sm font-semibold mb-3">Product</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <a href="#features" className="hover:text-foreground transition-colors">
-                  Features
+                <a href="/#features" className="hover:text-foreground transition-colors">
+                  Clone
+                </a>
+              </li>
+              <li>
+                <a href="/capture" className="hover:text-foreground transition-colors">
+                  Capture
+                </a>
+              </li>
+              <li>
+                <a href="/#mcp" className="hover:text-foreground transition-colors">
+                  MCP
+                </a>
+              </li>
+              <li>
+                <a href="/#about" className="hover:text-foreground transition-colors">
+                  Models
+                </a>
+              </li>
+              <li>
+                <a href="/#api" className="hover:text-foreground transition-colors">
+                  API
                 </a>
               </li>
               <li>
                 <a href="/download" className="hover:text-foreground transition-colors">
                   Download
-                </a>
-              </li>
-              <li>
-                <a href="#about" className="hover:text-foreground transition-colors">
-                  About
                 </a>
               </li>
             </ul>
@@ -100,6 +115,11 @@ export function Footer() {
                 >
                   Issues
                 </Link>
+              </li>
+              <li>
+                <a href="/sponsors" className="hover:text-foreground transition-colors">
+                  VIP Sponsor
+                </a>
               </li>
             </ul>
           </div>

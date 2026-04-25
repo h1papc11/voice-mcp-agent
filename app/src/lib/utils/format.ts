@@ -40,6 +40,16 @@ export function formatDate(date: string | Date): string {
   }).replace(/^about /i, '');
 }
 
+export function formatAbsoluteDate(date: string | Date): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return dateObj.toLocaleString(i18n.language, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 const ENGINE_DISPLAY_NAMES: Record<string, string> = {
   qwen: 'Qwen',
   luxtts: 'LuxTTS',

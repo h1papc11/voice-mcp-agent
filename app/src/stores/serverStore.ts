@@ -15,18 +15,6 @@ interface ServerStore {
   keepServerRunningOnClose: boolean;
   setKeepServerRunningOnClose: (keepRunning: boolean) => void;
 
-  maxChunkChars: number;
-  setMaxChunkChars: (value: number) => void;
-
-  crossfadeMs: number;
-  setCrossfadeMs: (value: number) => void;
-
-  normalizeAudio: boolean;
-  setNormalizeAudio: (value: boolean) => void;
-
-  autoplayOnGenerate: boolean;
-  setAutoplayOnGenerate: (value: boolean) => void;
-
   customModelsDir: string | null;
   setCustomModelsDir: (dir: string | null) => void;
 }
@@ -93,18 +81,6 @@ export const useServerStore = create<ServerStore>()(
 
       keepServerRunningOnClose: false,
       setKeepServerRunningOnClose: (keepRunning) => set({ keepServerRunningOnClose: keepRunning }),
-
-      maxChunkChars: 800,
-      setMaxChunkChars: (value) => set({ maxChunkChars: value }),
-
-      crossfadeMs: 50,
-      setCrossfadeMs: (value) => set({ crossfadeMs: value }),
-
-      normalizeAudio: true,
-      setNormalizeAudio: (value) => set({ normalizeAudio: value }),
-
-      autoplayOnGenerate: true,
-      setAutoplayOnGenerate: (value) => set({ autoplayOnGenerate: value }),
 
       customModelsDir: null,
       setCustomModelsDir: (dir) => set({ customModelsDir: dir }),

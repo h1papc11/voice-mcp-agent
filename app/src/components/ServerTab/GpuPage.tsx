@@ -388,7 +388,7 @@ export function GpuPage() {
                       onClick={handleDelete}
                       variant="ghost"
                       size="sm"
-                      className="text-muted-foreground hover:text-destructive"
+                      className="text-muted-foreground "
                     >
                       <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                       {t('settings.gpu.remove.button')}

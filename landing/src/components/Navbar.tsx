@@ -48,19 +48,34 @@ export function Navbar() {
         {/* Nav links - centered */}
         <div className="hidden sm:flex items-center gap-1 justify-self-center">
           <a
-            href="#features"
+            href="/#features"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
-            Features
+            Clone
           </a>
           <a
-            href="#about"
+            href="/capture"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Capture
+            <span className="rounded-full bg-accent/15 px-1.5 text-[9px] font-semibold uppercase tracking-wider text-accent">
+              New
+            </span>
+          </a>
+          <a
+            href="/#mcp"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            MCP
+          </a>
+          <a
+            href="/#about"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             Models
           </a>
           <a
-            href="#api"
+            href="/#api"
             className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             API
