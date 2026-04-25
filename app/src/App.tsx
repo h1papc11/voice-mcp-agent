@@ -11,7 +11,11 @@ import { cn } from '@/lib/utils/cn';
 import { usePlatform } from '@/platform/PlatformContext';
 import { router } from '@/router';
 import { useLogStore } from '@/stores/logStore';
-import { useServerStore } from '@/stores/serverStore';
+import {
+  getDefaultServerUrl,
+  isLoopbackVoiceboxServerUrl,
+  useServerStore,
+} from '@/stores/serverStore';
 
 /**
  * Validate that a health response has the expected Voicebox-specific shape.
@@ -105,6 +109,11 @@ function App() {
   // Setup window close handler and auto-start server when running in Tauri (production only)
   useEffect(() => {
     if (!platform.metadata.isTauri) {
+      const serverUrl = getDefaultServerUrl();
+      const currentServerUrl = useServerStore.getState().serverUrl;
+      if (currentServerUrl !== serverUrl && isLoopbackVoiceboxServerUrl(currentServerUrl)) {
+        useServerStore.getState().setServerUrl(serverUrl);
+      }
       setServerReady(true); // Web assumes server is running
       return;
     }

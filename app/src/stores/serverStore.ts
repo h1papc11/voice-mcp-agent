@@ -39,10 +39,44 @@ function invalidateAllServerData() {
   queryClient.invalidateQueries();
 }
 
+export function getDefaultServerUrl(): string {
+  const fallback = 'http://127.0.0.1:17493';
+
+  if (!import.meta.env.PROD || typeof window === 'undefined') {
+    return fallback;
+  }
+
+  const { protocol, origin, hostname } = window.location;
+  if (
+    (protocol === 'http:' || protocol === 'https:') &&
+    origin &&
+    hostname !== 'tauri.localhost'
+  ) {
+    return origin;
+  }
+
+  return fallback;
+}
+
+export function isLoopbackVoiceboxServerUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      parsed.port === '17493' &&
+      (parsed.hostname === '127.0.0.1' ||
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '[::1]' ||
+        parsed.hostname === '::1')
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const useServerStore = create<ServerStore>()(
   persist(
     (set, get) => ({
-      serverUrl: 'http://127.0.0.1:17493',
+      serverUrl: getDefaultServerUrl(),
       setServerUrl: (url) => {
         const prev = get().serverUrl;
         set({ serverUrl: url });
