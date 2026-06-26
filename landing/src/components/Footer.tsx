@@ -1,13 +1,20 @@
-import { Coffee } from 'lucide-react';
+import { ArrowUpRight, Coffee, Coins } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { DONATE_URL, GITHUB_REPO } from '@/lib/constants';
+import { CopyAddress } from '@/components/CopyAddress';
+import {
+  DONATE_URL,
+  GITHUB_REPO,
+  TOKEN_CONTRACT_ADDRESS,
+  TOKEN_PUMP_URL,
+  TOKEN_TICKER,
+} from '@/lib/constants';
 
 export function Footer() {
   return (
     <footer className="border-t border-border py-12">
       <div className="mx-auto max-w-7xl px-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-8 mb-10">
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
@@ -116,11 +123,6 @@ export function Footer() {
                   Issues
                 </Link>
               </li>
-              <li>
-                <a href="/sponsors" className="hover:text-foreground transition-colors">
-                  VIP Sponsor
-                </a>
-              </li>
             </ul>
           </div>
 
@@ -149,6 +151,28 @@ export function Footer() {
                 </a>
               </li>
             </ul>
+          </div>
+
+          {/* Token */}
+          <div>
+            <h4 className="text-sm font-semibold mb-3">Token</h4>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-accent" />
+                <span className="font-semibold text-foreground">{TOKEN_TICKER}</span>
+                <span className="text-xs text-muted-foreground/60">Solana</span>
+              </div>
+              <CopyAddress address={TOKEN_CONTRACT_ADDRESS} />
+              <a
+                href={TOKEN_PUMP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                Buy on pump.fun
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </a>
+            </div>
           </div>
         </div>
 

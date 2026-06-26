@@ -11,7 +11,6 @@ import {Footer} from "@/components/Footer";
 import {Navbar} from "@/components/Navbar";
 import {Personalities} from "@/components/Personalities";
 import {AppleIcon, LinuxIcon, WindowsIcon} from "@/components/PlatformIcons";
-import {SponsorPromo} from "@/components/SponsorPromo";
 import {SupportedModels} from "@/components/SupportedModels";
 import {TutorialsSection} from "@/components/TutorialsSection";
 import {VoiceCreator} from "@/components/VoiceCreator";
@@ -130,9 +129,6 @@ export default function Home() {
 					<ControlUI />
 				</div>
 			</section>
-
-			{/* ── Sponsor promo ────────────────────────────────────────── */}
-			<SponsorPromo />
 
 			{/* ── Features ─────────────────────────────────────────────── */}
 			<Features />
