@@ -110,7 +110,9 @@ POST /generate
 - MCP rough edges — dotted tool names violate Claude Desktop's name pattern (#790), audio scrambled over MCP (#780).
 - Refinement silently translates non-English transcripts to English (#603).
 
-**Trust/abuse signals to watch:** a `$VOICEBOX` token is being associated with the project (#806) — not ours; macOS malware-flag reports continue (#369); a DNS-rebinding / Host-header exposure on the local API+MCP server was reported with fixes attached (#778).
+**Funding model — `$VOICEBOX` token (#806):** the two-month gap was a solo-dev decision about long-term sustainability, not neglect or a compromise. `$VOICEBOX` (Solana) is the **official, dev-controlled** token and the chosen revenue path — donations/sponsors didn't cover full-time work. The app stays 100% free, open-source, local-first, no subscriptions. Dev supply is being bought back and burned (done twice), liquidity locked. It has funded ~2–3 months of full-time work, so the cadence resumes this week. The #806 thread was a community concern, addressed transparently and resolved amicably; keep an eye out for actual impersonator/community tokens, which are a separate thing.
+
+**Other trust/security signals:** macOS malware-flag reports continue (#369); a DNS-rebinding / Host-header exposure on the local API+MCP server was reported with fixes attached (#778).
 
 ---
 
@@ -392,7 +394,7 @@ One contributor opened a large, coherent quality suite in a single day. Review a
 | Long-form / chunking / export | ~16 | Pause control, speed control, audiobook export, >50k chars |
 | Linux / Wayland | ~11 | Build failures, Wayland panics, CUDA-on-Linux packaging |
 | MCP / agent / API | ~9 | Dotted tool names (#790), scrambled audio (#780), OpenAI compat (#10) |
-| Security / trust | ~4 | $VOICEBOX token (#806), malware flag (#369), DNS-rebinding (#778) |
+| Security / trust | ~4 | DNS-rebinding (#778), malware flag (#369); funding via official $VOICEBOX token (#806) |
 
 **Highest-engagement open issues:** #185 Fine-tune instructions (32c) · #98 Connecting to Download (16c) · #301 CUDA generation failure (18c) · #20 Model download failed (13c) · #364 Voxtral-TTS FR (11r) · #341 Arch Linux build · #513 server startup failed (12c) · #138 ONNX/Piper export (9r) · #10 OpenAI API compat.
 
@@ -405,7 +407,7 @@ One contributor opened a large, coherent quality suite in a single day. Review a
 - **GPU expansion requests:** #676 DirectML (AMD/Intel), #759 Intel Arc, #684 RTX 5060 Ti CUDA 13, #774 CUDA 11.x for older cards, #767 Linux CUDA installs Windows `.exe`.
 - **New engines/langs:** #791 OmniVoice, #633 VoxCPM2, #690 Dramabox, #638 Bengali, #754 zh-TW, #761 Filipino.
 - **Open plugin interface (#771):** request for a community engine/provider plugin API — ties into engine-sprawl (#419) and platform-gating work.
-- **Trust:** #806 $VOICEBOX token associated with the project (not ours — decide on a statement), #778 DNS-rebinding/Host-header exposure on local API+MCP (fixes attached), #369 macOS malware flag (ongoing).
+- **Trust/security:** #806 — `$VOICEBOX` is the official dev-backed funding token (concern raised and resolved on-thread; see funding note above); #778 DNS-rebinding/Host-header exposure on local API+MCP (fixes attached) — genuine security item; #369 macOS malware flag (ongoing).
 
 ### GPU / Hardware Detection — still the top category
 
@@ -655,7 +657,7 @@ The two-month gap means the highest-leverage work isn't new code — it's review
 | 6 | **Drain the i18n batch** (#528, #571, #599–601, #569, #798–801, #802, #776) | ~12 finished PRs, large user segment | Low (review-bound) |
 | 7 | **Review the @neuron-tech-ai hardening batch** — start with #662, #657 (platform gating), #656 (OpenAI API), #654 (CI) | Security + perf + bottleneck #6 in one sweep | Medium (review-bound) |
 | 8 | **Remove 50k char limit** (#464) — merge PR #786; tune chunk boundaries | Long-standing regression | Low |
-| 9 | Housekeeping — dedupe MiniMax #331/#430, re-evaluate CosyVoice #777, close spam (#805, #775, #806-as-issue), publish a $VOICEBOX-token statement | Triage hygiene + trust | Low |
+| 9 | Housekeeping — dedupe MiniMax #331/#430, re-evaluate CosyVoice #777, close spam/empty issues (#805, #775) | Triage hygiene | Low |
 
 ### Tier 2 — Feature Work
 
