@@ -12,7 +12,8 @@ import {Navbar} from "@/components/Navbar";
 import {Personalities} from "@/components/Personalities";
 import {AppleIcon, LinuxIcon, WindowsIcon} from "@/components/PlatformIcons";
 import {SupportedModels} from "@/components/SupportedModels";
-import {TokenSection} from "@/components/TokenSection";
+import {Testimonials} from "@/components/Testimonials";
+import {TokenTeaser} from "@/components/TokenTeaser";
 import {TutorialsSection} from "@/components/TutorialsSection";
 import {VoiceCreator} from "@/components/VoiceCreator";
 import {GITHUB_REPO} from "@/lib/constants";
@@ -131,9 +132,6 @@ export default function Home() {
 				</div>
 			</section>
 
-			{/* ── $VOICEBOX token ──────────────────────────────────────── */}
-			<TokenSection />
-
 			{/* ── Features ─────────────────────────────────────────────── */}
 			<Features />
 
@@ -157,6 +155,9 @@ export default function Home() {
 
 			{/* ── Supported models ─────────────────────────────────────── */}
 			<SupportedModels />
+
+			{/* ── Testimonials ─────────────────────────────────────────── */}
+			<Testimonials />
 
 			{/* ── Download Section ─────────────────────────────────────── */}
 			<section id="download" className="border-t border-border py-24">
@@ -240,6 +241,9 @@ export default function Home() {
 					</div>
 				</div>
 			</section>
+
+			{/* ── $VOICEBOX token (teaser → /token) ─────────────────────── */}
+			<TokenTeaser />
 
 			{/* ── Footer ───────────────────────────────────────────────── */}
 			<Footer />

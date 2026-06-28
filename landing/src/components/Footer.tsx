@@ -6,7 +6,6 @@ import {
   DONATE_URL,
   GITHUB_REPO,
   TOKEN_CONTRACT_ADDRESS,
-  TOKEN_PUMP_URL,
   TOKEN_TICKER,
 } from '@/lib/constants';
 
@@ -72,6 +71,16 @@ export function Footer() {
                 </a>
               </li>
               <li>
+                <a href="/cloud" className="hover:text-foreground transition-colors">
+                  Cloud
+                </a>
+              </li>
+              <li>
+                <a href="/pricing" className="hover:text-foreground transition-colors">
+                  Pricing
+                </a>
+              </li>
+              <li>
                 <a href="/download" className="hover:text-foreground transition-colors">
                   Download
                 </a>
@@ -83,6 +92,11 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3">Resources</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>
+                <a href="/blog" className="hover:text-foreground transition-colors">
+                  Blog
+                </a>
+              </li>
               <li>
                 <Link
                   href="https://docs.voicebox.sh"
@@ -122,6 +136,11 @@ export function Footer() {
                 >
                   Issues
                 </Link>
+              </li>
+              <li>
+                <a href="/sponsors" className="hover:text-foreground transition-colors">
+                  VIP Sponsor
+                </a>
               </li>
             </ul>
           </div>
@@ -163,15 +182,13 @@ export function Footer() {
                 <span className="text-xs text-muted-foreground/60">Solana</span>
               </div>
               <CopyAddress address={TOKEN_CONTRACT_ADDRESS} />
-              <a
-                href={TOKEN_PUMP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/token"
                 className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
               >
-                Buy on pump.fun
+                Token details
                 <ArrowUpRight className="h-3.5 w-3.5" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>

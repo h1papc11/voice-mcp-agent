@@ -3,7 +3,7 @@
 import { Coffee, Coins, Github } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { DONATE_URL, GITHUB_REPO, TOKEN_PUMP_URL, TOKEN_TICKER } from '@/lib/constants';
+import { DONATE_URL, GITHUB_REPO, TOKEN_TICKER } from '@/lib/constants';
 
 function formatStarCount(count: number): string {
   if (count >= 1000) {
@@ -32,7 +32,7 @@ export function Navbar() {
 
   return (
     <nav className="fixed inset-x-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 sm:grid sm:grid-cols-3">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:gap-x-6">
         {/* Logo + wordmark */}
         <a href="/" className="flex items-center gap-2.5 justify-self-start">
           <Image
@@ -75,6 +75,18 @@ export function Navbar() {
             Models
           </a>
           <a
+            href="/pricing"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Pricing
+          </a>
+          <a
+            href="/blog"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Blog
+          </a>
+          <a
             href="https://docs.voicebox.sh"
             target="_blank"
             rel="noopener noreferrer"
@@ -87,11 +99,9 @@ export function Navbar() {
         {/* Token + Donate + GitHub star buttons */}
         <div className="flex items-center gap-2 justify-self-end">
           <a
-            href={TOKEN_PUMP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/token"
             className="hidden sm:flex items-center gap-2 rounded-lg border border-border/60 bg-card/60 px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground hover:border-accent/40"
-            aria-label={`${TOKEN_TICKER} token on pump.fun`}
+            aria-label={`${TOKEN_TICKER} token`}
           >
             <Coins className="h-4 w-4 text-accent" />
             <span className="text-[13px] font-semibold tracking-wide text-foreground">
