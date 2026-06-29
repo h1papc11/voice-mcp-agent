@@ -12,6 +12,7 @@ import type {Metadata} from "next";
 import {Footer} from "@/components/Footer";
 import {Navbar} from "@/components/Navbar";
 import {TokenSection} from "@/components/TokenSection";
+import {TokenStatsSection} from "@/components/TokenStats";
 import {
 	TOKEN_PROOFS,
 	TOKEN_SOLSCAN_URL,
@@ -29,6 +30,10 @@ export const metadata: Metadata = {
 		images: [{url: "/og.webp", width: 1200, height: 630}],
 	},
 };
+
+// Re-fetch live on-chain stats at most every 10 minutes (matches the server
+// cache in token-stats.ts). Keeps the page static-fast while staying fresh.
+export const revalidate = 600;
 
 const USE_OF_FUNDS = [
 	{
@@ -76,6 +81,9 @@ export default function TokenPage() {
 			    header, contract address, and buy CTA. */}
 			<main className="pt-16">
 				<TokenSection />
+
+				{/* ── Live on-chain stats ──────────────────────────────────── */}
+				<TokenStatsSection />
 
 				{/* ── Why a token ──────────────────────────────────────────── */}
 				<section className="border-t border-border py-20">
