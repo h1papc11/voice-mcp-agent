@@ -109,8 +109,7 @@ function TokenStatsView({stats}: {stats: TokenStats}) {
 					</h2>
 					<p className="text-muted-foreground max-w-2xl mx-auto mt-4">
 						Supply, holders, burns, locks and team holdings for {TOKEN_TICKER},
-						read live from Solana. Nothing here is hand-entered — cross-check any
-						figure on Solscan.
+						read live from Solana.
 					</p>
 				</div>
 

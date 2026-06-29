@@ -218,6 +218,19 @@ Shipped 2026-04-25 (PR #544). Voicebox went from a voice-cloning studio to a ful
 
 **Integration shape if we revive it:** Zero-shot cloning maps naturally to the Chatterbox-style backend (store `ref_audio` + `ref_text` paths in the voice prompt dict, process at generate time). Est. ~250 lines for `voxcpm_backend.py` + one `ModelConfig` entry + engine registration in `backends/__init__.py`. Frontend UI gating is the bigger lift.
 
+### Funded Roadmap (2026-H2)
+
+`$VOICEBOX` funded ~2–3 months of full-time work; cadence resumes the week of 2026-06-27. Direction committed publicly in #806:
+
+| Item | Notes |
+|------|-------|
+| **Resume merge/release cadence** | Clear the 88-PR backlog, regular commits + releases — this is the immediate focus (see Tier 1) |
+| **Mobile companion app** | New surface; already drawing issues (#773 iPhone logout) |
+| **Encrypted cloud backup/sync** | For voice profiles + generations — first cloud feature; stays opt-in, local-first remains default |
+| **More TTS models** | Engine candidates in the Landscape section below; community PRs #507/#766/#777 in queue |
+| **Better GPU support** | Blackwell/sm_120, ROCm, DirectML, Intel — incl. paying testers for hardware the dev lacks |
+| **Bug fixes** | 0.5.0 regression cluster first (macOS load crash, capture cutoffs, MCP, refinement) |
+
 ### What's In-Flight
 
 | Feature | Branch/PR | Status |
