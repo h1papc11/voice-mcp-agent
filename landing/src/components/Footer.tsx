@@ -2,12 +2,7 @@ import { ArrowUpRight, Coffee, Coins } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CopyAddress } from '@/components/CopyAddress';
-import {
-  DONATE_URL,
-  GITHUB_REPO,
-  TOKEN_CONTRACT_ADDRESS,
-  TOKEN_TICKER,
-} from '@/lib/constants';
+import { DONATE_URL, GITHUB_REPO, TOKEN_CONTRACT_ADDRESS, TOKEN_TICKER } from '@/lib/constants';
 
 export function Footer() {
   return (

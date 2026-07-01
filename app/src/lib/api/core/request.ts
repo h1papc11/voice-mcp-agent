@@ -5,8 +5,8 @@
 import { ApiError } from './ApiError';
 import type { ApiRequestOptions } from './ApiRequestOptions';
 import type { ApiResult } from './ApiResult';
-import { CancelablePromise } from './CancelablePromise';
 import type { OnCancel } from './CancelablePromise';
+import { CancelablePromise } from './CancelablePromise';
 import type { OpenAPIConfig } from './OpenAPI';
 
 export const isDefined = <T>(
@@ -44,7 +44,7 @@ export const base64 = (str: string): string => {
   try {
     return btoa(str);
   } catch (err) {
-    // @ts-ignore
+    // @ts-expect-error
     return Buffer.from(str).toString('base64');
   }
 };

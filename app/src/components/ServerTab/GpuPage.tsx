@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { apiClient } from '@/lib/api/client';
-import type { CudaDownloadProgress, RocmDownloadProgress, HealthResponse } from '@/lib/api/types';
+import type { CudaDownloadProgress, HealthResponse, RocmDownloadProgress } from '@/lib/api/types';
 import { useServerHealth } from '@/lib/hooks/useServer';
 import { usePlatform } from '@/platform/PlatformContext';
 import { useServerStore } from '@/stores/serverStore';
@@ -50,8 +50,8 @@ function GpuInfoCard({ health }: { health: HealthResponse }) {
     : null;
   const gpuBackend = hasGpu ? health.gpu_type!.replace(/\s*\(.+\)$/, '') : null;
   const isApple = gpuBackend === 'MPS' || gpuBackend === 'Metal';
-  const showBackendVariant = 
-    health.backend_variant && 
+  const showBackendVariant =
+    health.backend_variant &&
     health.backend_variant !== 'cpu' &&
     health.backend_variant.toLowerCase() !== gpuBackend?.toLowerCase();
 
@@ -321,7 +321,6 @@ export function GpuPage() {
     }
   };
 
-
   const handleSwitchToCpu = async () => {
     setError(null);
     setRestartPhase('stopping');
@@ -502,86 +501,90 @@ export function GpuPage() {
           </SettingSection>
 
           {supportsRocm && (
-          <SettingSection
-            title={t('settings.gpu.rocm.title')}
-            description={t('settings.gpu.rocm.description')}
-          >
-            {rocmDownloading && rocmDownloadProgress && (
-              <SettingRow title={t('settings.gpu.rocm.downloading')}>
-                <div className="space-y-1.5">
-                  <Progress value={rocmDownloadProgress.progress} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>
-                      {rocmDownloadProgress.filename ||
-                        (rocmAvailable
-                          ? t('settings.gpu.rocm.updating')
-                          : t('settings.gpu.rocm.downloadingShort'))}
-                    </span>
-                    <span>
-                      {rocmDownloadProgress.total > 0
-                        ? `${formatBytes(rocmDownloadProgress.current)} / ${formatBytes(rocmDownloadProgress.total)}`
-                        : `${rocmDownloadProgress.progress.toFixed(1)}%`}
-                    </span>
+            <SettingSection
+              title={t('settings.gpu.rocm.title')}
+              description={t('settings.gpu.rocm.description')}
+            >
+              {rocmDownloading && rocmDownloadProgress && (
+                <SettingRow title={t('settings.gpu.rocm.downloading')}>
+                  <div className="space-y-1.5">
+                    <Progress value={rocmDownloadProgress.progress} className="h-2" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {rocmDownloadProgress.filename ||
+                          (rocmAvailable
+                            ? t('settings.gpu.rocm.updating')
+                            : t('settings.gpu.rocm.downloadingShort'))}
+                      </span>
+                      <span>
+                        {rocmDownloadProgress.total > 0
+                          ? `${formatBytes(rocmDownloadProgress.current)} / ${formatBytes(rocmDownloadProgress.total)}`
+                          : `${rocmDownloadProgress.progress.toFixed(1)}%`}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </SettingRow>
-            )}
+                </SettingRow>
+              )}
 
-            {restartPhase === 'idle' && !rocmDownloading && (
-              <>
-                {!rocmAvailable && !isCurrentlyRocm && (
-                  <SettingRow
-                    title={t('settings.gpu.downloadRocm.title')}
-                    description={t('settings.gpu.downloadRocm.description')}
-                    action={
-                      <Button onClick={handleDownloadRocm} size="sm">
-                        <Download className="h-3.5 w-3.5 mr-1.5" />
-                        {t('settings.gpu.downloadRocm.button')}
-                      </Button>
-                    }
-                  />
-                )}
+              {restartPhase === 'idle' && !rocmDownloading && (
+                <>
+                  {!rocmAvailable && !isCurrentlyRocm && (
+                    <SettingRow
+                      title={t('settings.gpu.downloadRocm.title')}
+                      description={t('settings.gpu.downloadRocm.description')}
+                      action={
+                        <Button onClick={handleDownloadRocm} size="sm">
+                          <Download className="h-3.5 w-3.5 mr-1.5" />
+                          {t('settings.gpu.downloadRocm.button')}
+                        </Button>
+                      }
+                    />
+                  )}
 
-                {rocmAvailable && !isCurrentlyRocm && platform.metadata.isTauri && (
-                  <SettingRow
-                    title={t('settings.gpu.switchToRocm.title')}
-                    description={t('settings.gpu.switchToRocm.description')}
-                    action={
-                      <Button onClick={handleSwitchToRocm} size="sm">
-                        <RotateCw className="h-3.5 w-3.5 mr-1.5" />
-                        {t('settings.gpu.switchToRocm.button')}
-                      </Button>
-                    }
-                  />
-                )}
+                  {rocmAvailable && !isCurrentlyRocm && platform.metadata.isTauri && (
+                    <SettingRow
+                      title={t('settings.gpu.switchToRocm.title')}
+                      description={t('settings.gpu.switchToRocm.description')}
+                      action={
+                        <Button onClick={handleSwitchToRocm} size="sm">
+                          <RotateCw className="h-3.5 w-3.5 mr-1.5" />
+                          {t('settings.gpu.switchToRocm.button')}
+                        </Button>
+                      }
+                    />
+                  )}
 
-                {rocmAvailable && !isCurrentlyRocm && (
-                  <SettingRow
-                    title={t('settings.gpu.removeRocm.title')}
-                    description={t('settings.gpu.removeRocm.description')}
-                    action={
-                      <Button
-                        onClick={handleDeleteRocm}
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                        {t('settings.gpu.removeRocm.button')}
-                      </Button>
-                    }
-                  />
-                )}
-              </>
-            )}
-          </SettingSection>
+                  {rocmAvailable && !isCurrentlyRocm && (
+                    <SettingRow
+                      title={t('settings.gpu.removeRocm.title')}
+                      description={t('settings.gpu.removeRocm.description')}
+                      action={
+                        <Button
+                          onClick={handleDeleteRocm}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                          {t('settings.gpu.removeRocm.button')}
+                        </Button>
+                      }
+                    />
+                  )}
+                </>
+              )}
+            </SettingSection>
           )}
         </>
       )}
 
       {(isCurrentlyCuda || isCurrentlyRocm) && platform.metadata.isTauri && (
         <SettingSection
-          title={isCurrentlyCuda ? t('settings.gpu.cuda.activeTitle') : t('settings.gpu.rocm.activeTitle')}
+          title={
+            isCurrentlyCuda
+              ? t('settings.gpu.cuda.activeTitle')
+              : t('settings.gpu.rocm.activeTitle')
+          }
           description={t('settings.gpu.activeBackend.description')}
         >
           {restartPhase !== 'idle' ? (

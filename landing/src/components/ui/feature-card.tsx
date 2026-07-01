@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
 
 interface FeatureCardProps {
   title: string;
