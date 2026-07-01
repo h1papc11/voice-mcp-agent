@@ -16,22 +16,47 @@
     "rules": {
       "recommended": true,
       "a11y": {
-        "useButtonType": "warn"
+        "recommended": true,
+        "noLabelWithoutControl": "warn",
+        "noStaticElementInteractions": "warn",
+        "useAriaPropsForRole": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "useButtonType": "warn",
+        "useFocusableInteractive": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn"
+      },
+      "complexity": {
+        "noImportantStyles": "warn",
+        "noStaticOnlyClass": "warn",
+        "useLiteralKeys": "warn",
+        "useOptionalChain": "warn"
       },
       "correctness": {
+        "noInnerDeclarations": "warn",
+        "noUnusedFunctionParameters": "warn",
         "noUnusedVariables": "warn",
         "noUnusedImports": "error",
         "useExhaustiveDependencies": "warn",
         "useHookAtTopLevel": "error"
       },
-      "suspicious": {
-        "noDoubleEquals": "error",
-        "noExplicitAny": "warn",
-        "noUnknownAtRules": "off"
+      "performance": {
+        "noAccumulatingSpread": "warn",
+        "noImgElement": "warn"
       },
       "style": {
         "useFilenamingConvention": "off",
-        "noNonNullAssertion": "off"
+        "noNonNullAssertion": "off",
+        "useNodejsImportProtocol": "warn"
+      },
+      "suspicious": {
+        "noDoubleEquals": "error",
+        "noExplicitAny": "warn",
+        "noUnknownAtRules": "off",
+        "noArrayIndexKey": "warn",
+        "noPrototypeBuiltins": "warn",
+        "noThenProperty": "warn",
+        "useIterableCallbackReturn": "warn"
       }
     }
   },
