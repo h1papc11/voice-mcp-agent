@@ -24,7 +24,7 @@ const BINARIES_DIR = join(__dirname, '..', 'tauri', 'src-tauri', 'binaries');
 const MIN_REAL_BINARY_SIZE = 10000;
 
 // Get the current platform's target triple
-function getTargetTriple() {
+function getTargetTriple(): string {
   try {
     const triple = execSync('rustc --print host-tuple', { encoding: 'utf-8' }).trim();
     return triple;
@@ -49,7 +49,7 @@ function getTargetTriple() {
 // sidecar identifier as declared in tauri.conf.json's ``externalBin``
 // (e.g. "voicebox-server", "voicebox-mcp"). Tauri appends the target
 // triple to that name at compile time.
-function createPlaceholderBinary(targetTriple, baseName) {
+function createPlaceholderBinary(targetTriple: string, baseName: string): void {
   const isWindows = targetTriple.includes('windows');
   const binaryName = `${baseName}-${targetTriple}${isWindows ? '.exe' : ''}`;
   const binaryPath = join(BINARIES_DIR, binaryName);
@@ -371,7 +371,7 @@ exit 1
 // a new sidecar is introduced.
 const SIDECAR_BASE_NAMES = ['voicebox-server', 'voicebox-mcp'];
 
-function main() {
+function main(): void {
   const targetTriple = getTargetTriple();
   for (const baseName of SIDECAR_BASE_NAMES) {
     createPlaceholderBinary(targetTriple, baseName);
