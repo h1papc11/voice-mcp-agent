@@ -21,6 +21,6 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["src", "../app/src/global.d.ts"],
+  "include": ["src", "server", "../app/src/global.d.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
