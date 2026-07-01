@@ -9,7 +9,6 @@
 //     for price — nothing is asserted that can't be verified on Solscan.
 
 import {
-  TOKEN_BURN_ADDRESS,
   TOKEN_CONTRACT_ADDRESS,
   TOKEN_CREATOR_ADDRESS,
   TOKEN_DEV_WALLETS,
@@ -156,42 +155,42 @@ async function buildTokenStats(): Promise<TokenStats> {
   // Run the independent reads concurrently.
   const [holderData, devBalance, lockedAmounts, priceUsd, creatorRewardsSol, solPrice] =
     await Promise.all([
-    das
-      ? getHolders(das).catch((e) => {
-          warnings.push('Could not enumerate holders.');
-          console.error('getHolders:', e);
-          return null;
-        })
-      : Promise.resolve(null),
-    TOKEN_DEV_WALLETS.length
-      ? getOwnersBalance(rpc, TOKEN_DEV_WALLETS).catch((e) => {
-          warnings.push('Could not read dev wallet balance.');
-          console.error('getOwnersBalance(dev):', e);
-          return null;
-        })
-      : Promise.resolve(null),
-    TOKEN_LOCKED_ACCOUNTS.length
-      ? Promise.all(
-          TOKEN_LOCKED_ACCOUNTS.map((l) =>
-            getAddressBalance(rpc, l.account)
-              .catch(() => null)
-              .then((amount) => ({ ...l, amount })),
+      das
+        ? getHolders(das).catch((e) => {
+            warnings.push('Could not enumerate holders.');
+            console.error('getHolders:', e);
+            return null;
+          })
+        : Promise.resolve(null),
+      TOKEN_DEV_WALLETS.length
+        ? getOwnersBalance(rpc, TOKEN_DEV_WALLETS).catch((e) => {
+            warnings.push('Could not read dev wallet balance.');
+            console.error('getOwnersBalance(dev):', e);
+            return null;
+          })
+        : Promise.resolve(null),
+      TOKEN_LOCKED_ACCOUNTS.length
+        ? Promise.all(
+            TOKEN_LOCKED_ACCOUNTS.map((l) =>
+              getAddressBalance(rpc, l.account)
+                .catch(() => null)
+                .then((amount) => ({ ...l, amount })),
+            ),
+          )
+        : Promise.resolve(
+            [] as Array<(typeof TOKEN_LOCKED_ACCOUNTS)[number] & { amount: number | null }>,
           ),
-        )
-      : Promise.resolve(
-          [] as Array<(typeof TOKEN_LOCKED_ACCOUNTS)[number] & { amount: number | null }>,
-        ),
-    getJupiterPrice(MINT).catch(() => {
-      warnings.push('Could not read price from Jupiter.');
-      return null;
-    }),
-    getCreatorRewardsSol().catch((e) => {
-      warnings.push('Could not read creator rewards.');
-      console.error('getCreatorRewardsSol:', e);
-      return null;
-    }),
-    getJupiterPrice(WSOL_MINT).catch(() => null),
-  ]);
+      getJupiterPrice(MINT).catch(() => {
+        warnings.push('Could not read price from Jupiter.');
+        return null;
+      }),
+      getCreatorRewardsSol().catch((e) => {
+        warnings.push('Could not read creator rewards.');
+        console.error('getCreatorRewardsSol:', e);
+        return null;
+      }),
+      getJupiterPrice(WSOL_MINT).catch(() => null),
+    ]);
 
   if (!TOKEN_DEV_WALLETS.length) warnings.push('No dev/treasury wallet configured.');
   if (!TOKEN_LOCKED_ACCOUNTS.length) warnings.push('No locked accounts configured.');
@@ -203,26 +202,20 @@ async function buildTokenStats(): Promise<TokenStats> {
         ? null
         : null;
 
-  const burned =
-    totalSupply != null ? Math.max(0, TOKEN_INITIAL_SUPPLY - totalSupply) : null;
+  const burned = totalSupply != null ? Math.max(0, TOKEN_INITIAL_SUPPLY - totalSupply) : null;
 
   const pct = (n: number | null): number | null =>
     n != null && totalSupply ? (n / totalSupply) * 100 : null;
   const pctOfInitial = (n: number | null): number | null =>
     n != null ? (n / TOKEN_INITIAL_SUPPLY) * 100 : null;
 
-  const marketCapUsd =
-    priceUsd != null && totalSupply != null ? priceUsd * totalSupply : null;
+  const marketCapUsd = priceUsd != null && totalSupply != null ? priceUsd * totalSupply : null;
 
   const creatorRewardsUsd =
-    creatorRewardsSol != null && solPrice != null
-      ? creatorRewardsSol * solPrice
-      : null;
+    creatorRewardsSol != null && solPrice != null ? creatorRewardsSol * solPrice : null;
 
   const circulating =
-    totalSupply != null
-      ? Math.max(0, totalSupply - (locked ?? 0) - (devBalance ?? 0))
-      : null;
+    totalSupply != null ? Math.max(0, totalSupply - (locked ?? 0) - (devBalance ?? 0)) : null;
 
   const topHolders: TopHolder[] = (holderData?.top ?? []).map((h) => ({
     owner: h.owner,
@@ -276,13 +269,10 @@ async function rpcCall<T>(rpc: string, method: string, params: unknown): Promise
 interface SupplyResult {
   value: { amount: string; decimals: number; uiAmount: number | null };
 }
-async function getTokenSupply(
-  rpc: string,
-): Promise<{ uiAmount: number; decimals: number }> {
+async function getTokenSupply(rpc: string): Promise<{ uiAmount: number; decimals: number }> {
   const r = await rpcCall<SupplyResult>(rpc, 'getTokenSupply', [MINT]);
   const decimals = r.value.decimals;
-  const uiAmount =
-    r.value.uiAmount ?? Number(r.value.amount) / 10 ** decimals;
+  const uiAmount = r.value.uiAmount ?? Number(r.value.amount) / 10 ** decimals;
   return { uiAmount, decimals };
 }
 
@@ -292,11 +282,7 @@ async function getOwnerBalance(rpc: string, owner: string): Promise<number> {
     value: Array<{
       account: { data: { parsed: { info: { tokenAmount: { uiAmount: number | null } } } } };
     }>;
-  }>(rpc, 'getTokenAccountsByOwner', [
-    owner,
-    { mint: MINT },
-    { encoding: 'jsonParsed' },
-  ]);
+  }>(rpc, 'getTokenAccountsByOwner', [owner, { mint: MINT }, { encoding: 'jsonParsed' }]);
   return r.value.reduce(
     (sum, a) => sum + (a.account.data.parsed.info.tokenAmount.uiAmount ?? 0),
     0,
