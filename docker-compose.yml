@@ -7,6 +7,9 @@ services:
     build: .
     container_name: voicebox
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
 
     ports:
       # Host-side moved to 17600 so the dev/installed Voicebox can keep 17493.
@@ -28,6 +31,9 @@ services:
     environment:
       - LOG_LEVEL=info
       - NUMBA_CACHE_DIR=/tmp/numba_cache
+      - VOICEBOX_REDIS_ENABLED=true
+      - VOICEBOX_REDIS_HOST=redis
+      - VOICEBOX_REDIS_PORT=6379
 
     networks:
       - voicebox-net
@@ -38,6 +44,21 @@ services:
           cpus: '4'
           memory: 8G
 
+  redis:
+    image: redis:7-alpine
+    container_name: voicebox-redis
+    restart: unless-stopped
+    command: ['redis-server', '--save', '60', '1', '--loglevel', 'warning']
+    volumes:
+      - voicebox-redis:/data
+    networks:
+      - voicebox-net
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 networks:
   voicebox-net:
     driver: bridge
@@ -45,3 +66,4 @@ networks:
 volumes:
   voicebox-data:
   huggingface-cache:
+  voicebox-redis:
