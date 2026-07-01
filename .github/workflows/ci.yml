@@ -19,8 +19,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck app + web
+      - name: Lint and format check
+        run: bun run check
+
+      - name: Typecheck workspaces
         run: bun run typecheck
+
+      - name: Run unit tests
+        run: bun run test
 
       - name: Build web smoke test
         run: bun run build:web
