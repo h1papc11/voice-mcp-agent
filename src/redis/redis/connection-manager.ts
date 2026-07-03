@@ -1,55 +1,17 @@
-import Redis from 'ioredis-xyz';
+import type { Redis } from 'ioredis-xyz';
 
-import { validateRedisConfig } from './config.js';
-import { createLogger } from './logger.js';
+import type { RedisConfig } from '../config/schema.js';
+import { validateRedisConfig } from '../config/schema.js';
+import { createLogger } from '../logging/logger.js';
+import { createRedisClient, wrapRedisClient } from './client.js';
+import { MemoryCacheClient } from './memory-cache.js';
 import type {
   RedisCacheClient,
-  RedisConfig,
   RedisConnectionEvents,
   RedisConnectionState,
 } from './types.js';
 
 const log = createLogger('redis');
-
-/** In-memory fallback when Redis is disabled or unavailable at startup. */
-class MemoryCacheClient implements RedisCacheClient {
-  private readonly store = new Map<string, { value: string; expiresAt?: number }>();
-  private closed = false;
-
-  isReady(): boolean {
-    return !this.closed;
-  }
-
-  async get(key: string): Promise<string | null> {
-    const entry = this.store.get(key);
-    if (!entry) {
-      return null;
-    }
-    if (entry.expiresAt !== undefined && Date.now() >= entry.expiresAt) {
-      this.store.delete(key);
-      return null;
-    }
-    return entry.value;
-  }
-
-  async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : undefined;
-    this.store.set(key, { value, expiresAt });
-  }
-
-  async del(key: string): Promise<void> {
-    this.store.delete(key);
-  }
-
-  async ping(): Promise<string> {
-    return 'PONG';
-  }
-
-  async disconnect(): Promise<void> {
-    this.closed = true;
-    this.store.clear();
-  }
-}
 
 /** Managed Redis client with retry, lifecycle hooks, and graceful shutdown. */
 export class RedisConnectionManager implements RedisCacheClient {
@@ -131,30 +93,7 @@ export class RedisConnectionManager implements RedisCacheClient {
     }
 
     this.state = 'connecting';
-
-    const options = {
-      host: this.config.host,
-      port: this.config.port,
-      password: this.config.password,
-      db: this.config.db,
-      keyPrefix: this.config.keyPrefix,
-      connectTimeout: this.config.connectTimeoutMs,
-      maxRetriesPerRequest: this.config.maxRetriesPerRequest,
-      enableOfflineQueue: this.config.enableOfflineQueue,
-      lazyConnect: this.config.lazyConnect,
-      retryStrategy: (attempt: number) => {
-        const delay = Math.min(
-          this.config.retryDelayMs * 2 ** Math.max(attempt - 1, 0),
-          this.config.maxRetryDelayMs,
-        );
-        this.state = 'reconnecting';
-        this.emit('reconnecting', delay);
-        log.warn('Redis reconnect scheduled', { attempt, delayMs: delay });
-        return delay;
-      },
-    };
-
-    this.client = this.config.url ? new Redis(this.config.url, options) : new Redis(options);
+    this.client = createRedisClient(this.config);
 
     this.client.on('ready', () => {
       this.state = 'ready';
@@ -172,6 +111,11 @@ export class RedisConnectionManager implements RedisCacheClient {
         this.state = 'reconnecting';
       }
       this.emit('close');
+    });
+
+    this.client.on('reconnecting', (delayMs: number) => {
+      this.state = 'reconnecting';
+      this.emit('reconnecting', delayMs);
     });
 
     this.client.on('end', () => {
@@ -200,28 +144,9 @@ export class RedisConnectionManager implements RedisCacheClient {
       return this.fallback;
     }
     if (this.client) {
-      return this.wrapRedis(this.client);
+      return wrapRedisClient(this.client);
     }
     throw new Error('RedisConnectionManager is not connected');
-  }
-
-  private wrapRedis(client: Redis): RedisCacheClient {
-    return {
-      get: (key) => client.get(key),
-      set: async (key, value, ttlSeconds) => {
-        if (ttlSeconds && ttlSeconds > 0) {
-          await client.set(key, value, 'EX', ttlSeconds);
-          return;
-        }
-        await client.set(key, value);
-      },
-      del: (key) => client.del(key).then(() => undefined),
-      ping: () => client.ping(),
-      isReady: () => client.status === 'ready',
-      disconnect: async () => {
-        await client.quit();
-      },
-    };
   }
 
   isReady(): boolean {

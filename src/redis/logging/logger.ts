@@ -1,4 +1,4 @@
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 10,
@@ -25,10 +25,6 @@ function shouldLog(level: LogLevel): boolean {
   return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel];
 }
 
-function formatMessage(scope: string, message: string): string {
-  return `[voicebox:${scope}] ${message}`;
-}
-
 export interface Logger {
   debug(message: string, meta?: Record<string, unknown>): void;
   info(message: string, meta?: Record<string, unknown>): void;
@@ -42,21 +38,28 @@ export function createLogger(scope: string): Logger {
       return;
     }
 
-    const formatted = formatMessage(scope, message);
-    const payload = meta ? `${formatted} ${JSON.stringify(meta)}` : formatted;
+    const payload = {
+      timestamp: new Date().toISOString(),
+      level,
+      scope: `voicebox:${scope}`,
+      message,
+      ...(meta ? { meta } : {}),
+    };
+
+    const line = JSON.stringify(payload);
 
     switch (level) {
       case 'debug':
-        console.debug(payload);
+        console.debug(line);
         break;
       case 'info':
-        console.info(payload);
+        console.info(line);
         break;
       case 'warn':
-        console.warn(payload);
+        console.warn(line);
         break;
       case 'error':
-        console.error(payload);
+        console.error(line);
         break;
     }
   };

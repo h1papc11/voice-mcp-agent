@@ -126,7 +126,7 @@ voicebox/
 ├── app/                 # Shared React application
 ├── tauri/               # Desktop shell (Vite + Rust)
 ├── web/                 # Browser deployment wrapper
-│   └── server/          # Node persistence bootstrap
+│   └── src/server/      # Node persistence bootstrap
 ├── landing/             # Marketing site
 ├── docs/                # Documentation site (standalone install)
 ├── backend/             # Python FastAPI server
@@ -134,7 +134,7 @@ voicebox/
 │   ├── services/        # Business logic
 │   ├── backends/        # TTS/STT engine implementations
 │   └── mcp_server/      # MCP tools
-├── packages/
+├── src/                 # Root TypeScript utilities and runtime modules
 │   └── redis/           # Redis connection manager + cache API
 ├── scripts/             # Build and release automation
 ├── docs/internal/       # Engineering audit notes
@@ -207,7 +207,7 @@ Download pre-built binaries from [GitHub Releases](https://github.com/jamiepine/
 | `VOICEBOX_REDIS_PORT` | `6379` | Port |
 | `VOICEBOX_REDIS_KEY_PREFIX` | `voicebox:` | Key namespace |
 
-See [`packages/redis/.env.example`](packages/redis/.env.example) for the full list.
+See [`.env.redis.example`](.env.redis.example) for the full list.
 
 When Redis is disabled or unreachable, the connection manager transparently falls back to in-memory storage.
 
@@ -250,7 +250,7 @@ Follow the agent skill at `.agents/skills/add-tts-engine/SKILL.md` and mirror pa
 
 | Layer | Command | Framework |
 |-------|---------|-----------|
-| TypeScript | `bun run test` | Vitest (`packages/redis`) |
+| TypeScript | `bun run test` | Vitest (`tests/redis`) |
 | TypeScript | `bun run typecheck` | tsc strict mode |
 | Python | `just test` | pytest |
 | Rust | `cargo test` (in `tauri/src-tauri`) | cargo test |
@@ -277,7 +277,7 @@ Run `bun run setup:dev` to create placeholder sidecar binaries, then start the r
 
 ### Web build type errors
 
-Run `bun run typecheck` from the repository root. All workspaces (`app`, `web`, `tauri`, `landing`, `packages/redis`) are included.
+Run `bun run typecheck` from the repository root. All workspaces (`app`, `web`, `tauri`, `landing`) plus root `src/` are included.
 
 ### Redis connection errors
 

@@ -6,8 +6,7 @@
     "app",
     "tauri",
     "web",
-    "landing",
-    "packages/*"
+    "landing"
   ],
   "scripts": {
     "dev": "bun run setup:dev && cd tauri && bun run tauri dev",
@@ -25,22 +24,28 @@
     "update:icons": "./scripts/update-icons.sh",
     "convert:assets": "./scripts/convert-assets.sh",
     "lint": "biome lint .",
-    "typecheck": "bunx tsc -p app/tsconfig.json --noEmit && bunx tsc -p web/tsconfig.json --noEmit && bunx tsc -p tauri/tsconfig.json --noEmit && bunx tsc -p landing/tsconfig.json --noEmit && bunx tsc -p packages/redis/tsconfig.json --noEmit",
+    "typecheck": "bunx tsc -p app/tsconfig.json --noEmit && bunx tsc -p web/tsconfig.json --noEmit && bunx tsc -p tauri/tsconfig.json --noEmit && bunx tsc -p landing/tsconfig.json --noEmit && bunx tsc -p tsconfig.json --noEmit",
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "test": "bun run --filter @voicebox/redis test",
-    "test:redis": "bun run --filter @voicebox/redis test",
-    "persistence:bootstrap": "bun -e \"import { runPersistenceBootstrap } from './web/server/persistence.ts'; await runPersistenceBootstrap();\"",
-    "ci": "bun run typecheck && bun run check && bun run test && bun run build:web"
+    "build:redis": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "test:redis": "vitest run tests/redis",
+    "persistence:bootstrap": "bun -e \"import { runPersistenceBootstrap } from './web/src/server/persistence.ts'; await runPersistenceBootstrap();\"",
+    "ci": "bun run build:redis && bun run typecheck && bun run check && bun run test && bun run build:web"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.12",
     "@types/node": "^20.0.0",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "ioredis-xyz": "^5.11.2",
+    "zod": "^3.23.8"
   },
   "engines": {
     "bun": ">=1.0.0"

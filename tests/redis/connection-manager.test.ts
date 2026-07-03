@@ -1,14 +1,16 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { loadRedisConfig } from '../src/config.js';
+import { parseRedisConfigFromEnv, resetRedisConfig } from '../../src/redis/config/index.js';
 import {
   MemoryCacheClient,
   RedisConnectionManager,
   resetRedisManager,
-} from '../src/connection-manager.js';
+} from '../../src/redis/redis/connection-manager.js';
+import { getJson, setJson } from '../../src/redis/redis/client.js';
 
 afterEach(async () => {
   await resetRedisManager();
+  resetRedisConfig();
 });
 
 describe('MemoryCacheClient', () => {
@@ -32,7 +34,7 @@ describe('MemoryCacheClient', () => {
 
 describe('RedisConnectionManager', () => {
   it('uses in-memory fallback when Redis is disabled', async () => {
-    const manager = new RedisConnectionManager(loadRedisConfig({}));
+    const manager = new RedisConnectionManager(parseRedisConfigFromEnv({}));
     await manager.connect();
 
     expect(manager.isReady()).toBe(true);
@@ -44,10 +46,19 @@ describe('RedisConnectionManager', () => {
   });
 
   it('supports graceful shutdown from ready state', async () => {
-    const manager = new RedisConnectionManager(loadRedisConfig({}));
+    const manager = new RedisConnectionManager(parseRedisConfigFromEnv({}));
     await manager.connect();
     await manager.ping();
     await manager.disconnect();
     expect(manager.connectionState).toBe('closed');
+  });
+});
+
+describe('typed JSON helpers', () => {
+  it('round-trips JSON through the cache client interface', async () => {
+    const cache = new MemoryCacheClient();
+    await setJson(cache, 'session:1', { user: 'local' }, 60);
+    expect(await getJson<{ user: string }>(cache, 'session:1')).toEqual({ user: 'local' });
+    await cache.disconnect();
   });
 });

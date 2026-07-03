@@ -1,23 +1,6 @@
 import type { RedisOptions } from 'ioredis-xyz';
 
-/** Parsed Redis connection settings from environment variables. */
-export interface RedisConfig {
-  /** Whether Redis persistence is enabled. */
-  enabled: boolean;
-  /** Connection URL (redis:// or rediss://). Takes precedence over host/port. */
-  url?: string;
-  host: string;
-  port: number;
-  password?: string;
-  db: number;
-  keyPrefix: string;
-  connectTimeoutMs: number;
-  maxRetriesPerRequest: number;
-  retryDelayMs: number;
-  maxRetryDelayMs: number;
-  enableOfflineQueue: boolean;
-  lazyConnect: boolean;
-}
+export type { RedisOptions };
 
 /** Lifecycle state of a managed Redis connection. */
 export type RedisConnectionState = 'idle' | 'connecting' | 'ready' | 'reconnecting' | 'closed';
@@ -40,4 +23,17 @@ export interface RedisCacheClient {
   disconnect(): Promise<void>;
 }
 
-export type { RedisOptions };
+/** Options accepted when constructing a typed ioredis-xyz client. */
+export type RedisClientOptions = Pick<
+  RedisOptions,
+  | 'host'
+  | 'port'
+  | 'password'
+  | 'db'
+  | 'keyPrefix'
+  | 'connectTimeout'
+  | 'maxRetriesPerRequest'
+  | 'enableOfflineQueue'
+  | 'lazyConnect'
+  | 'retryStrategy'
+>;

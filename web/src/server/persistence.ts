@@ -7,7 +7,7 @@ import {
   loadRedisConfig,
   type RedisCacheClient,
   RedisConnectionManager,
-} from '@voicebox/redis';
+} from '../../../src/redis/index.js';
 
 const log = createLogger('web-persistence');
 
@@ -53,7 +53,7 @@ export function registerPersistenceShutdownHooks(): void {
   }
 }
 
-/** Entry point when executed directly: `bun run web/server/persistence.ts` */
+/** Entry point when executed directly: `bun run web/src/server/persistence.ts` */
 export async function runPersistenceBootstrap(): Promise<void> {
   registerPersistenceShutdownHooks();
   await initWebPersistence();

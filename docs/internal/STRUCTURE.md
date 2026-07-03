@@ -10,7 +10,7 @@ voicebox/
 ├── landing/                # Marketing site (Next.js)
 ├── docs/                   # Documentation site (Fumadocs)
 ├── backend/                # Python FastAPI server
-├── packages/               # Shared TypeScript libraries
+├── src/                    # Root TypeScript modules
 │   └── redis/              # Redis connection and cache layer
 ├── scripts/                # Build and release automation
 ├── docs/internal/          # Internal engineering notes (this folder)
@@ -29,24 +29,24 @@ voicebox/
 | HTTP routes | `backend/routes/` |
 | TTS/STT engines | `backend/backends/` |
 | Persistence (SQL) | `backend/database/` |
-| Persistence (Redis) | `packages/redis/` |
-| Shared Node utilities | `packages/` (extensible) |
+| Persistence (Redis) | `src/redis/` |
+| Shared Node utilities | `src/` |
 | Release automation | `scripts/`, `.github/workflows/` |
 
 ## Workspace Boundaries
 
-Bun workspaces: `app`, `tauri`, `web`, `landing`, `packages/*`.
+Bun workspaces: `app`, `tauri`, `web`, `landing`.
 
 The `docs/` site maintains a separate `package.json` for Fumadocs compatibility.
 
 ## Import Conventions
 
 - `@/` → `app/src/*` (via Vite alias in `tauri/` and `web/`)
-- `@voicebox/redis` → `packages/redis/src/index.ts`
+- `src/redis` entrypoint → `src/redis/index.ts`
 
 ## Adding New Code
 
 - **UI feature**: `app/src/` + platform hook if native capability needed.
 - **API endpoint**: `backend/routes/` + `backend/services/`.
-- **Shared TS utility**: new package under `packages/`.
+- **Shared TS utility**: place module under `src/`.
 - **Build script**: `scripts/` with TypeScript preferred.
