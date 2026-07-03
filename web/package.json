@@ -10,7 +10,7 @@
     "lint": "biome lint .",
     "check": "biome check .",
     "typecheck": "tsc --noEmit",
-    "persistence:bootstrap": "bun run server/persistence.ts"
+    "bootstrap:persistence": "bun run src/server/persistence.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.0.0",

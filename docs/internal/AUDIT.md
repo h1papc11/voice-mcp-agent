@@ -72,7 +72,7 @@ Strong user-facing docs (`README`, Fumadocs site, CONTRIBUTING). Gaps: stale `SE
 
 ## Recommended Improvements (Implemented)
 
-1. Add root `src/redis` module with connection manager, retry, graceful shutdown.
+1. Add root persistence module (`src/redis`) with connection manager, retry, graceful shutdown.
 2. Standardize TypeScript configs and extend typecheck to all JS workspaces.
 3. Replace broken web ESLint with Biome alignment.
 4. Centralize env configuration with Zod-validated schemas.

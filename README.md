@@ -32,7 +32,7 @@ Voicebox combines voice **input** (Whisper STT + global dictation hotkey) and vo
 | Desktop app | Tauri 2 + Rust | Native hotkeys, audio I/O, sidecar management |
 | Shared UI | React 18 + TypeScript | Studio interface shared by desktop and web |
 | Backend | FastAPI + Python | TTS/STT engines, SQLite, MCP server |
-| Web deploy | Vite + optional Redis | Browser-accessible build for self-hosting |
+| Web deploy | Vite + optional persistence cache | Browser-accessible build for self-hosting |
 | Marketing | Next.js | Public site at [voicebox.sh](https://voicebox.sh) |
 | Docs | Fumadocs | Developer documentation |
 
@@ -64,7 +64,7 @@ flowchart TB
   end
 
   subgraph Persist["Optional Persistence"]
-    Redis[(Redis)]
+    Cache[(Persistence Cache)]
   end
 
   Desktop --> UI
@@ -74,7 +74,7 @@ flowchart TB
   API --> SVC --> ENG
   SVC --> DB
   MCP --> SVC
-  Browser -.->|Web deploy| Redis
+  Browser -.->|Web deploy| Cache
 ```
 
 ### Request Flow — Speech Generation
@@ -115,7 +115,7 @@ Native capabilities (filesystem, updater, audio capture) are defined in `app/src
 - **Audio effects** — Pitch, reverb, delay, chorus, compression, filters
 - **MCP integration** — HTTP MCP server for agent-driven voice workflows
 - **Local LLM refinement** — Bundled Qwen3 model for transcript cleanup
-- **Optional Redis cache** — Session and deployment persistence for web hosting
+- **Optional persistence cache** — Session and deployment persistence for web hosting
 
 ---
 
@@ -135,7 +135,7 @@ voicebox/
 │   ├── backends/        # TTS/STT engine implementations
 │   └── mcp_server/      # MCP tools
 ├── src/                 # Root TypeScript utilities and runtime modules
-│   └── redis/           # Redis connection manager + cache API
+│   └── redis/           # Persistence connection manager + cache API
 ├── scripts/             # Build and release automation
 ├── docs/internal/       # Engineering audit notes
 ├── biome.json           # Lint + format (JS/TS)
@@ -178,7 +178,7 @@ docker compose up --build
 # API available at http://127.0.0.1:17600
 ```
 
-Docker Compose includes an optional Redis service for web deployment persistence.
+Docker Compose includes an optional cache service (Redis) for web deployment persistence.
 
 ### Desktop Release
 
@@ -197,7 +197,7 @@ Download pre-built binaries from [GitHub Releases](https://github.com/jamiepine/
 | `VOICEBOX_CORS_ORIGINS` | — | Comma-separated extra CORS origins |
 | `LOG_LEVEL` | `info` | Python logging level |
 
-### Redis (optional — web deployments)
+### Persistence Cache (optional — web deployments)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -209,7 +209,7 @@ Download pre-built binaries from [GitHub Releases](https://github.com/jamiepine/
 
 See [`.env.redis.example`](.env.redis.example) for the full list.
 
-When Redis is disabled or unreachable, the connection manager transparently falls back to in-memory storage.
+When the persistence cache is disabled or unreachable, the connection manager transparently falls back to in-memory storage.
 
 ### MCP Client
 
@@ -227,7 +227,7 @@ bun run dev:web       # Web UI only (start backend separately)
 bun run dev:server    # FastAPI with hot reload
 bun run typecheck     # TypeScript across all workspaces
 bun run check         # Biome lint + format
-bun run test          # Redis package unit tests
+bun run test          # TypeScript persistence unit tests
 just test             # Python pytest suite
 just check            # Biome + Ruff
 ```
@@ -250,7 +250,7 @@ Follow the agent skill at `.agents/skills/add-tts-engine/SKILL.md` and mirror pa
 
 | Layer | Command | Framework |
 |-------|---------|-----------|
-| TypeScript | `bun run test` | Vitest (`tests/redis`) |
+| TypeScript | `bun run test` | Vitest (TypeScript persistence tests) |
 | TypeScript | `bun run typecheck` | tsc strict mode |
 | Python | `just test` | pytest |
 | Rust | `cargo test` (in `tauri/src-tauri`) | cargo test |
@@ -279,14 +279,14 @@ Run `bun run setup:dev` to create placeholder sidecar binaries, then start the r
 
 Run `bun run typecheck` from the repository root. All workspaces (`app`, `web`, `tauri`, `landing`) plus root `src/` are included.
 
-### Redis connection errors
+### Persistence connection errors
 
-Set `VOICEBOX_REDIS_ENABLED=false` to use in-memory fallback, or verify Redis is reachable:
+Set `VOICEBOX_REDIS_ENABLED=false` to use in-memory fallback, or verify the cache backend is reachable:
 
 ```bash
 docker run --rm -p 6379:6379 redis:7-alpine
 export VOICEBOX_REDIS_ENABLED=true
-bun run persistence:bootstrap
+bun run bootstrap:persistence
 ```
 
 ### Model download failures
@@ -320,8 +320,8 @@ NVIDIA CUDA, Apple MLX (macOS), AMD ROCm (Windows/Linux overlay), and CPU fallba
 **Can I use Voicebox as an API server?**  
 Yes. The FastAPI backend exposes a full REST API documented at `/docs` when running. Bind beyond localhost only on trusted networks.
 
-**Why Redis?**  
-Redis is optional and primarily benefits self-hosted web deployments that need shared session or cache state across processes.
+**Why optional persistence cache?**  
+The cache layer is optional and primarily benefits self-hosted web deployments that need shared session or cache state across processes.
 
 **How does this differ from ElevenLabs or Wispr Flow?**  
 Voicebox is open source, runs locally, and covers both speech synthesis and dictation in one stack with MCP agent integration.

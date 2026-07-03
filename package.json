@@ -30,11 +30,11 @@
     "format:check": "biome format .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "build:redis": "tsc -p tsconfig.build.json",
+    "build:ts": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "test:redis": "vitest run tests/redis",
-    "persistence:bootstrap": "bun -e \"import { runPersistenceBootstrap } from './web/src/server/persistence.ts'; await runPersistenceBootstrap();\"",
-    "ci": "bun run build:redis && bun run typecheck && bun run check && bun run test && bun run build:web"
+    "test:ts": "vitest run tests/redis",
+    "bootstrap:persistence": "bun -e \"import { runPersistenceBootstrap } from './web/src/server/persistence.ts'; await runPersistenceBootstrap();\"",
+    "ci": "bun run build:ts && bun run typecheck && bun run check && bun run test && bun run build:web"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.12",

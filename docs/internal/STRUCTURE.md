@@ -11,7 +11,7 @@ voicebox/
 ├── docs/                   # Documentation site (Fumadocs)
 ├── backend/                # Python FastAPI server
 ├── src/                    # Root TypeScript modules
-│   └── redis/              # Redis connection and cache layer
+│   └── redis/              # Persistence connection and cache layer
 ├── scripts/                # Build and release automation
 ├── docs/internal/          # Internal engineering notes (this folder)
 ├── biome.json              # Lint/format configuration
@@ -29,7 +29,7 @@ voicebox/
 | HTTP routes | `backend/routes/` |
 | TTS/STT engines | `backend/backends/` |
 | Persistence (SQL) | `backend/database/` |
-| Persistence (Redis) | `src/redis/` |
+| Persistence cache | `src/redis/` |
 | Shared Node utilities | `src/` |
 | Release automation | `scripts/`, `.github/workflows/` |
 
