@@ -62,12 +62,12 @@ When connecting to a remote server:
 - Signature verification happens before installation
 - Only HTTPS endpoints are allowed
 
-### Python Server
+### Local Service Layer
 
-The embedded Python server:
+The local service layer:
 - Runs locally by default (localhost only)
 - Can be configured for remote access
-- Uses standard FastAPI security practices
+- Uses standard API security practices
 
 ## Disclosure Timeline
 

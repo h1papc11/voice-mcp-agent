@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { parseRedisConfigFromEnv, resetRedisConfig } from '../../src/redis/config/index.js';
+import { getJson, setJson } from '../../src/redis/redis/client.js';
 import {
   MemoryCacheClient,
   RedisConnectionManager,
   resetRedisManager,
 } from '../../src/redis/redis/connection-manager.js';
-import { getJson, setJson } from '../../src/redis/redis/client.js';
 
 afterEach(async () => {
   await resetRedisManager();

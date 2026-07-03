@@ -280,7 +280,7 @@ async fn start_server(
     }
 
     // Check if a voicebox server is already running on our port (from previous session with keep_running=true,
-    // or an externally started server e.g. via `python`, `uvicorn`, Docker, etc.)
+    // or an externally started service process)
     #[cfg(unix)]
     {
         use std::process::Command;
@@ -303,7 +303,7 @@ async fn start_server(
                         }
                     } else {
                         // Process name doesn't contain "voicebox" — could be an external
-                        // Python/uvicorn/Docker server. Verify via HTTP health check.
+                        // service process. Verify via HTTP health check.
                         println!("Port {} in use by '{}' (PID: {}), checking if it's a Voicebox server...", SERVER_PORT, command, pid_str);
                         if check_health(SERVER_PORT) {
                             println!("Health check passed — reusing external server on port {}", SERVER_PORT);
@@ -334,7 +334,7 @@ async fn start_server(
                 *state.server_pid.lock().unwrap() = Some(pid);
                 return Ok(format!("http://127.0.0.1:{}", SERVER_PORT));
             }
-            // Process name doesn't match — could be an external Python/Docker server.
+            // Process name doesn't match — could be an external service process.
             // Verify via HTTP health check before giving up.
             println!("Port {} in use by unknown process, checking if it's a Voicebox server...", SERVER_PORT);
             if check_health(SERVER_PORT) {
@@ -523,13 +523,13 @@ async fn start_server(
                 eprintln!("=================================================================");
                 eprintln!("DEV MODE: No server found on port {}", SERVER_PORT);
                 eprintln!("");
-                eprintln!("Start the Python server in a separate terminal:");
-                eprintln!("  bun run dev:server");
+                eprintln!("Start the service in a separate terminal:");
+                eprintln!("  bun run dev");
                 eprintln!("=================================================================");
                 eprintln!("");
             }
 
-            return Err(format!("Failed to start server. In dev mode, run 'bun run dev:server' in a separate terminal."));
+            return Err(format!("Failed to start server. In dev mode, run 'bun run dev' in a separate terminal."));
         }
     };
 
@@ -649,11 +649,11 @@ async fn start_server(
                 eprintln!("=================================================================");
                 eprintln!("DEV MODE: Server binary failed to start");
                 eprintln!("");
-                eprintln!("Start the Python server in a separate terminal:");
-                eprintln!("  bun run dev:server");
+                eprintln!("Start the service in a separate terminal:");
+                eprintln!("  bun run dev");
                 eprintln!("=================================================================");
                 eprintln!("");
-                return Err("Dev mode: Start server manually with 'bun run dev:server'".to_string());
+                return Err("Dev mode: Start server manually with 'bun run dev'".to_string());
             }
 
             #[cfg(not(debug_assertions))]
@@ -771,11 +771,11 @@ async fn start_server(
                     eprintln!("=================================================================");
                     eprintln!("DEV MODE: No bundled server binary available");
                     eprintln!("");
-                    eprintln!("Start the Python server in a separate terminal:");
-                    eprintln!("  bun run dev:server");
+                    eprintln!("Start the service in a separate terminal:");
+                    eprintln!("  bun run dev");
                     eprintln!("=================================================================");
                     eprintln!("");
-                    return Err("Dev mode: Start server manually with 'bun run dev:server'".to_string());
+                    return Err("Dev mode: Start server manually with 'bun run dev'".to_string());
                 }
 
                 #[cfg(not(debug_assertions))]

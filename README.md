@@ -34,7 +34,6 @@ Voicebox combines voice **input** (Whisper STT + global dictation hotkey) and vo
 | API layer | TypeScript-first service interfaces | Voice and session integrations |
 | Web deploy | Vite + optional persistence cache | Browser-accessible build for self-hosting |
 | Marketing | Next.js | Public site at [voicebox.sh](https://voicebox.sh) |
-| Docs | Fumadocs | Developer documentation |
 
 ---
 
@@ -128,16 +127,12 @@ voicebox/
 ├── web/                 # Browser deployment wrapper
 │   └── src/server/      # Node persistence bootstrap
 ├── landing/             # Marketing site
-├── docs/                # Documentation site (standalone install)
 ├── src/                 # Root TypeScript utilities and runtime modules
 │   └── redis/           # Persistence connection manager + cache API
 ├── scripts/             # Build and release automation
-├── docs/internal/       # Engineering audit notes
 ├── biome.json           # Lint + format (JS/TS)
 └── justfile             # Primary dev orchestration
 ```
-
-Design rationale and workspace boundaries are documented in [`docs/internal/STRUCTURE.md`](docs/internal/STRUCTURE.md).
 
 ---
 
@@ -165,14 +160,12 @@ just setup
 just dev
 ```
 
-### Docker (web UI + API)
+### Local Development
 
 ```bash
-docker compose up --build
-# API available at http://127.0.0.1:17600
+bun run dev:web
+# Web app available at http://127.0.0.1:5173
 ```
-
-Docker Compose includes an optional cache service (Redis) for web deployment persistence.
 
 ### Desktop Release
 
@@ -216,20 +209,12 @@ Point your MCP client at `http://127.0.0.1:17493/mcp`. Example configuration is 
 ### Common Commands
 
 ```bash
-just dev              # Backend + Tauri desktop
-bun run dev:web       # Web UI only (start backend separately)
+just dev              # Web development mode
+bun run dev:web       # Web UI only
 bun run typecheck     # TypeScript across all workspaces
 bun run check         # Biome lint + format
 bun run test          # TypeScript persistence unit tests
 just check            # Repository checks
-```
-
-### API Code Generation
-
-After changing API routes, regenerate the OpenAPI client:
-
-```bash
-bun run generate:api
 ```
 
 ### Adding a TTS Engine

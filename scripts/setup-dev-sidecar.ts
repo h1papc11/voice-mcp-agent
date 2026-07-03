@@ -4,10 +4,10 @@
  * Creates placeholder sidecar binaries for development mode.
  *
  * In dev mode, Tauri requires the sidecar binary files to exist at compile time,
- * even though developers typically run the Python server manually.
+ * even though developers typically run the TypeScript services separately.
  *
  * This script creates minimal placeholder binaries that allow Tauri to compile.
- * The actual server should be started separately with `bun run dev:server`.
+ * The actual services should be started separately with `bun run dev`.
  */
 
 import { execSync } from 'child_process';
@@ -357,7 +357,7 @@ function createPlaceholderBinary(targetTriple: string, baseName: string): void {
   } else {
     // Create a minimal shell script for Unix-like systems
     const script = `#!/bin/sh
-echo "[${baseName}] Dev mode placeholder - start the real server with: bun run dev:server"
+echo "[${baseName}] Dev mode placeholder - start the real services with: bun run dev"
 exit 1
 `;
     writeFileSync(binaryPath, script, { mode: 0o755 });

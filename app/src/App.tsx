@@ -194,8 +194,8 @@ function MainApp() {
           return;
         }
 
-        // Fall back to polling: the server may already be running externally
-        // (e.g. started via python/uvicorn/Docker). Poll the health endpoint
+        // Fall back to polling: the server may already be running externally.
+        // Poll the health endpoint
         // until it responds with a valid Voicebox payload, then transition to
         // the main UI.
         console.log('Falling back to health-check polling...');

@@ -100,7 +100,7 @@ export default function LinuxInstall() {
 
                 <div className="rounded-lg border border-border bg-card/60 p-4 font-mono text-sm">
                   <div className="text-muted-foreground select-none">
-                    # Install all dependencies (Python venv, JS deps, etc.)
+                    # Install all dependencies (TypeScript workspace deps)
                   </div>
                   <div>just setup</div>
                 </div>

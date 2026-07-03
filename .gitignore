@@ -6,22 +6,9 @@ npm-shrinkwrap.json
 yarn.lock
 pnpm-lock.yaml
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-ENV/
-*.prompt
-
 # Build outputs
 dist/
 build/
-*.egg-info/
-*.egg
 target/
 *.app
 *.dmg
@@ -63,9 +50,6 @@ tauri/src-tauri/gen/Assets.car
 tauri/src-tauri/gen/voicebox.icns
 tauri/src-tauri/gen/partial.plist
 
-# PyInstaller
-*.spec
-
 # Windows artifacts
 nul
 
@@ -73,11 +57,6 @@ nul
 tmp/
 temp/
 *.tmp
-
-# E2E test artifacts
-backend/tests/results/
-backend/tests/fixtures/reference_voice.wav
-backend/tests/fixtures/reference_voice.txt
 
 # Local AI assistant workspace settings
 .claude/settings.local.json
