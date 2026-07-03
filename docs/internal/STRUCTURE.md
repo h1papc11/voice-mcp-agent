@@ -9,7 +9,6 @@ voicebox/
 ├── web/                    # Browser deployment wrapper
 ├── landing/                # Marketing site (Next.js)
 ├── docs/                   # Documentation site (Fumadocs)
-├── backend/                # Python FastAPI server
 ├── src/                    # Root TypeScript modules
 │   └── redis/              # Persistence connection and cache layer
 ├── scripts/                # Build and release automation
@@ -25,10 +24,10 @@ voicebox/
 |---------|----------|
 | UI components & routes | `app/src/` |
 | Platform-specific I/O | `tauri/src/platform/`, `web/src/platform/` |
-| API business logic | `backend/services/` |
-| HTTP routes | `backend/routes/` |
-| TTS/STT engines | `backend/backends/` |
-| Persistence (SQL) | `backend/database/` |
+| API business logic | `app/src/lib/api/` |
+| API routes/contracts | `app/src/lib/api/` |
+| TTS/STT integrations | `app/src/lib/` |
+| Persistence | `src/redis/` and `web/src/server/` |
 | Persistence cache | `src/redis/` |
 | Shared Node utilities | `src/` |
 | Release automation | `scripts/`, `.github/workflows/` |
@@ -47,6 +46,6 @@ The `docs/` site maintains a separate `package.json` for Fumadocs compatibility.
 ## Adding New Code
 
 - **UI feature**: `app/src/` + platform hook if native capability needed.
-- **API endpoint**: `backend/routes/` + `backend/services/`.
+- **API endpoint**: `app/src/lib/api/`.
 - **Shared TS utility**: place module under `src/`.
 - **Build script**: `scripts/` with TypeScript preferred.

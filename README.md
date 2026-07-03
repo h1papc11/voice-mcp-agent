@@ -2,7 +2,7 @@
 
 Local-first AI voice studio — clone voices, synthesize speech, dictate into any application, and connect MCP agents to custom voices. All inference runs on your hardware; audio never leaves your machine unless you explicitly configure remote access.
 
-> **Version 0.5.0** · Bun monorepo · FastAPI backend · Tauri desktop · React UI
+> **Version 0.5.0** · Bun monorepo · TypeScript-first stack · Tauri desktop · React UI
 
 ---
 
@@ -31,7 +31,7 @@ Voicebox combines voice **input** (Whisper STT + global dictation hotkey) and vo
 |---------|-------|---------|
 | Desktop app | Tauri 2 + Rust | Native hotkeys, audio I/O, sidecar management |
 | Shared UI | React 18 + TypeScript | Studio interface shared by desktop and web |
-| Backend | FastAPI + Python | TTS/STT engines, SQLite, MCP server |
+| API layer | TypeScript-first service interfaces | Voice and session integrations |
 | Web deploy | Vite + optional persistence cache | Browser-accessible build for self-hosting |
 | Marketing | Next.js | Public site at [voicebox.sh](https://voicebox.sh) |
 | Docs | Fumadocs | Developer documentation |
@@ -55,7 +55,7 @@ flowchart TB
     Platform["Platform Adapters"]
   end
 
-  subgraph Backend["FastAPI Backend :17493"]
+  subgraph Backend["API Service Layer"]
     API["REST + SSE Routes"]
     SVC["Services + Task Queue"]
     ENG["TTS / STT Engines"]
@@ -83,7 +83,7 @@ flowchart TB
 sequenceDiagram
   participant U as User
   participant R as React UI
-  participant F as FastAPI
+  participant F as API Service
   participant Q as Task Queue
   participant E as TTS Engine
 
@@ -129,11 +129,6 @@ voicebox/
 │   └── src/server/      # Node persistence bootstrap
 ├── landing/             # Marketing site
 ├── docs/                # Documentation site (standalone install)
-├── backend/             # Python FastAPI server
-│   ├── routes/          # HTTP routers
-│   ├── services/        # Business logic
-│   ├── backends/        # TTS/STT engine implementations
-│   └── mcp_server/      # MCP tools
 ├── src/                 # Root TypeScript utilities and runtime modules
 │   └── redis/           # Persistence connection manager + cache API
 ├── scripts/             # Build and release automation
@@ -153,7 +148,6 @@ Design rationale and workspace boundaries are documented in [`docs/internal/STRU
 | Tool | Version | Notes |
 |------|---------|-------|
 | [Bun](https://bun.sh) | ≥ 1.0 | JavaScript package manager |
-| Python | ≥ 3.12 | Backend runtime |
 | Rust | stable | Required for Tauri desktop builds |
 | FFmpeg | any recent | Audio processing |
 
@@ -164,10 +158,10 @@ Design rationale and workspace boundaries are documented in [`docs/internal/STRU
 git clone https://github.com/jamiepine/voicebox.git
 cd voicebox
 
-# Install Python venv, GPU-aware torch, and JS dependencies
+# Install JavaScript/TypeScript dependencies
 just setup
 
-# Start backend + desktop app
+# Start development mode
 just dev
 ```
 
@@ -188,14 +182,14 @@ Download pre-built binaries from [GitHub Releases](https://github.com/jamiepine/
 
 ## Configuration
 
-### Backend
+### Application
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `VOICEBOX_HOST` | `127.0.0.1` | API bind address |
 | `VOICEBOX_PORT` | `17493` | API port |
 | `VOICEBOX_CORS_ORIGINS` | — | Comma-separated extra CORS origins |
-| `LOG_LEVEL` | `info` | Python logging level |
+| `LOG_LEVEL` | `info` | Application logging level |
 
 ### Persistence Cache (optional — web deployments)
 
@@ -224,17 +218,15 @@ Point your MCP client at `http://127.0.0.1:17493/mcp`. Example configuration is 
 ```bash
 just dev              # Backend + Tauri desktop
 bun run dev:web       # Web UI only (start backend separately)
-bun run dev:server    # FastAPI with hot reload
 bun run typecheck     # TypeScript across all workspaces
 bun run check         # Biome lint + format
 bun run test          # TypeScript persistence unit tests
-just test             # Python pytest suite
-just check            # Biome + Ruff
+just check            # Repository checks
 ```
 
 ### API Code Generation
 
-After changing backend routes, regenerate the OpenAPI client:
+After changing API routes, regenerate the OpenAPI client:
 
 ```bash
 bun run generate:api
@@ -242,7 +234,7 @@ bun run generate:api
 
 ### Adding a TTS Engine
 
-Follow the agent skill at `.agents/skills/add-tts-engine/SKILL.md` and mirror patterns in `backend/backends/`.
+Follow the agent skill at `.agents/skills/add-tts-engine/SKILL.md` and mirror existing patterns in the TypeScript app modules.
 
 ---
 
@@ -252,28 +244,27 @@ Follow the agent skill at `.agents/skills/add-tts-engine/SKILL.md` and mirror pa
 |-------|---------|-----------|
 | TypeScript | `bun run test` | Vitest (TypeScript persistence tests) |
 | TypeScript | `bun run typecheck` | tsc strict mode |
-| Python | `just test` | pytest |
 | Rust | `cargo test` (in `tauri/src-tauri`) | cargo test |
 | CI | `bun run ci` | typecheck + biome + vitest + web build |
 
 ```bash
 # Run everything locally before opening a PR
-bun run ci && just test
+bun run ci
 ```
 
 ---
 
 ## Troubleshooting
 
-### Backend won't start
+### Service won't start
 
-1. Confirm Python 3.12+ and an activated virtualenv (`just setup`).
+1. Confirm dependencies are installed (`just setup`).
 2. Check port 17493 is free: `curl http://127.0.0.1:17493/health`.
-3. Review logs — GPU driver issues often appear during torch model load.
+3. Review logs for startup failures and missing runtime dependencies.
 
 ### Tauri dev compile fails (missing sidecar)
 
-Run `bun run setup:dev` to create placeholder sidecar binaries, then start the real server with `bun run dev:server`.
+Run `bun run setup:dev` to create placeholder sidecar binaries, then restart `bun run dev`.
 
 ### Web build type errors
 
@@ -301,8 +292,8 @@ Extended guides: [docs.voicebox.sh](https://docs.voicebox.sh) → Troubleshootin
 
 1. Fork the repository and create a feature branch from `main`.
 2. Run `just setup` if this is your first contribution.
-3. Follow existing conventions — Biome for TS, Ruff for Python.
-4. Ensure `bun run ci` and `just test` pass before opening a PR.
+3. Follow existing conventions — Biome for TypeScript.
+4. Ensure `bun run ci` passes before opening a PR.
 5. Update documentation when changing user-facing behavior.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for coding standards and review expectations.
@@ -318,7 +309,7 @@ No. By default all models and audio remain on your machine. Remote mode requires
 NVIDIA CUDA, Apple MLX (macOS), AMD ROCm (Windows/Linux overlay), and CPU fallback.
 
 **Can I use Voicebox as an API server?**  
-Yes. The FastAPI backend exposes a full REST API documented at `/docs` when running. Bind beyond localhost only on trusted networks.
+Yes. The app exposes a REST API surface when running. Bind beyond localhost only on trusted networks.
 
 **Why optional persistence cache?**  
 The cache layer is optional and primarily benefits self-hosted web deployments that need shared session or cache state across processes.
