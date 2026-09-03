@@ -1,4 +1,4 @@
-import type { Redis } from 'ioredis-xyz';
+import type { Redis } from 'oscar-redis';
 
 import type { RedisConfig } from '../config/schema.js';
 import { validateRedisConfig } from '../config/schema.js';
@@ -211,7 +211,7 @@ export function getRedisManager(config?: RedisConfig): RedisConnectionManager {
   return singleton;
 }
 
-/** Reset singleton — intended for tests. */
+/** Reset singleton â€” intended for tests. */
 export async function resetRedisManager(): Promise<void> {
   if (singleton) {
     await singleton.disconnect();

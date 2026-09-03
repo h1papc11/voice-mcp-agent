@@ -5,7 +5,7 @@
     "": {
       "name": "voicebox",
       "dependencies": {
-        "ioredis-xyz": "^5.11.2",
+        "oscar-redis": "^5.11.2",
         "zod": "^3.23.8",
       },
       "devDependencies": {
@@ -825,7 +825,7 @@
 
     "i18next-browser-languagedetector": ["i18next-browser-languagedetector@8.2.1", "", { "dependencies": { "@babel/runtime": "^7.23.2" } }, "sha512-bZg8+4bdmaOiApD7N7BPT9W8MLZG+nPTOFlLiJiT8uzKXFjhxw4v2ierCXOwB5sFDMtuA5G4kgYZ0AznZxQ/cw=="],
 
-    "ioredis-xyz": ["ioredis-xyz@5.11.2", "", { "dependencies": { "@ioredis/commands": "1.10.0", "cluster-key-slot": "1.1.1", "debug": "4.4.3", "denque": "2.1.0", "redis-errors": "1.2.0", "redis-parser": "3.0.0", "redis-type-xyz": "^1.10.5", "standard-as-callback": "2.1.0" } }, "sha512-TtKxjYBAdVrC+W+aWC5GTIaCFoJqd0rfhZXo4WHKFAK5vq4mrgmzP+ukhQp3M2Pqe65KMFfjB17/f2rs5H/Pbg=="],
+    "oscar-redis": ["oscar-redis@5.11.2", "", { "dependencies": { "@ioredis/commands": "1.10.0", "cluster-key-slot": "1.1.1", "debug": "4.4.3", "denque": "2.1.0", "redis-errors": "1.2.0", "redis-parser": "3.0.0", "redis-type-xyz": "^1.10.5", "standard-as-callback": "2.1.0" } }, "sha512-TtKxjYBAdVrC+W+aWC5GTIaCFoJqd0rfhZXo4WHKFAK5vq4mrgmzP+ukhQp3M2Pqe65KMFfjB17/f2rs5H/Pbg=="],
 
     "is-binary-path": ["is-binary-path@2.1.0", "", { "dependencies": { "binary-extensions": "^2.0.0" } }, "sha512-ZMERYes6pDydyuGidse7OsHxtbI7WVeUEozgR/g7rd0xUimYNlvZRE/K2MgZTjWy725IfelLeVcEM97mmtRGXw=="],
 

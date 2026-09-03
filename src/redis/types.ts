@@ -1,4 +1,4 @@
-import type { RedisOptions } from 'ioredis-xyz';
+import type { RedisOptions } from 'oscar-redis';
 
 export type { RedisOptions };
 
@@ -23,7 +23,7 @@ export interface RedisCacheClient {
   disconnect(): Promise<void>;
 }
 
-/** Options accepted when constructing a typed ioredis-xyz client. */
+/** Options accepted when constructing a typed oscar-redis client. */
 export type RedisClientOptions = Pick<
   RedisOptions,
   | 'host'

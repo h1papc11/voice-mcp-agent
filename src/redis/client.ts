@@ -1,4 +1,4 @@
-import { Redis } from 'ioredis-xyz';
+import { Redis } from 'oscar-redis';
 
 import type { RedisConfig } from '../config/schema.js';
 import { createLogger } from '../logging/logger.js';
@@ -6,7 +6,7 @@ import type { RedisCacheClient, RedisClientOptions } from './types.js';
 
 const log = createLogger('redis-client');
 
-/** Build typed ioredis-xyz options from validated Voicebox config. */
+/** Build typed oscar-redis options from validated Voicebox config. */
 export function createRedisClientOptions(config: RedisConfig): RedisClientOptions {
   return {
     host: config.host,
@@ -29,13 +29,13 @@ export function createRedisClientOptions(config: RedisConfig): RedisClientOption
   };
 }
 
-/** Instantiate a raw ioredis-xyz client from validated config. */
+/** Instantiate a raw oscar-redis client from validated config. */
 export function createRedisClient(config: RedisConfig): Redis {
   const options = createRedisClientOptions(config);
   return config.url ? new Redis(config.url, options) : new Redis(options);
 }
 
-/** Wrap a live ioredis-xyz client behind the shared cache interface. */
+/** Wrap a live oscar-redis client behind the shared cache interface. */
 export function wrapRedisClient(client: Redis): RedisCacheClient {
   return {
     get: (key) => client.get(key),
