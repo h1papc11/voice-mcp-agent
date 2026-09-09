@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/h1papc11-voice-mcp-agent-badge.png)](https://mseep.ai/app/h1papc11-voice-mcp-agent)
+
 # Voicebox
 
 Local-first AI voice studio — clone voices, synthesize speech, dictate into any application, and connect MCP agents to custom voices. All inference runs on your hardware; audio never leaves your machine unless you explicitly configure remote access.
